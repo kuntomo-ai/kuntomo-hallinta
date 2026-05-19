@@ -16,7 +16,7 @@ const MAKSUTAVAT_TERAPIA = [
 ]
 const COMPANY_METHODS = ['Yrityslaskutus', 'Yrityskäynti']
 
-const VALMENNUS_PALVELUT = ['Fysiikkavalmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Pienryhmä', 'Muu']
+const VALMENNUS_PALVELUT = ['Jatkuva valmennus', 'Fysiikkavalmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Muu']
 const JASENYYSTYYPIT = ['10x kortti', 'Kuukausikortti', 'Hieronta & Fysioterapia', 'Hieronta & Fysioterapia 100€']
 const MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Eazybreak', 'SmartumPay', 'ePassi']
 
@@ -281,16 +281,82 @@ function TerapiaForm({ onSaved }) {
   )
 }
 
-// ─── Simple form (valmennus / jasen) ─────────────────────────────────────────
+// ─── Valmennus form ───────────────────────────────────────────────────────────
 
-const emptyValmennus = { customer_name: '', service: VALMENNUS_PALVELUT[0], price: '', payment_method: MAKSUTAVAT[0], notes: '' }
+function ValmennusForm({ onSaved }) {
+  const [form, setForm] = useState({ visit_date: TODAY, customer_name: '', service: '', price: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit() {
+    if (!form.customer_name.trim() || !form.service || !form.price) return
+    setSaving(true)
+    await supabase.from('valmennusmyynti').insert({
+      customer_name: form.customer_name.trim(),
+      service: form.service,
+      price: parseFloat(form.price),
+      notes: form.notes.trim() || null,
+    })
+    setSaving(false)
+    setForm({ visit_date: TODAY, customer_name: '', service: '', price: '', notes: '' })
+    onSaved()
+  }
+
+  return (
+    <div className="card" style={{ padding: '1.5rem', alignSelf: 'start' }}>
+      <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', marginBottom: '1.25rem' }}>
+        Uusi valmennuskirjaus
+      </h3>
+      <div className="form-grid">
+        <div className="input-group">
+          <label className="input-label">Päivämäärä</label>
+          <input className="input-field" type="date" value={form.visit_date}
+            onChange={e => setForm(f => ({ ...f, visit_date: e.target.value }))} />
+        </div>
+        <div className="input-group">
+          <label className="input-label">Asiakkaan nimi *</label>
+          <input className="input-field" placeholder="Etunimi Sukunimi" value={form.customer_name}
+            onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} />
+        </div>
+        <div className="input-group">
+          <label className="input-label">Palvelu *</label>
+          <select className="input-field" value={form.service}
+            onChange={e => setForm(f => ({ ...f, service: e.target.value }))}>
+            <option value="">Valitse palvelu</option>
+            {VALMENNUS_PALVELUT.map(p => <option key={p}>{p}</option>)}
+          </select>
+        </div>
+        <div className="input-group">
+          <label className="input-label">Hinta (€) *</label>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', fontSize: '.9rem' }}>€</span>
+            <input className="input-field" type="number" step="0.01" min="0" placeholder="0"
+              style={{ paddingLeft: '2rem' }}
+              value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+          </div>
+        </div>
+        <div className="input-group">
+          <label className="input-label">Lisätiedot</label>
+          <textarea className="input-field" rows={2} placeholder="Vapaamuotoisia muistiinpanoja..."
+            value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            style={{ resize: 'vertical' }} />
+        </div>
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={saving} style={{ width: '100%', marginTop: '.25rem' }}>
+          {saving ? 'Tallennetaan...' : 'Kirjaa myynti'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Simple form (jasen) ──────────────────────────────────────────────────────
+
 const emptyJasen = { customer_name: '', membership_type: JASENYYSTYYPIT[0], price: '', start_date: '', payment_method: MAKSUTAVAT[0], notes: '' }
 
-function SimpleForm({ tab, form, onChange, onSave, saving }) {
+function SimpleForm({ form, onChange, onSave, saving }) {
   return (
     <div className="card" style={{ padding: '1.25rem', alignSelf: 'start' }}>
       <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>
-        Uusi kirjaus
+        Uusi jäsenkirjaus
       </h3>
       <div className="form-grid">
         <div className="input-group">
@@ -298,29 +364,16 @@ function SimpleForm({ tab, form, onChange, onSave, saving }) {
           <input className="input-field" name="customer_name" placeholder="Etunimi Sukunimi" value={form.customer_name} onChange={onChange} />
         </div>
 
-        {tab === 'valmennus' && (
-          <div className="input-group">
-            <label className="input-label">Palvelu</label>
-            <select className="input-field" name="service" value={form.service} onChange={onChange}>
-              {VALMENNUS_PALVELUT.map(p => <option key={p}>{p}</option>)}
-            </select>
-          </div>
-        )}
-
-        {tab === 'jasen' && (
-          <>
-            <div className="input-group">
-              <label className="input-label">Jäsenyystyyppi</label>
-              <select className="input-field" name="membership_type" value={form.membership_type} onChange={onChange}>
-                {JASENYYSTYYPIT.map(j => <option key={j}>{j}</option>)}
-              </select>
-            </div>
-            <div className="input-group">
-              <label className="input-label">Jäsenyys alkaa</label>
-              <input className="input-field" name="start_date" type="date" value={form.start_date} onChange={onChange} />
-            </div>
-          </>
-        )}
+        <div className="input-group">
+          <label className="input-label">Jäsenyystyyppi</label>
+          <select className="input-field" name="membership_type" value={form.membership_type} onChange={onChange}>
+            {JASENYYSTYYPIT.map(j => <option key={j}>{j}</option>)}
+          </select>
+        </div>
+        <div className="input-group">
+          <label className="input-label">Jäsenyys alkaa</label>
+          <input className="input-field" name="start_date" type="date" value={form.start_date} onChange={onChange} />
+        </div>
 
         <div className="input-group">
           <label className="input-label">Hinta (€)</label>
@@ -359,13 +412,12 @@ export default function Sales() {
   const [todayTotal, setTodayTotal] = useState(0)
 
   const TABLE_MAP = { valmennus: 'valmennusmyynti', jasen: 'jasenmyynti' }
-  const EMPTY_MAP = { valmennus: emptyValmennus, jasen: emptyJasen }
 
   useEffect(() => {
     if (tab === 'terapia') {
       fetchTerapia()
     } else {
-      setForm(EMPTY_MAP[tab])
+      if (tab === 'jasen') setForm(emptyJasen)
       setSearch('')
       fetchOther(tab)
     }
@@ -413,13 +465,11 @@ export default function Sales() {
   async function handleSave() {
     if (!form.customer_name.trim() || !form.price) return
     setSaving(true)
-    const t = TABLE_MAP[tab]
     const base = { customer_name: form.customer_name.trim(), price: parseFloat(form.price), payment_method: form.payment_method, notes: form.notes.trim() || null }
-    if (tab === 'valmennus') await supabase.from(t).insert({ ...base, service: form.service })
-    else await supabase.from(t).insert({ ...base, membership_type: form.membership_type, start_date: form.start_date || null })
+    await supabase.from('jasenmyynti').insert({ ...base, membership_type: form.membership_type, start_date: form.start_date || null })
     setSaving(false)
-    setForm(EMPTY_MAP[tab])
-    fetchOther(tab)
+    setForm(emptyJasen)
+    fetchOther('jasen')
   }
 
   async function handleDelete(id) {
@@ -461,10 +511,9 @@ export default function Sales() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.25rem', alignItems: 'start' }}>
 
-        {tab === 'terapia'
-          ? <TerapiaForm onSaved={fetchTerapia} />
-          : <SimpleForm tab={tab} form={form} onChange={handleChange} onSave={handleSave} saving={saving} />
-        }
+        {tab === 'terapia' && <TerapiaForm onSaved={fetchTerapia} />}
+        {tab === 'valmennus' && <ValmennusForm onSaved={() => fetchOther('valmennus')} />}
+        {tab === 'jasen' && <SimpleForm form={form} onChange={handleChange} onSave={handleSave} saving={saving} />}
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.75rem' }}>
