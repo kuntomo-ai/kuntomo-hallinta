@@ -86,17 +86,20 @@ export default function VoiceControl() {
     rec.interimResults = false
     rec.onresult = (e) => {
       const text = e.results[0][0].transcript
+      const lower = text.toLowerCase()
       setTranscript(text)
       const path = location.pathname
-      if (path.includes('terapiamyynti')) {
-        setContext('terapia')
-        setParsed(parseTerapiaFromTranscript(text))
-      } else if (path.includes('valmennusmyynti')) {
-        setContext('valmennus')
-        setParsed(parseValmennusFromTranscript(text))
-      } else if (path.includes('timelog')) {
+      if (path.includes('timelog')) {
         setContext('timelog')
         setParsed(parseTimelogFromTranscript(text))
+      } else if (path.includes('myynti') || path.includes('terapia') || path.includes('valmennus')) {
+        if (lower.includes('valmennus') || lower.includes('harjoitus') || lower.includes('ohjelma')) {
+          setContext('valmennus')
+          setParsed(parseValmennusFromTranscript(text))
+        } else {
+          setContext('terapia')
+          setParsed(parseTerapiaFromTranscript(text))
+        }
       } else {
         setContext('generic')
         setParsed({})
@@ -123,14 +126,14 @@ export default function VoiceControl() {
   function handleOk() {
     setShowResult(false)
     if (context === 'terapia') {
-      if (!location.pathname.includes('terapiamyynti')) navigate('/finance/myynti/terapiamyynti')
-      window.dispatchEvent(new CustomEvent('voice-terapia', { detail: parsed }))
+      if (!location.pathname.includes('myynti')) navigate('/finance/myynti')
+      setTimeout(() => window.dispatchEvent(new CustomEvent('voice-terapia', { detail: parsed })), 100)
     } else if (context === 'valmennus') {
-      if (!location.pathname.includes('valmennusmyynti')) navigate('/finance/myynti/valmennusmyynti')
-      window.dispatchEvent(new CustomEvent('voice-valmennus', { detail: parsed }))
+      if (!location.pathname.includes('myynti')) navigate('/finance/myynti')
+      setTimeout(() => window.dispatchEvent(new CustomEvent('voice-valmennus', { detail: parsed })), 100)
     } else if (context === 'timelog') {
       if (!location.pathname.includes('timelog')) navigate('/timelog')
-      window.dispatchEvent(new CustomEvent('voice-timelog', { detail: parsed }))
+      setTimeout(() => window.dispatchEvent(new CustomEvent('voice-timelog', { detail: parsed })), 100)
     }
   }
 

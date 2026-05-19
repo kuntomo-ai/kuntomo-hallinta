@@ -18,6 +18,17 @@ export default function Timelog() {
 
   useEffect(() => { fetchData() }, [])
 
+  useEffect(() => {
+    function onVoiceTimelog(e) {
+      const name = profile?.full_name || profile?.email || ''
+      setEditing(null)
+      setForm({ ...empty, driver_name: name, ...e.detail })
+      setShowModal(true)
+    }
+    window.addEventListener('voice-timelog', onVoiceTimelog)
+    return () => window.removeEventListener('voice-timelog', onVoiceTimelog)
+  }, [profile])
+
   async function fetchData() {
     setLoading(true)
     const { data } = await supabase.from('drive_logs').select('*').order('created_at', { ascending: false })

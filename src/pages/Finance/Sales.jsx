@@ -130,6 +130,23 @@ export default function Sales() {
     fetchData(tab)
   }, [tab])
 
+  useEffect(() => {
+    function onVoiceTerapia(e) {
+      setTab('terapia')
+      setForm(f => ({ ...emptyTerapia, ...e.detail }))
+    }
+    function onVoiceValmennus(e) {
+      setTab('valmennus')
+      setForm(f => ({ ...emptyValmennus, ...e.detail }))
+    }
+    window.addEventListener('voice-terapia', onVoiceTerapia)
+    window.addEventListener('voice-valmennus', onVoiceValmennus)
+    return () => {
+      window.removeEventListener('voice-terapia', onVoiceTerapia)
+      window.removeEventListener('voice-valmennus', onVoiceValmennus)
+    }
+  }, [])
+
   async function fetchData(activeTab) {
     setLoading(true)
     const table = TABLE_MAP[activeTab]
