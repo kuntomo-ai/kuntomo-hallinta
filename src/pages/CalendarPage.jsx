@@ -195,7 +195,7 @@ function KalenteriTab() {
   )
 }
 
-// ─── Vuosikello (Markkinointikalenteri) ───────────────────────────────────────
+// ─── Markkinointikalenteri (kanban board) ─────────────────────────────────────
 
 const ALUEET = [
   { key: 'kuntosali', label: 'Kuntosali', color: '#7a0251' },
@@ -203,108 +203,15 @@ const ALUEET = [
   { key: 'valmennus', label: 'Valmennus', color: '#0369a1' },
 ]
 
-const emptyMark = { title: '', alue: ALUEET[0].key, month: String(new Date().getMonth() + 1), description: '' }
+const CATEGORY_TYPES = ['Kampanja', 'Lanseeraus', 'Tarjous', 'Tapahtuma', 'Some-sisältö', 'Muu']
+const CATEGORY_COLORS = {
+  'Kampanja': '#7a0251', 'Lanseeraus': '#c2410c', 'Tarjous': '#0369a1',
+  'Tapahtuma': '#059669', 'Some-sisältö': '#7c3aed', 'Muu': '#6b7280',
+}
 
-function Vuosikello({ events, onClickMonth }) {
-  const cx = 200, cy = 200, r = 155
-
-  return (
-    <svg viewBox="0 0 400 400" style={{ width: '100%', maxWidth: 420 }}>
-      {/* Month segments */}
-      {MONTH_SHORT.map((name, i) => {
-        const startAngle = (i * 30 - 90) * Math.PI / 180
-        const endAngle = ((i + 1) * 30 - 90) * Math.PI / 180
-        const midAngle = ((i * 30 + 15) - 90) * Math.PI / 180
-
-        const x1 = cx + r * Math.cos(startAngle)
-        const y1 = cy + r * Math.sin(startAngle)
-        const x2 = cx + r * Math.cos(endAngle)
-        const y2 = cy + r * Math.sin(endAngle)
-
-        const lx = cx + (r - 22) * Math.cos(midAngle)
-        const ly = cy + (r - 22) * Math.sin(midAngle)
-
-        const isCurrentMonth = i === new Date().getMonth()
-
-        return (
-          <g key={i} onClick={() => onClickMonth(i + 1)} style={{ cursor: 'pointer' }}>
-            <path
-              d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`}
-              fill={isCurrentMonth ? '#f5e6f0' : '#f9fafb'}
-              stroke="#e5e7eb"
-              strokeWidth="1"
-            />
-            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
-              style={{ fontSize: 9, fontWeight: isCurrentMonth ? 800 : 600, fill: isCurrentMonth ? '#7a0251' : '#6b7280', fontFamily: 'system-ui' }}>
-              {name}
-            </text>
-          </g>
-        )
-      })}
-
-      {/* Inner rings for each alue */}
-      {ALUEET.map((alue, ai) => {
-        const innerR = 55 + ai * 28
-        const outerR = 55 + ai * 28 + 24
-
-        const monthEvents = {}
-        events.filter(e => e.alue === alue.key).forEach(e => {
-          const m = parseInt(e.month)
-          if (!monthEvents[m]) monthEvents[m] = []
-          monthEvents[m].push(e)
-        })
-
-        return Array.from({ length: 12 }, (_, i) => {
-          const startAngle = (i * 30 - 90) * Math.PI / 180
-          const endAngle = ((i + 1) * 30 - 90) * Math.PI / 180
-          const midAngle = ((i * 30 + 15) - 90) * Math.PI / 180
-
-          const ix1 = cx + innerR * Math.cos(startAngle)
-          const iy1 = cy + innerR * Math.sin(startAngle)
-          const ox1 = cx + outerR * Math.cos(startAngle)
-          const oy1 = cy + outerR * Math.sin(startAngle)
-          const ix2 = cx + innerR * Math.cos(endAngle)
-          const iy2 = cy + innerR * Math.sin(endAngle)
-          const ox2 = cx + outerR * Math.cos(endAngle)
-          const oy2 = cy + outerR * Math.sin(endAngle)
-
-          const hasEvents = (monthEvents[i + 1] || []).length > 0
-          const count = (monthEvents[i + 1] || []).length
-
-          const lx = cx + (innerR + 12) * Math.cos(midAngle)
-          const ly = cy + (innerR + 12) * Math.sin(midAngle)
-
-          return (
-            <g key={`${alue.key}-${i}`} onClick={() => onClickMonth(i + 1, alue.key)} style={{ cursor: 'pointer' }}>
-              <path
-                d={`M ${ix1} ${iy1} L ${ox1} ${oy1} A ${outerR} ${outerR} 0 0 1 ${ox2} ${oy2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 0 0 ${ix1} ${iy1}`}
-                fill={hasEvents ? alue.color : 'transparent'}
-                fillOpacity={hasEvents ? 0.15 + Math.min(count * 0.1, 0.6) : 0}
-                stroke={alue.color}
-                strokeWidth="0.5"
-                strokeOpacity="0.4"
-              />
-              {hasEvents && (
-                <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
-                  style={{ fontSize: 7, fontWeight: 700, fill: alue.color, fontFamily: 'system-ui' }}>
-                  {count}
-                </text>
-              )}
-            </g>
-          )
-        })
-      })}
-
-      {/* Center label */}
-      <circle cx={cx} cy={cy} r={52} fill="white" stroke="#e5e7eb" strokeWidth="1" />
-      <text x={cx} y={cy - 8} textAnchor="middle" style={{ fontSize: 10, fontWeight: 800, fill: '#7a0251', fontFamily: 'system-ui' }}>
-        {new Date().getFullYear()}
-      </text>
-      <text x={cx} y={cy + 6} textAnchor="middle" style={{ fontSize: 7, fill: '#9ca3af', fontFamily: 'system-ui' }}>
-        Vuosikello
-      </text>
-    </svg>
-  )
+const emptyMark = {
+  title: '', alue: ALUEET[0].key, month: String(new Date().getMonth() + 1),
+  description: '', category_type: 'Kampanja', event_date: '',
 }
 
 function MarkkinointiTab() {
@@ -313,8 +220,9 @@ function MarkkinointiTab() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(emptyMark)
   const [saving, setSaving] = useState(false)
-  const [filterMonth, setFilterMonth] = useState(null)
   const [filterAlue, setFilterAlue] = useState(null)
+  const [filterCategory, setFilterCategory] = useState('')
+  const [viewYear, setViewYear] = useState(new Date().getFullYear())
 
   useEffect(() => { fetchData() }, [])
 
@@ -335,6 +243,8 @@ function MarkkinointiTab() {
       alue: form.alue,
       month: parseInt(form.month),
       description: form.description.trim() || null,
+      category_type: form.category_type,
+      event_date: form.event_date || null,
     })
     setSaving(false)
     setShowModal(false)
@@ -348,79 +258,134 @@ function MarkkinointiTab() {
     fetchData()
   }
 
-  function onClickMonth(month, alue) {
-    setFilterMonth(month)
-    setFilterAlue(alue || null)
-  }
-
   const filtered = events.filter(e => {
-    if (filterMonth && e.month !== filterMonth) return false
     if (filterAlue && e.alue !== filterAlue) return false
+    if (filterCategory && e.category_type !== filterCategory) return false
     return true
   })
 
+  const curMonth = new Date().getMonth()
+  const curYear = new Date().getFullYear()
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-        <button className="btn btn-primary" onClick={() => { setForm(emptyMark); setShowModal(true) }}>
+      {/* Header bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setViewYear(y => y - 1)} style={{ padding: '.25rem .4rem' }}><ChevronLeft size={14} /></button>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', minWidth: 52, textAlign: 'center' }}>{viewYear}</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setViewYear(y => y + 1)} style={{ padding: '.25rem .4rem' }}><ChevronRight size={14} /></button>
+        </div>
+        <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => { setForm(emptyMark); setShowModal(true) }}>
           <Plus size={16} /> Uusi tapahtuma
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '440px 1fr', gap: '1.5rem', alignItems: 'start' }}>
-        <div>
-          <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
-            <Vuosikello events={events} onClickMonth={onClickMonth} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem', marginTop: '.75rem' }}>
-              {ALUEET.map(a => (
-                <div key={a.key} style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.75rem' }}>
-                  <div style={{ width: 10, height: 10, borderRadius: 2, background: a.color, flexShrink: 0 }} />
-                  <span style={{ color: 'var(--text2)' }}>{a.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          {(filterMonth || filterAlue) && (
-            <button className="btn btn-ghost btn-sm" style={{ width: '100%' }} onClick={() => { setFilterMonth(null); setFilterAlue(null) }}>
-              Näytä kaikki
+      {/* Filter row */}
+      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        {[null, ...ALUEET.map(a => a.key)].map(key => {
+          const alue = ALUEET.find(a => a.key === key)
+          const label = key === null ? 'Kaikki alueet' : alue?.label
+          const color = alue?.color || 'var(--text3)'
+          const active = filterAlue === key
+          return (
+            <button key={key ?? 'all'} onClick={() => setFilterAlue(key)} style={{
+              padding: '.3rem .75rem', borderRadius: 99, fontSize: '.78rem', fontWeight: 600, cursor: 'pointer',
+              border: `1.5px solid ${active ? (key === null ? 'var(--border)' : color) : 'var(--border)'}`,
+              background: active ? (key === null ? 'var(--bg3)' : `${color}18`) : 'transparent',
+              color: active ? (key === null ? 'var(--text)' : color) : 'var(--text3)',
+              transition: 'all .15s',
+            }}>
+              {label}
             </button>
-          )}
-        </div>
-
-        <div>
-          {(filterMonth || filterAlue) && (
-            <div style={{ marginBottom: '.75rem', fontSize: '.82rem', color: 'var(--text3)' }}>
-              Suodatus: {filterMonth ? MONTH_NAMES[filterMonth - 1] : 'Kaikki kuukaudet'}
-              {filterAlue ? ` · ${ALUEET.find(a => a.key === filterAlue)?.label}` : ''}
-            </div>
-          )}
-
-          {loading ? (
-            <p style={{ color: 'var(--text3)' }}>Ladataan...</p>
-          ) : filtered.length === 0 ? (
-            <p style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ei tapahtumia. Lisää tapahtuma tai klikkaa vuosikelloa suodattaaksesi.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-              {filtered.map(e => {
-                const alue = ALUEET.find(a => a.key === e.alue)
-                return (
-                  <div key={e.id} className="card" style={{ padding: '.75rem 1rem', display: 'flex', alignItems: 'center', gap: '.75rem' }}>
-                    <div style={{ width: 4, alignSelf: 'stretch', borderRadius: 4, background: alue?.color || 'var(--violet)', flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '.85rem' }}>{e.title}</div>
-                      <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.15rem' }}>
-                        {MONTH_NAMES[(e.month || 1) - 1]} · {alue?.label}
-                      </div>
-                      {e.description && <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.15rem' }}>{e.description}</div>}
-                    </div>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(e.id)}><Trash2 size={13} /></button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+          )
+        })}
+        <select className="input-field" style={{ width: 'auto', fontSize: '.8rem', padding: '.3rem .6rem', height: 'auto', marginLeft: 'auto' }}
+          value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+          <option value="">Kaikki kategoriat</option>
+          {CATEGORY_TYPES.map(c => <option key={c}>{c}</option>)}
+        </select>
       </div>
+
+      {/* Kanban board: 4 cols × 3 rows */}
+      {loading ? (
+        <p style={{ color: 'var(--text3)' }}>Ladataan...</p>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '.65rem' }}>
+          {MONTH_NAMES.map((monthName, i) => {
+            const monthNum = i + 1
+            const monthEvts = filtered.filter(e => e.month === monthNum)
+            const isCurrentMonth = (curYear === viewYear && curMonth === i)
+            return (
+              <div key={i} style={{
+                background: isCurrentMonth ? 'var(--violet-subtle)' : 'var(--bg2)',
+                borderRadius: 'var(--radius)',
+                border: isCurrentMonth ? '1.5px solid var(--violet-border)' : '1px solid var(--border)',
+                overflow: 'hidden',
+                minHeight: 100,
+              }}>
+                <div style={{
+                  padding: '.55rem .8rem',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: isCurrentMonth ? 'rgba(122,2,81,.07)' : 'transparent',
+                }}>
+                  <span style={{ fontSize: '.8rem', fontWeight: 700, color: isCurrentMonth ? 'var(--violet)' : 'var(--text2)' }}>
+                    {monthName}
+                  </span>
+                  {monthEvts.length > 0 && (
+                    <span style={{
+                      fontSize: '.65rem', fontWeight: 700, lineHeight: '1.7',
+                      background: isCurrentMonth ? 'var(--violet)' : 'var(--bg3)',
+                      color: isCurrentMonth ? '#fff' : 'var(--text3)',
+                      borderRadius: 99, padding: '0 .45rem',
+                    }}>
+                      {monthEvts.length}
+                    </span>
+                  )}
+                </div>
+                <div style={{ padding: '.45rem', display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                  {monthEvts.map(e => {
+                    const alue = ALUEET.find(a => a.key === e.alue)
+                    const catColor = CATEGORY_COLORS[e.category_type] || '#6b7280'
+                    return (
+                      <div key={e.id} style={{
+                        background: 'var(--bg)',
+                        borderRadius: 6,
+                        padding: '.4rem .55rem',
+                        borderLeft: `3px solid ${alue?.color || 'var(--violet)'}`,
+                        display: 'flex', gap: '.4rem',
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '.78rem', fontWeight: 600, lineHeight: 1.3, marginBottom: '.18rem', wordBreak: 'break-word' }}>
+                            {e.title}
+                          </div>
+                          {e.description && (
+                            <div style={{ fontSize: '.68rem', color: 'var(--text3)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                              {e.description}
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', gap: '.3rem', marginTop: '.22rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {e.category_type && (
+                              <span style={{ fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: catColor, background: `${catColor}18`, borderRadius: 99, padding: '0 .4rem', lineHeight: 1.8 }}>
+                                {e.category_type}
+                              </span>
+                            )}
+                            <span style={{ fontSize: '.6rem', color: alue?.color, fontWeight: 600, opacity: .8 }}>{alue?.label}</span>
+                          </div>
+                        </div>
+                        <button onClick={() => handleDelete(e.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text4)', padding: 0, flexShrink: 0, alignSelf: 'flex-start' }}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {showModal && (
         <Modal title="Uusi markkinointitapahtuma" onClose={() => setShowModal(false)} footer={
@@ -448,6 +413,18 @@ function MarkkinointiTab() {
                 <select className="input-field" name="month" value={form.month} onChange={handleChange}>
                   {MONTH_NAMES.map((m, i) => <option key={i + 1} value={String(i + 1)}>{m}</option>)}
                 </select>
+              </div>
+            </div>
+            <div className="form-grid form-grid-2">
+              <div className="input-group">
+                <label className="input-label">Kategoria</label>
+                <select className="input-field" name="category_type" value={form.category_type} onChange={handleChange}>
+                  {CATEGORY_TYPES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="input-group">
+                <label className="input-label">Päivämäärä (valinnainen)</label>
+                <input className="input-field" name="event_date" type="date" value={form.event_date} onChange={handleChange} />
               </div>
             </div>
             <div className="input-group">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Trash2, Camera } from 'lucide-react'
+import { Search, Trash2, Camera, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
@@ -589,6 +589,7 @@ export default function Sales() {
   const [search, setSearch] = useState('')
   const [todayTotal, setTodayTotal] = useState(0)
   const [period, setPeriod] = useState('kuukausi')
+  const [navDate, setNavDate] = useState(new Date())
   const [filterUser, setFilterUser] = useState('')
   const [users, setUsers] = useState([])
 
@@ -635,6 +636,23 @@ export default function Sales() {
     setLoading(false)
   }
 
+  function movePeriod(dir) {
+    setNavDate(d => {
+      const n = new Date(d)
+      if (period === 'paiva') n.setDate(n.getDate() + dir)
+      else if (period === 'kuukausi') n.setMonth(n.getMonth() + dir)
+      else if (period === 'vuosi') n.setFullYear(n.getFullYear() + dir)
+      return n
+    })
+  }
+
+  function periodLabel() {
+    if (period === 'paiva') return navDate.toLocaleDateString('fi-FI', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+    if (period === 'kuukausi') return navDate.toLocaleDateString('fi-FI', { month: 'long', year: 'numeric' })
+    if (period === 'vuosi') return String(navDate.getFullYear())
+    return 'Kaikki'
+  }
+
   async function handleDelete(id) {
     if (!confirm('Poistetaanko kirjaus?')) return
     const t = tab === 'terapia' ? 'terapiamyynti' : TABLE_MAP[tab]
@@ -642,13 +660,13 @@ export default function Sales() {
     tab === 'terapia' ? fetchTerapia() : fetchOther(tab)
   }
 
+  const navDateStr = navDate.toISOString().slice(0, 10)
   const filtered = rows.filter(r => {
     if (!r.customer_name?.toLowerCase().includes(search.toLowerCase())) return false
     const dateStr = (r.created_at || '').slice(0, 10)
-    const today = new Date().toISOString().slice(0, 10)
-    if (period === 'paiva' && dateStr !== today) return false
-    if (period === 'kuukausi' && dateStr.slice(0, 7) !== today.slice(0, 7)) return false
-    if (period === 'vuosi' && dateStr.slice(0, 4) !== today.slice(0, 4)) return false
+    if (period === 'paiva' && dateStr !== navDateStr) return false
+    if (period === 'kuukausi' && dateStr.slice(0, 7) !== navDateStr.slice(0, 7)) return false
+    if (period === 'vuosi' && dateStr.slice(0, 4) !== navDateStr.slice(0, 4)) return false
     if (filterUser && r.customer_name !== filterUser) return false
     return true
   })
@@ -697,6 +715,13 @@ export default function Sales() {
                 {l}
               </button>
             ))}
+            {period !== 'kaikki' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.2rem' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => movePeriod(-1)} style={{ padding: '.25rem .35rem' }}><ChevronLeft size={14} /></button>
+                <span style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text2)', minWidth: 150, textAlign: 'center' }}>{periodLabel()}</span>
+                <button className="btn btn-ghost btn-sm" onClick={() => movePeriod(1)} style={{ padding: '.25rem .35rem' }}><ChevronRight size={14} /></button>
+              </div>
+            )}
             {isAdmin && users.length > 0 && (
               <select className="input-field" style={{ width: 'auto', fontSize: '.82rem', padding: '.35rem .6rem', height: 'auto' }}
                 value={filterUser} onChange={e => setFilterUser(e.target.value)}>
@@ -755,6 +780,33 @@ export default function Sales() {
               </tbody>
             </table>
           </div>
+
+          {tab === 'terapia' && filtered.length > 0 && (() => {
+            let brutto = 0, tilitettava = 0
+            for (const r of filtered) {
+              const price = r.price || 0
+              brutto += price
+              const pm = (r.payment_method || '').toLowerCase()
+              if (pm.includes('käteinen')) continue
+              let net = price
+              if (pm.includes('lahjakortti')) net *= 0.90
+              else if (pm.includes('hyvinvointietu')) net *= 0.95
+              tilitettava += net
+            }
+            return (
+              <div style={{ marginTop: '.75rem', padding: '.85rem 1.25rem', background: 'var(--violet-subtle)', border: '1px solid var(--violet-border)', borderRadius: 'var(--radius)', display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text3)', marginBottom: '.2rem' }}>Bruttomyynti</div>
+                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--text)' }}>{brutto.toFixed(2)} €</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text3)', marginBottom: '.2rem' }}>Tilitettävä summa</div>
+                  <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--violet)' }}>{tilitettava.toFixed(2)} €</div>
+                  <div style={{ fontSize: '.62rem', color: 'var(--text3)', marginTop: '.15rem' }}>Käteinen ei sisälly · Lahjakortti −10% · Hyvinvointietu −5%</div>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </div>
