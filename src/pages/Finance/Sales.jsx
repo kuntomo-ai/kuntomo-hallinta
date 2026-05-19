@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Search, Trash2, Camera } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
+import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -49,6 +51,7 @@ async function compressImg(file) {
 // ─── Terapia form ─────────────────────────────────────────────────────────────
 
 function TerapiaForm({ onSaved }) {
+  const { profile, user } = useAuth()
   const [products, setProducts] = useState([])
   const [companies, setCompanies] = useState([])
   const [persons, setPersons] = useState([])
@@ -63,6 +66,8 @@ function TerapiaForm({ onSaved }) {
     payment_methods: [],
     splits: {},
     hve_provider: '',
+    muu_details: '',
+    notify_admin: 'ei',
     company_id: '',
     company_person_id: '',
     company_person_name: '',
@@ -87,6 +92,8 @@ function TerapiaForm({ onSaved }) {
         ...f,
         payment_methods: methods,
         hve_provider: methods.includes('Hyvinvointietu') ? f.hve_provider : '',
+        muu_details: methods.includes('Muu') ? f.muu_details : '',
+        notify_admin: methods.includes('Muu') ? f.notify_admin : 'ei',
         company_id: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_id : '',
         company_person_id: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_person_id : '',
         company_person_name: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_person_name : '',
@@ -136,9 +143,11 @@ function TerapiaForm({ onSaved }) {
       }
     }
 
-    const paymentStr = form.payment_methods.map(m =>
-      m === 'Hyvinvointietu' && form.hve_provider ? `Hyvinvointietu (${form.hve_provider})` : m
-    ).join(', ')
+    const paymentStr = form.payment_methods.map(m => {
+      if (m === 'Hyvinvointietu' && form.hve_provider) return `Hyvinvointietu (${form.hve_provider})`
+      if (m === 'Muu' && form.muu_details) return `Muu: ${form.muu_details}`
+      return m
+    }).join(', ')
     const customerName = form.company_person_name || '—'
 
     await supabase.from('terapiamyynti').insert({
@@ -165,9 +174,19 @@ function TerapiaForm({ onSaved }) {
       })
     }
 
+    if (form.notify_admin === 'kylla') {
+      await supabase.from('channel_messages').insert({
+        content: `🔔 Hoitomyynti-ilmoitus: ${form.service} — ${parseFloat(form.price).toFixed(2)} € (${paymentStr})${form.notes ? '. ' + form.notes : ''}`,
+        sender_name: profile?.full_name || profile?.email || 'Järjestelmä',
+        sender_id: user?.id || null,
+        recipient_type: 'role',
+        recipient_role: 'admin',
+      })
+    }
+
     setSaving(false)
     setReceipt(null)
-    setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, hve_provider: '', company_id: '', company_person_id: '', company_person_name: '', notes: '' })
+    setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, hve_provider: '', muu_details: '', notify_admin: 'ei', company_id: '', company_person_id: '', company_person_name: '', notes: '' })
     onSaved()
   }
 
@@ -176,9 +195,19 @@ function TerapiaForm({ onSaved }) {
 
   return (
     <div className="card" style={{ padding: '1.5rem', alignSelf: 'start' }}>
-      <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', marginBottom: '1.25rem' }}>
-        Uusi hoitomyynti
-      </h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', margin: 0 }}>
+          Uusi hoitomyynti
+        </h3>
+        <VoiceMicButton label="Puhekirjaus" onResult={text => {
+          const parsed = parseVoiceTerapia(text, products)
+          setForm(f => ({
+            ...f,
+            ...parsed,
+            payment_methods: parsed.payment_methods || f.payment_methods,
+          }))
+        }} />
+      </div>
 
       <div className="form-grid">
 
@@ -252,6 +281,31 @@ function TerapiaForm({ onSaved }) {
                         {p}
                       </label>
                     ))}
+                  </div>
+                )}
+                {m === 'Muu' && form.payment_methods.includes('Muu') && (
+                  <div style={{ marginLeft: '1.65rem', marginTop: '.5rem', padding: '.8rem', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+                    <div className="input-group" style={{ margin: 0 }}>
+                      <label className="input-label">Tarkenna maksutapa (vapaaehtoinen)</label>
+                      <input className="input-field" placeholder="Esim. Lasku, Smartum..."
+                        value={form.muu_details}
+                        onChange={e => setForm(f => ({ ...f, muu_details: e.target.value }))} />
+                    </div>
+                    <div>
+                      <div className="input-label" style={{ marginBottom: '.2rem' }}>Viesti Admin</div>
+                      <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginBottom: '.4rem' }}>Lähetetäänkö pääkäyttäjälle ilmoitus tästä hoitomyynnistä?</div>
+                      <div style={{ display: 'flex', gap: '1.5rem' }}>
+                        {[['kylla', 'Kyllä'], ['ei', 'Ei']].map(([v, l]) => (
+                          <label key={v} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer', fontSize: '.85rem', userSelect: 'none' }}>
+                            <input type="radio" name="notify_admin" value={v}
+                              checked={form.notify_admin === v}
+                              onChange={() => setForm(f => ({ ...f, notify_admin: v }))}
+                              style={{ accentColor: 'var(--violet)', cursor: 'pointer' }} />
+                            {l}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -378,9 +432,15 @@ function ValmennusForm({ onSaved }) {
 
   return (
     <div className="card" style={{ padding: '1.5rem', alignSelf: 'start' }}>
-      <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', marginBottom: '1.25rem' }}>
-        Uusi valmennuskirjaus
-      </h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+        <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', margin: 0 }}>
+          Uusi valmennuskirjaus
+        </h3>
+        <VoiceMicButton label="Puhekirjaus" onResult={text => {
+          const parsed = parseVoiceValmennus(text)
+          setForm(f => ({ ...f, ...parsed }))
+        }} />
+      </div>
       <div className="form-grid">
         <div className="input-group">
           <label className="input-label">Päivämäärä</label>
@@ -520,11 +580,17 @@ function JasenForm({ onSaved }) {
 // ─── Main Sales page ──────────────────────────────────────────────────────────
 
 export default function Sales() {
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'hallitus'
+
   const [tab, setTab] = useState('terapia')
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [todayTotal, setTodayTotal] = useState(0)
+  const [period, setPeriod] = useState('kuukausi')
+  const [filterUser, setFilterUser] = useState('')
+  const [users, setUsers] = useState([])
 
   const TABLE_MAP = { valmennus: 'valmennusmyynti', jasen: 'jasenmyynti' }
 
@@ -576,7 +642,17 @@ export default function Sales() {
     tab === 'terapia' ? fetchTerapia() : fetchOther(tab)
   }
 
-  const filtered = rows.filter(r => r.customer_name?.toLowerCase().includes(search.toLowerCase()))
+  const filtered = rows.filter(r => {
+    if (!r.customer_name?.toLowerCase().includes(search.toLowerCase())) return false
+    const dateStr = (r.created_at || '').slice(0, 10)
+    const today = new Date().toISOString().slice(0, 10)
+    if (period === 'paiva' && dateStr !== today) return false
+    if (period === 'kuukausi' && dateStr.slice(0, 7) !== today.slice(0, 7)) return false
+    if (period === 'vuosi' && dateStr.slice(0, 4) !== today.slice(0, 4)) return false
+    if (filterUser && r.customer_name !== filterUser) return false
+    return true
+  })
+  const filteredTotal = filtered.reduce((s, r) => s + (r.price || 0), 0)
 
   return (
     <div>
@@ -613,11 +689,31 @@ export default function Sales() {
         {tab === 'jasen' && <JasenForm onSaved={() => fetchOther('jasen')} />}
 
         <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.75rem' }}>
-            <div className="search-wrap">
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '.75rem' }}>
+            {[['paiva', 'Päivä'], ['kuukausi', 'Kuukausi'], ['vuosi', 'Vuosi'], ['kaikki', 'Kaikki']].map(([v, l]) => (
+              <button key={v} className={`sub-tab${period === v ? ' active' : ''}`}
+                onClick={() => setPeriod(v)}
+                style={{ fontSize: '.78rem', padding: '.35rem .75rem' }}>
+                {l}
+              </button>
+            ))}
+            {isAdmin && users.length > 0 && (
+              <select className="input-field" style={{ width: 'auto', fontSize: '.82rem', padding: '.35rem .6rem', height: 'auto' }}
+                value={filterUser} onChange={e => setFilterUser(e.target.value)}>
+                <option value="">Kaikki käyttäjät</option>
+                {users.map(u => {
+                  const name = u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim()
+                  return <option key={u.id} value={name}>{name}</option>
+                })}
+              </select>
+            )}
+            <div className="search-wrap" style={{ marginLeft: 'auto' }}>
               <Search size={15} />
               <input className="search-input" placeholder="Hae asiakkaalla..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
+          </div>
+          <div style={{ fontSize: '.78rem', color: 'var(--text3)', marginBottom: '.5rem', textAlign: 'right' }}>
+            {filtered.length} kirjausta · {filteredTotal.toFixed(2)} €
           </div>
 
           <div className="table-wrap">

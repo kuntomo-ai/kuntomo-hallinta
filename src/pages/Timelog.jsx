@@ -3,6 +3,7 @@ import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
+import VoiceMicButton, { parseVoiceAjo, parseVoiceWorkTime } from '../components/VoiceInput'
 
 const TODAY = new Date().toISOString().slice(0, 10)
 
@@ -163,6 +164,10 @@ function AjokirjausTab({ isAdmin, myName }) {
       {showModal && (
         <Modal title={editing ? 'Muokkaa ajokirjausta' : 'Uusi ajokirjaus'} onClose={() => setShowModal(false)} footer={
           <>
+            <VoiceMicButton label="Puhekirjaus" onResult={text => {
+              const parsed = parseVoiceAjo(text)
+              setForm(f => ({ ...f, ...parsed }))
+            }} />
             <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Peruuta</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Tallennetaan...' : 'Tallenna'}</button>
           </>
@@ -348,6 +353,10 @@ function WorkTimeTab({ isAdmin, myName }) {
       {showModal && (
         <Modal title={editing ? 'Muokkaa kirjausta' : 'Uusi työaikakirjaus'} onClose={() => setShowModal(false)} footer={
           <>
+            <VoiceMicButton label="Puhekirjaus" onResult={text => {
+              const parsed = parseVoiceWorkTime(text)
+              setForm(f => ({ ...f, ...parsed }))
+            }} />
             <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Peruuta</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Tallennetaan...' : 'Tallenna'}</button>
           </>
