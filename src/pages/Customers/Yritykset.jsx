@@ -145,6 +145,12 @@ export default function Yritykset() {
     fetchCompanyData(selected.id, viewYear)
   }
 
+  async function deleteVisit(id) {
+    if (!confirm('Poistetaanko käyntikirjaus?')) return
+    await supabase.from('company_visits').delete().eq('id', id)
+    fetchCompanyData(selected.id, viewYear)
+  }
+
   function handleChange(e) { setForm(f => ({ ...f, [e.target.name]: e.target.value })) }
   function handleEditChange(e) { setEditForm(f => ({ ...f, [e.target.name]: e.target.value })) }
 
@@ -317,10 +323,19 @@ export default function Yritykset() {
                         const m = mi + 1
                         const visit = visitGrid[p.id]?.[m]
                         return (
-                          <td key={mi} style={{ padding: '.35rem .4rem', textAlign: 'center', verticalAlign: 'top', borderLeft: '1px solid var(--border)', cursor: visit && isAdmin ? 'pointer' : 'default' }}
-                            onClick={() => visit && isAdmin && toggleInvoiced(visit)}>
+                          <td key={mi} style={{ padding: '.35rem .4rem', textAlign: 'center', verticalAlign: 'top', borderLeft: '1px solid var(--border)' }}>
                             {visit ? (
-                              <div style={{ background: visit.invoiced ? 'var(--green-subtle)' : 'var(--orange-subtle)', borderRadius: 4, padding: '.3rem .45rem', fontSize: '.7rem', lineHeight: 1.45, border: `1px solid ${visit.invoiced ? 'var(--green)' : 'var(--orange)'}`, opacity: visit.invoiced ? 0.8 : 1, textAlign: 'left' }}>
+                              <div
+                                onClick={() => isAdmin && toggleInvoiced(visit)}
+                                style={{ position: 'relative', background: visit.invoiced ? 'var(--green-subtle)' : 'var(--orange-subtle)', borderRadius: 4, padding: '.3rem .45rem', fontSize: '.7rem', lineHeight: 1.45, border: `1px solid ${visit.invoiced ? 'var(--green)' : 'var(--orange)'}`, opacity: visit.invoiced ? 0.8 : 1, textAlign: 'left', cursor: isAdmin ? 'pointer' : 'default' }}>
+                                {isAdmin && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); deleteVisit(visit.id) }}
+                                    title="Poista käynti"
+                                    style={{ position: 'absolute', top: 2, right: 2, background: 'none', border: 'none', cursor: 'pointer', padding: '1px 3px', color: 'var(--text4)', lineHeight: 1, borderRadius: 3, fontSize: '.65rem' }}>
+                                    <Trash2 size={10} />
+                                  </button>
+                                )}
                                 <div style={{ fontWeight: 700, color: visit.invoiced ? 'var(--green)' : 'var(--text)', marginBottom: 1 }}>
                                   {visit.company_person_name || visit.payment_type || '—'}
                                 </div>
