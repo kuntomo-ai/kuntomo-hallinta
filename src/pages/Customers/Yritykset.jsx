@@ -257,8 +257,8 @@ export default function Yritykset() {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ fontSize: '.85rem', color: notes ? 'var(--text1)' : 'var(--text4)', fontStyle: notes ? 'normal' : 'italic' }}
-                      onClick={() => setEditingNotes(true)} style={{ cursor: 'pointer', fontSize: '.85rem' }}>
+                    <div style={{ fontSize: '.85rem', cursor: 'pointer', color: notes ? 'var(--text1)' : 'var(--text4)', fontStyle: notes ? 'normal' : 'italic' }}
+                      onClick={() => setEditingNotes(true)}>
                       {notes || 'Lisää muistiinpano...'}
                     </div>
                   )}
