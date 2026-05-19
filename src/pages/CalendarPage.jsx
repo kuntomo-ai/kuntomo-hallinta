@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Trash2, Globe, Users, User } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import Modal from '../components/ui/Modal'
+import { useAuth } from '../context/AuthContext'
 
 // ─── Kalenteri tab ────────────────────────────────────────────────────────────
 
 const CATEGORIES = ['tapahtuma', 'kampanja', 'koulutus', 'muu']
 const CAT_COLORS = { tapahtuma: 'var(--violet)', kampanja: 'var(--orange)', koulutus: 'var(--blue)', muu: 'var(--green)' }
 const CAT_BG = { tapahtuma: 'var(--violet-subtle)', kampanja: 'var(--orange-subtle)', koulutus: 'var(--blue-subtle)', muu: 'var(--green-subtle)' }
+const ROLES = ['admin', 'hallitus', 'terapeutti', 'valmentaja', 'toimisto']
 
-const emptyEvent = { title: '', category: 'tapahtuma', start_date: '', end_date: '', description: '' }
+const emptyEvent = { title: '', category: 'tapahtuma', start_date: '', end_date: '', description: '', recipient_type: 'all', recipient_role: ROLES[2] }
 
 function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate() }
 function getFirstDayOfMonth(year, month) {
@@ -22,6 +24,9 @@ const MONTH_SHORT = ['Tam', 'Hel', 'Maa', 'Huh', 'Tou', 'Kes', 'Hei', 'Elo', 'Sy
 const DAY_NAMES = ['Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su']
 
 function KalenteriTab() {
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'hallitus'
+
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -36,8 +41,15 @@ function KalenteriTab() {
   async function fetchData() {
     setLoading(true)
     const { data } = await supabase.from('calendar_events').select('*').order('start_date', { ascending: true })
-    setEvents(data || [])
+    setEvents((data || []).filter(e => shouldShow(e)))
     setLoading(false)
+  }
+
+  function shouldShow(e) {
+    if (isAdmin) return true
+    if (!e.recipient_type || e.recipient_type === 'all') return true
+    if (e.recipient_type === 'role' && e.recipient_role === profile?.role) return true
+    return false
   }
 
   function prevMonth() {
@@ -60,6 +72,8 @@ function KalenteriTab() {
       start_date: form.start_date,
       end_date: form.end_date || form.start_date,
       description: form.description.trim() || null,
+      recipient_type: isAdmin ? form.recipient_type : 'all',
+      recipient_role: isAdmin && form.recipient_type === 'role' ? form.recipient_role : null,
     })
     setSaving(false)
     setShowModal(false)
@@ -117,7 +131,8 @@ function KalenteriTab() {
                 <div key={day} style={{ minHeight: 72, borderRadius: 6, padding: '4px 5px', background: isToday ? 'var(--violet-subtle)' : 'var(--bg2)', border: isToday ? '1px solid var(--violet-border)' : '1px solid transparent' }}>
                   <div style={{ fontSize: '.72rem', fontWeight: isToday ? 800 : 500, color: isToday ? 'var(--violet)' : 'var(--text2)', marginBottom: 2 }}>{day}</div>
                   {dayEvents.slice(0, 3).map(ev => (
-                    <div key={ev.id} title={ev.title} style={{ fontSize: '.62rem', fontWeight: 600, background: CAT_BG[ev.category] || 'var(--bg3)', color: CAT_COLORS[ev.category] || 'var(--text3)', borderRadius: 3, padding: '1px 4px', marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div key={ev.id} title={`${ev.title}${ev.recipient_type === 'role' ? ` → ${ev.recipient_role}` : ''}`} style={{ fontSize: '.62rem', fontWeight: 600, background: CAT_BG[ev.category] || 'var(--bg3)', color: CAT_COLORS[ev.category] || 'var(--text3)', borderRadius: 3, padding: '1px 4px', marginBottom: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {ev.recipient_type === 'role' && <span style={{ opacity: .6 }}>👥 </span>}
                       {ev.title}
                     </div>
                   ))}
@@ -184,6 +199,34 @@ function KalenteriTab() {
                 <input className="input-field" name="end_date" type="date" value={form.end_date} onChange={handleChange} />
               </div>
             </div>
+            {isAdmin && (
+              <div className="input-group">
+                <label className="input-label">Näkyvyys</label>
+                <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                  {[['all', <Globe size={13} />, 'Kaikille'], ['role', <Users size={13} />, 'Roolille']].map(([v, icon, label]) => (
+                    <button key={v} type="button"
+                      onClick={() => setForm(f => ({ ...f, recipient_type: v }))}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '.35rem',
+                        padding: '.3rem .65rem', borderRadius: 20, fontSize: '.78rem', fontWeight: 600,
+                        border: `1.5px solid ${form.recipient_type === v ? 'var(--violet)' : 'var(--border)'}`,
+                        background: form.recipient_type === v ? 'var(--violet-subtle)' : 'transparent',
+                        color: form.recipient_type === v ? 'var(--violet)' : 'var(--text3)',
+                        cursor: 'pointer',
+                      }}>
+                      {icon} {label}
+                    </button>
+                  ))}
+                </div>
+                {form.recipient_type === 'role' && (
+                  <select className="input-field" style={{ marginTop: '.5rem', width: 'auto' }}
+                    value={form.recipient_role}
+                    onChange={e => setForm(f => ({ ...f, recipient_role: e.target.value }))}>
+                    {ROLES.map(r => <option key={r}>{r}</option>)}
+                  </select>
+                )}
+              </div>
+            )}
             <div className="input-group">
               <label className="input-label">Kuvaus</label>
               <textarea className="input-field" name="description" rows={3} value={form.description} onChange={handleChange} style={{ resize: 'vertical' }} />

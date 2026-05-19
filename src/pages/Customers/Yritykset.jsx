@@ -31,6 +31,8 @@ export default function Yritykset() {
   const [newPersonName, setNewPersonName] = useState('')
   const [addingPerson, setAddingPerson] = useState(false)
   const [csvImporting, setCsvImporting] = useState(false)
+  const [editingCompany, setEditingCompany] = useState(false)
+  const [editForm, setEditForm] = useState(empty)
 
   useEffect(() => { fetchData() }, [])
 
@@ -102,6 +104,23 @@ export default function Yritykset() {
     }
     setNotesSaving(false)
     setEditingNotes(false)
+  }
+
+  async function handleUpdateCompany() {
+    if (!editForm.name.trim()) return
+    setSaving(true)
+    await supabase.from('companies').update({
+      name: editForm.name.trim(),
+      contact_person: editForm.contact_person.trim() || null,
+      email: editForm.email.trim() || null,
+      phone: editForm.phone.trim() || null,
+      city: editForm.city.trim() || null,
+      notes: editForm.notes.trim() || null,
+    }).eq('id', selected.id)
+    setSelected(s => ({ ...s, ...editForm, name: editForm.name.trim() }))
+    fetchData()
+    setSaving(false)
+    setEditingCompany(false)
   }
 
   async function toggleInvoiced(visit) {
@@ -220,16 +239,61 @@ export default function Yritykset() {
           {view === 'info' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
               <div className="card" style={{ padding: '1.25rem' }}>
-                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, marginBottom: '1rem' }}>Yhteystiedot</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
-                  {[['Yhteyshenkilö', selected.contact_person], ['Email', selected.email], ['Puhelin', selected.phone], ['Kaupunki', selected.city]].map(([k, v]) => v && (
-                    <div key={k}>
-                      <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.2rem' }}>{k}</div>
-                      <div style={{ fontSize: '.85rem' }}>{v}</div>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                  <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, margin: 0 }}>Yhteystiedot</h3>
+                  {isAdmin && !editingCompany && (
+                    <button className="btn btn-ghost btn-sm" onClick={() => {
+                      setEditForm({ name: selected.name || '', contact_person: selected.contact_person || '', email: selected.email || '', phone: selected.phone || '', city: selected.city || '', notes: selected.notes || '' })
+                      setEditingCompany(true)
+                    }}>Muokkaa</button>
+                  )}
                 </div>
-                {selected.notes && <div style={{ marginTop: '1rem', fontSize: '.83rem', color: 'var(--text2)', padding: '.75rem', background: 'var(--bg2)', borderRadius: 6 }}>{selected.notes}</div>}
+                {editingCompany ? (
+                  <div className="form-grid">
+                    <div className="input-group">
+                      <label className="input-label">Yrityksen nimi</label>
+                      <input className="input-field" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label">Yhteyshenkilö</label>
+                      <input className="input-field" value={editForm.contact_person} onChange={e => setEditForm(f => ({ ...f, contact_person: e.target.value }))} />
+                    </div>
+                    <div className="form-grid form-grid-2">
+                      <div className="input-group">
+                        <label className="input-label">Sähköposti</label>
+                        <input className="input-field" type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+                      </div>
+                      <div className="input-group">
+                        <label className="input-label">Puhelin</label>
+                        <input className="input-field" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label">Kaupunki</label>
+                      <input className="input-field" value={editForm.city} onChange={e => setEditForm(f => ({ ...f, city: e.target.value }))} />
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label">Muistiinpanot</label>
+                      <textarea className="input-field" rows={3} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} style={{ resize: 'vertical' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '.5rem' }}>
+                      <button className="btn btn-primary" onClick={handleUpdateCompany} disabled={saving}>{saving ? 'Tallennetaan...' : 'Tallenna'}</button>
+                      <button className="btn btn-ghost" onClick={() => setEditingCompany(false)}>Peruuta</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
+                      {[['Yhteyshenkilö', selected.contact_person], ['Email', selected.email], ['Puhelin', selected.phone], ['Kaupunki', selected.city]].map(([k, v]) => v && (
+                        <div key={k}>
+                          <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.2rem' }}>{k}</div>
+                          <div style={{ fontSize: '.85rem' }}>{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {selected.notes && <div style={{ marginTop: '1rem', fontSize: '.83rem', color: 'var(--text2)', padding: '.75rem', background: 'var(--bg2)', borderRadius: 6 }}>{selected.notes}</div>}
+                  </>
+                )}
               </div>
 
               <div className="card" style={{ padding: '1.25rem' }}>
