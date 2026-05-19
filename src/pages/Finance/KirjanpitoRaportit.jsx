@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, ExternalLink, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
+import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 const DOC_TYPES = ['Tuloslaskelma', 'Tase', 'Muu']
 const empty = { title: '', description: '', document_type: DOC_TYPES[0], period: '', file_url: '' }
@@ -50,6 +51,7 @@ export default function KirjanpitoRaportit() {
 
   return (
     <div>
+      <KirjanpitoNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Kirjanpitoraportit</h1>

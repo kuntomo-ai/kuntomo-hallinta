@@ -12,9 +12,7 @@ import Communication from './pages/Communication'
 import Inventory from './pages/Inventory'
 import Documents from './pages/Documents'
 import Lahjakortit from './pages/Finance/Lahjakortit'
-import TerapiaSales from './pages/Finance/TerapiaSales'
-import ValmennusSales from './pages/Finance/ValmennusSales'
-import JasenSales from './pages/Finance/JasenSales'
+import Sales from './pages/Finance/Sales'
 import Kirjanpito from './pages/Finance/Kirjanpito'
 import Tase from './pages/Finance/Tase'
 import Tulos from './pages/Finance/Tulos'
@@ -54,9 +52,10 @@ function AppRoutes() {
               <Route path="/communication" element={<Communication />} />
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/documents" element={<Documents />} />
-              <Route path="/finance/myynti/terapiamyynti" element={<TerapiaSales />} />
-              <Route path="/finance/myynti/valmennusmyynti" element={<ValmennusSales />} />
-              <Route path="/finance/myynti/jasenmyynti" element={<JasenSales />} />
+              <Route path="/finance/myynti" element={<Sales />} />
+              <Route path="/finance/myynti/terapiamyynti" element={<Navigate to="/finance/myynti" replace />} />
+              <Route path="/finance/myynti/valmennusmyynti" element={<Navigate to="/finance/myynti" replace />} />
+              <Route path="/finance/myynti/jasenmyynti" element={<Navigate to="/finance/myynti" replace />} />
               <Route path="/finance/lahjakortit" element={<Lahjakortit />} />
               <Route path="/finance/kirjanpito" element={<Kirjanpito />} />
               <Route path="/finance/kirjanpito/tase" element={<Tase />} />

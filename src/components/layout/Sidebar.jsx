@@ -15,9 +15,7 @@ const NAV = [
   { label: 'Tehtävät',       href: '/tasks',             icon: CheckSquare },
 
   { section: 'Myynti' },
-  { label: 'Terapiamyynti',  href: '/finance/myynti/terapiamyynti',  icon: Stethoscope },
-  { label: 'Valmennusmyynti',href: '/finance/myynti/valmennusmyynti',icon: Dumbbell },
-  { label: 'Jäsenmyynti',    href: '/finance/myynti/jasenmyynti',    icon: Users2 },
+  { label: 'Myynti',         href: '/finance/myynti',                icon: Stethoscope },
   { label: 'Lahjakortit',    href: '/finance/lahjakortit',           icon: Gift },
   { label: 'Ajokirjaus',     href: '/timelog',           icon: Car },
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
+import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 const empty = { account_name: '', account_group: 'tuotot', amount: '', period: '' }
 
@@ -93,6 +94,7 @@ export default function Tulos() {
 
   return (
     <div>
+      <KirjanpitoNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Tuloslaskelma</h1>

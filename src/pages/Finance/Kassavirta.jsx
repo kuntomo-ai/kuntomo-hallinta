@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
+import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 const empty = { description: '', amount: '', entry_type: 'tulo', entry_date: new Date().toISOString().slice(0, 10), notes: '' }
 
@@ -72,6 +73,7 @@ export default function Kassavirta() {
 
   return (
     <div>
+      <KirjanpitoNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Kassavirta</h1>
