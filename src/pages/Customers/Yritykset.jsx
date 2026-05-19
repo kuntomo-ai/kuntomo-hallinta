@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Trash2, ChevronLeft, Upload } from 'lucide-react'
+import { Plus, Search, Trash2, ChevronLeft, ChevronRight, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/AuthContext'
@@ -7,7 +7,6 @@ import { useAuth } from '../../context/AuthContext'
 const empty = { name: '', contact_person: '', email: '', phone: '', city: '', notes: '' }
 
 const MONTH_SHORT = ['Tammi', 'Helmi', 'Maalis', 'Huhti', 'Touko', 'Kesä', 'Heinä', 'Elo', 'Syys', 'Loka', 'Marras', 'Joulu']
-const YEAR = new Date().getFullYear()
 
 export default function Yritykset() {
   const { profile } = useAuth()
@@ -22,6 +21,7 @@ export default function Yritykset() {
 
   const [selected, setSelected] = useState(null)
   const [view, setView] = useState('info') // 'info' | 'grid'
+  const [viewYear, setViewYear] = useState(new Date().getFullYear())
 
   const [persons, setPersons] = useState([])
   const [visits, setVisits] = useState([])
@@ -44,19 +44,23 @@ export default function Yritykset() {
   async function handleRowClick(row) {
     setSelected(row)
     setView('info')
-    fetchCompanyData(row.id)
+    fetchCompanyData(row.id, viewYear)
   }
 
-  async function fetchCompanyData(company_id) {
+  async function fetchCompanyData(company_id, year) {
     const [personsRes, visitsRes, notesRes] = await Promise.all([
       supabase.from('company_persons').select('*').eq('company_id', company_id).order('name'),
-      supabase.from('company_visits').select('*').eq('company_id', company_id).gte('visit_date', `${YEAR}-01-01`).lte('visit_date', `${YEAR}-12-31`),
-      supabase.from('company_notes').select('*').eq('company_id', company_id).eq('year', YEAR).maybeSingle(),
+      supabase.from('company_visits').select('*').eq('company_id', company_id).gte('visit_date', `${year}-01-01`).lte('visit_date', `${year}-12-31`),
+      supabase.from('company_notes').select('*').eq('company_id', company_id).eq('year', year).maybeSingle(),
     ])
     setPersons(personsRes.data || [])
     setVisits(visitsRes.data || [])
     setNotes(notesRes.data?.notes || '')
   }
+
+  useEffect(() => {
+    if (selected) fetchCompanyData(selected.id, viewYear)
+  }, [viewYear])
 
   async function addPerson() {
     if (!newPersonName.trim() || !selected) return
@@ -64,7 +68,7 @@ export default function Yritykset() {
     await supabase.from('company_persons').insert({ company_id: selected.id, name: newPersonName.trim() })
     setNewPersonName('')
     setAddingPerson(false)
-    fetchCompanyData(selected.id)
+    fetchCompanyData(selected.id, viewYear)
   }
 
   async function importCsv(file) {
@@ -79,22 +83,22 @@ export default function Yritykset() {
       await supabase.from('company_persons').insert(names.map(name => ({ company_id: selected.id, name })))
     }
     setCsvImporting(false)
-    fetchCompanyData(selected.id)
+    fetchCompanyData(selected.id, viewYear)
   }
 
   async function deletePerson(id) {
     if (!confirm('Poistetaanko henkilö?')) return
     await supabase.from('company_persons').delete().eq('id', id)
-    fetchCompanyData(selected.id)
+    fetchCompanyData(selected.id, viewYear)
   }
 
   async function saveNotes() {
     setNotesSaving(true)
-    const existing = await supabase.from('company_notes').select('id').eq('company_id', selected.id).eq('year', YEAR).maybeSingle()
+    const existing = await supabase.from('company_notes').select('id').eq('company_id', selected.id).eq('year', viewYear).maybeSingle()
     if (existing.data) {
       await supabase.from('company_notes').update({ notes }).eq('id', existing.data.id)
     } else {
-      await supabase.from('company_notes').insert({ company_id: selected.id, year: YEAR, notes })
+      await supabase.from('company_notes').insert({ company_id: selected.id, year: viewYear, notes })
     }
     setNotesSaving(false)
     setEditingNotes(false)
@@ -103,7 +107,7 @@ export default function Yritykset() {
   async function toggleInvoiced(visit) {
     if (!isAdmin) return
     await supabase.from('company_visits').update({ invoiced: !visit.invoiced }).eq('id', visit.id)
-    fetchCompanyData(selected.id)
+    fetchCompanyData(selected.id, viewYear)
   }
 
   function handleChange(e) {
@@ -208,7 +212,7 @@ export default function Yritykset() {
             <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.3rem', margin: 0 }}>{selected.name}</h2>
             <div className="sub-tabs" style={{ marginLeft: 'auto', marginBottom: 0 }}>
               <button className={`sub-tab${view === 'info' ? ' active' : ''}`} onClick={() => setView('info')}>Tiedot</button>
-              <button className={`sub-tab${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')}>Käyntikirjanpito {YEAR}</button>
+              <button className={`sub-tab${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')}>Käyntikirjanpito {viewYear}</button>
             </div>
           </div>
 
@@ -270,7 +274,7 @@ export default function Yritykset() {
               <div className="card" style={{ padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '.72rem', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.3rem' }}>
-                    Muistiinpanot ({YEAR})
+                    Muistiinpanot ({viewYear})
                   </div>
                   {editingNotes ? (
                     <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
@@ -293,11 +297,16 @@ export default function Yritykset() {
                 )}
               </div>
 
-              {/* Totals */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', padding: '.75rem 1rem', background: 'var(--bg2)', borderRadius: 6, marginBottom: '1rem', fontSize: '.85rem' }}>
+              {/* Totals + year nav */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', padding: '.75rem 1rem', background: 'var(--bg2)', borderRadius: 6, marginBottom: '1rem', fontSize: '.85rem', flexWrap: 'wrap' }}>
                 <span>Laskutettu yhteensä: <strong>{invoicedTotal.toFixed(2)} €</strong></span>
                 <span>Avoinna: <strong style={{ color: openTotal > 0 ? 'var(--orange)' : 'var(--green)' }}>{openTotal.toFixed(2)} €</strong></span>
-                {isAdmin && <span style={{ marginLeft: 'auto', fontSize: '.75rem', color: 'var(--text3)' }}>Klikkaa lokeroa merkitäksesi laskutetuksi (admin)</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginLeft: 'auto' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setViewYear(y => y - 1)} style={{ padding: '.25rem .35rem' }}><ChevronLeft size={14} /></button>
+                  <span style={{ fontWeight: 700, minWidth: 44, textAlign: 'center' }}>{viewYear}</span>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setViewYear(y => y + 1)} style={{ padding: '.25rem .35rem' }}><ChevronRight size={14} /></button>
+                </div>
+                {isAdmin && <span style={{ fontSize: '.75rem', color: 'var(--text3)' }}>Klikkaa lokeroa → laskutettu (admin)</span>}
               </div>
 
               {/* Grid */}
@@ -313,11 +322,14 @@ export default function Yritykset() {
                         <th style={{ textAlign: 'left', padding: '.6rem .75rem', background: 'var(--bg2)', fontWeight: 700, position: 'sticky', left: 0, zIndex: 1, minWidth: 140, borderBottom: '2px solid var(--border)' }}>
                           Työntekijä
                         </th>
-                        {MONTH_SHORT.map((m, i) => (
-                          <th key={i} style={{ padding: '.6rem .5rem', background: 'var(--bg2)', fontWeight: 700, textAlign: 'center', minWidth: 100, borderBottom: '2px solid var(--border)', color: i + 1 === new Date().getMonth() + 1 ? 'var(--violet)' : 'inherit' }}>
-                            {m} {String(YEAR).slice(2)}
-                          </th>
-                        ))}
+                        {MONTH_SHORT.map((m, i) => {
+                          const isCurrentMonth = viewYear === new Date().getFullYear() && i === new Date().getMonth()
+                          return (
+                            <th key={i} style={{ padding: '.6rem .5rem', background: 'var(--bg2)', fontWeight: 700, textAlign: 'center', minWidth: 100, borderBottom: '2px solid var(--border)', color: isCurrentMonth ? 'var(--violet)' : 'inherit' }}>
+                              {m} {String(viewYear).slice(2)}
+                            </th>
+                          )
+                        })}
                       </tr>
                     </thead>
                     <tbody>
