@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, Trash2, Camera } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -17,10 +17,33 @@ const MAKSUTAVAT_TERAPIA = [
 const COMPANY_METHODS = ['Yrityslaskutus', 'Yrityskäynti']
 
 const VALMENNUS_PALVELUT = ['Jatkuva valmennus', 'Fysiikkavalmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Muu']
-const JASENYYSTYYPIT = ['10x kortti', 'Kuukausikortti', 'Hieronta & Fysioterapia', 'Hieronta & Fysioterapia 100€']
-const MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Eazybreak', 'SmartumPay', 'ePassi']
+const JASENYYSTUOTTEET = [
+  { name: 'Kuntosali', price: 30 },
+  { name: 'Päiväjäsenyys', price: 25 },
+  { name: '10-x kortti', price: 7.79 },
+]
 
 const TODAY = new Date().toISOString().slice(0, 10)
+
+// ─── Image compression util ───────────────────────────────────────────────────
+
+async function compressImg(file) {
+  return new Promise(resolve => {
+    const img = new Image()
+    const blobUrl = URL.createObjectURL(file)
+    img.onload = () => {
+      const maxW = 1400
+      const scale = Math.min(1, maxW / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(blobUrl)
+      canvas.toBlob(resolve, 'image/jpeg', 0.72)
+    }
+    img.src = blobUrl
+  })
+}
 
 // ─── Terapia form ─────────────────────────────────────────────────────────────
 
@@ -30,6 +53,7 @@ function TerapiaForm({ onSaved }) {
   const [persons, setPersons] = useState([])
   const [saving, setSaving] = useState(false)
   const [splitError, setSplitError] = useState(false)
+  const [receipt, setReceipt] = useState(null)
 
   const [form, setForm] = useState({
     visit_date: TODAY,
@@ -98,6 +122,17 @@ function TerapiaForm({ onSaved }) {
     setSplitError(false)
     setSaving(true)
 
+    let receipt_url = null
+    if (receipt) {
+      const blob = await compressImg(receipt)
+      const path = `terapia/${Date.now()}.jpg`
+      const { data: upData } = await supabase.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
+      if (upData) {
+        const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
+        receipt_url = urlData.publicUrl
+      }
+    }
+
     const paymentStr = form.payment_methods.join(', ')
     const customerName = form.company_person_name || '—'
 
@@ -107,6 +142,7 @@ function TerapiaForm({ onSaved }) {
       price: parseFloat(form.price),
       payment_method: paymentStr,
       notes: form.notes.trim() || null,
+      receipt_url,
     })
 
     if (needsCompany && form.company_id && form.company_person_id) {
@@ -125,6 +161,7 @@ function TerapiaForm({ onSaved }) {
     }
 
     setSaving(false)
+    setReceipt(null)
     setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, company_id: '', company_person_id: '', company_person_name: '', notes: '' })
     onSaved()
   }
@@ -273,6 +310,23 @@ function TerapiaForm({ onSaved }) {
             value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
         </div>
 
+        {/* Kuitti */}
+        <div className="input-group">
+          <label className="input-label">Kuitti (valinnainen)</label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', background: 'var(--bg2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.85rem', color: 'var(--text2)' }}>
+            <Camera size={15} />
+            {receipt ? receipt.name : 'Ota kuva tai valitse tiedosto'}
+            <input type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={e => setReceipt(e.target.files[0] || null)} />
+          </label>
+          {receipt && (
+            <div style={{ marginTop: '.35rem', fontSize: '.72rem', color: 'var(--text3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{(receipt.size / 1024).toFixed(0)} KB → pakataan automaattisesti</span>
+              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: '.72rem', padding: 0 }} onClick={() => setReceipt(null)}>Poista</button>
+            </div>
+          )}
+        </div>
+
         <button className="btn btn-primary" onClick={handleSubmit} disabled={saving} style={{ width: '100%', marginTop: '.25rem' }}>
           {saving ? 'Tallennetaan...' : 'Lähetä'}
         </button>
@@ -348,52 +402,87 @@ function ValmennusForm({ onSaved }) {
   )
 }
 
-// ─── Simple form (jasen) ──────────────────────────────────────────────────────
+// ─── Jasen form ───────────────────────────────────────────────────────────────
 
-const emptyJasen = { customer_name: '', membership_type: JASENYYSTYYPIT[0], price: '', start_date: '', payment_method: MAKSUTAVAT[0], notes: '' }
+function JasenForm({ onSaved }) {
+  const [form, setForm] = useState({ customer_name: '', customer_email: '', service: '', price: '', discount_info: '', start_date: '', notes: '' })
+  const [saving, setSaving] = useState(false)
 
-function SimpleForm({ form, onChange, onSave, saving }) {
+  function selectService(name) {
+    const p = JASENYYSTUOTTEET.find(x => x.name === name)
+    setForm(f => ({ ...f, service: name, price: p ? String(p.price) : f.price }))
+  }
+
+  async function handleSubmit() {
+    if (!form.customer_name.trim() || !form.service || !form.price) return
+    setSaving(true)
+    await supabase.from('jasenmyynti').insert({
+      customer_name: form.customer_name.trim(),
+      customer_email: form.customer_email.trim() || null,
+      membership_type: form.service,
+      price: parseFloat(form.price),
+      discount_info: form.discount_info.trim() || null,
+      start_date: form.start_date || null,
+      notes: form.notes.trim() || null,
+    })
+    setSaving(false)
+    setForm({ customer_name: '', customer_email: '', service: '', price: '', discount_info: '', start_date: '', notes: '' })
+    onSaved()
+  }
+
   return (
-    <div className="card" style={{ padding: '1.25rem', alignSelf: 'start' }}>
-      <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>
-        Uusi jäsenkirjaus
+    <div className="card" style={{ padding: '1.5rem', alignSelf: 'start' }}>
+      <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', marginBottom: '1.25rem' }}>
+        Uusi myynti
       </h3>
       <div className="form-grid">
         <div className="input-group">
-          <label className="input-label">Asiakkaan nimi</label>
-          <input className="input-field" name="customer_name" placeholder="Etunimi Sukunimi" value={form.customer_name} onChange={onChange} />
+          <label className="input-label">Asiakkaan nimi *</label>
+          <input className="input-field" placeholder="Etunimi Sukunimi" value={form.customer_name}
+            onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))} />
         </div>
-
         <div className="input-group">
-          <label className="input-label">Jäsenyystyyppi</label>
-          <select className="input-field" name="membership_type" value={form.membership_type} onChange={onChange}>
-            {JASENYYSTYYPIT.map(j => <option key={j}>{j}</option>)}
+          <label className="input-label">Asiakkaan email</label>
+          <input className="input-field" type="email" placeholder="asiakas@email.com" value={form.customer_email}
+            onChange={e => setForm(f => ({ ...f, customer_email: e.target.value }))} />
+        </div>
+        <div className="input-group">
+          <label className="input-label">Palvelu *</label>
+          <select className="input-field" value={form.service} onChange={e => selectService(e.target.value)}>
+            <option value="">Valitse palvelu</option>
+            {JASENYYSTUOTTEET.map(p => (
+              <option key={p.name} value={p.name}>{p.name} — {p.price} €</option>
+            ))}
           </select>
         </div>
         <div className="input-group">
-          <label className="input-label">Jäsenyys alkaa</label>
-          <input className="input-field" name="start_date" type="date" value={form.start_date} onChange={onChange} />
+          <label className="input-label">Hinta (€) *</label>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', fontSize: '.9rem' }}>€</span>
+            <input className="input-field" type="number" step="0.01" min="0" placeholder="0"
+              style={{ paddingLeft: '2rem' }}
+              value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+          </div>
+          {form.service && <span style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.2rem', display: 'block' }}>Hinta täyttyy automaattisesti, mutta voit muokata sitä.</span>}
         </div>
-
         <div className="input-group">
-          <label className="input-label">Hinta (€)</label>
-          <input className="input-field" name="price" type="number" step="0.01" min="0" placeholder="0.00" value={form.price} onChange={onChange} />
+          <label className="input-label">Alennuksen sisältö</label>
+          <input className="input-field" placeholder="Esim. opiskelija-alennus -10%" value={form.discount_info}
+            onChange={e => setForm(f => ({ ...f, discount_info: e.target.value }))} />
         </div>
-
         <div className="input-group">
-          <label className="input-label">Maksutapa</label>
-          <select className="input-field" name="payment_method" value={form.payment_method} onChange={onChange}>
-            {MAKSUTAVAT.map(m => <option key={m}>{m}</option>)}
-          </select>
+          <label className="input-label">Jäsenyyden aloitusaika</label>
+          <input className="input-field" type="date" value={form.start_date}
+            onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
         </div>
-
         <div className="input-group">
-          <label className="input-label">Muistiinpanot</label>
-          <textarea className="input-field" name="notes" rows={2} value={form.notes} onChange={onChange} style={{ resize: 'vertical' }} />
+          <label className="input-label">Lisätiedot</label>
+          <textarea className="input-field" rows={2} placeholder="Vapaamuotoisia muistiinpanoja..."
+            value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+            style={{ resize: 'vertical' }} />
         </div>
-
-        <button className="btn btn-primary" onClick={onSave} disabled={saving} style={{ width: '100%' }}>
-          {saving ? 'Tallennetaan...' : 'Tallenna kirjaus'}
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={saving} style={{ width: '100%', marginTop: '.25rem' }}>
+          {saving ? 'Tallennetaan...' : 'Kirjaa myynti'}
         </button>
       </div>
     </div>
@@ -407,20 +496,14 @@ export default function Sales() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [form, setForm] = useState(emptyValmennus)
-  const [saving, setSaving] = useState(false)
   const [todayTotal, setTodayTotal] = useState(0)
 
   const TABLE_MAP = { valmennus: 'valmennusmyynti', jasen: 'jasenmyynti' }
 
   useEffect(() => {
-    if (tab === 'terapia') {
-      fetchTerapia()
-    } else {
-      if (tab === 'jasen') setForm(emptyJasen)
-      setSearch('')
-      fetchOther(tab)
-    }
+    setSearch('')
+    if (tab === 'terapia') fetchTerapia()
+    else fetchOther(tab)
   }, [tab])
 
   useEffect(() => {
@@ -456,20 +539,6 @@ export default function Sales() {
     const today = new Date().toISOString().slice(0, 10)
     setTodayTotal((data || []).filter(r => r.created_at?.slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
     setLoading(false)
-  }
-
-  function handleChange(e) {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }))
-  }
-
-  async function handleSave() {
-    if (!form.customer_name.trim() || !form.price) return
-    setSaving(true)
-    const base = { customer_name: form.customer_name.trim(), price: parseFloat(form.price), payment_method: form.payment_method, notes: form.notes.trim() || null }
-    await supabase.from('jasenmyynti').insert({ ...base, membership_type: form.membership_type, start_date: form.start_date || null })
-    setSaving(false)
-    setForm(emptyJasen)
-    fetchOther('jasen')
   }
 
   async function handleDelete(id) {
@@ -513,7 +582,7 @@ export default function Sales() {
 
         {tab === 'terapia' && <TerapiaForm onSaved={fetchTerapia} />}
         {tab === 'valmennus' && <ValmennusForm onSaved={() => fetchOther('valmennus')} />}
-        {tab === 'jasen' && <SimpleForm form={form} onChange={handleChange} onSave={handleSave} saving={saving} />}
+        {tab === 'jasen' && <JasenForm onSaved={() => fetchOther('jasen')} />}
 
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.75rem' }}>

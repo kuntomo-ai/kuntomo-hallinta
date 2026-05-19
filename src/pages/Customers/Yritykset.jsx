@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, X, Trash2, ChevronLeft } from 'lucide-react'
+import { Plus, Search, Trash2, ChevronLeft, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/AuthContext'
@@ -30,6 +30,7 @@ export default function Yritykset() {
   const [notesSaving, setNotesSaving] = useState(false)
   const [newPersonName, setNewPersonName] = useState('')
   const [addingPerson, setAddingPerson] = useState(false)
+  const [csvImporting, setCsvImporting] = useState(false)
 
   useEffect(() => { fetchData() }, [])
 
@@ -63,6 +64,21 @@ export default function Yritykset() {
     await supabase.from('company_persons').insert({ company_id: selected.id, name: newPersonName.trim() })
     setNewPersonName('')
     setAddingPerson(false)
+    fetchCompanyData(selected.id)
+  }
+
+  async function importCsv(file) {
+    if (!file || !selected) return
+    setCsvImporting(true)
+    const text = await file.text()
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    const firstLower = lines[0]?.toLowerCase()
+    const startIdx = (firstLower === 'name' || firstLower === 'nimi' || firstLower === 'henkilö') ? 1 : 0
+    const names = lines.slice(startIdx).map(l => l.split(',')[0].trim()).filter(Boolean)
+    if (names.length > 0) {
+      await supabase.from('company_persons').insert(names.map(name => ({ company_id: selected.id, name })))
+    }
+    setCsvImporting(false)
     fetchCompanyData(selected.id)
   }
 
@@ -233,6 +249,15 @@ export default function Yritykset() {
                     value={newPersonName} onChange={e => setNewPersonName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addPerson()} />
                   <button className="btn btn-primary btn-sm" onClick={addPerson} disabled={addingPerson}><Plus size={14} /></button>
+                </div>
+                <label title="Tuo henkilöt CSV-tiedostosta (yksi nimi per rivi)" style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginTop: '.6rem', cursor: 'pointer', fontSize: '.75rem', color: 'var(--text3)', padding: '.4rem .6rem', border: '1px dashed var(--border)', borderRadius: 6, background: 'var(--bg2)' }}>
+                  <Upload size={13} />
+                  {csvImporting ? 'Tuodaan...' : 'Tuo CSV'}
+                  <input type="file" accept=".csv,text/csv,text/plain" style={{ display: 'none' }}
+                    onChange={e => { importCsv(e.target.files[0]); e.target.value = '' }} />
+                </label>
+                <div style={{ fontSize: '.68rem', color: 'var(--text4)', marginTop: '.25rem' }}>
+                  CSV: yksi nimi per rivi, tai sarake "name" ensimmäisenä
                 </div>
               </div>
             </div>
