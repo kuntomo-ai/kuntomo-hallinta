@@ -51,7 +51,7 @@ export default function Sidebar({ mobOpen, onClose }) {
     <nav className={`sidebar${mobOpen ? ' mob-open' : ''}`}>
       <div className="sidebar-logo">
         <img src={logo} alt="Kuntomo" />
-        <div className="sidebar-logo-sub">Hallintajärjestelmä</div>
+        <div className="sidebar-logo-sub">Kuntomo ERP</div>
       </div>
 
       <div className="sidebar-nav">

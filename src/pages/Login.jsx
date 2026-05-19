@@ -24,7 +24,7 @@ export default function Login() {
       <div className="login-card">
         <div className="login-logo">
           <img src={logo} alt="Kuntomo" />
-          <div className="login-logo-sub">Hallintajärjestelmä</div>
+          <div className="login-logo-sub">Kuntomo ERP</div>
         </div>
         <form className="login-form" onSubmit={handleSubmit}>
           {error && <div className="login-error">{error}</div>}

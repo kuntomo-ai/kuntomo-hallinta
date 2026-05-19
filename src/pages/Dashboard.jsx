@@ -48,7 +48,7 @@ export default function Dashboard() {
     <div>
       <div className="welcome-banner">
         <div className="welcome-title">{greeting}, <span>{name}</span> 👋</div>
-        <div className="welcome-sub">Tervetuloa Kuntomon hallintaan — {new Date().toLocaleDateString('fi-FI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+        <div className="welcome-sub">Tervetuloa Kuntomo ERP:hen — {new Date().toLocaleDateString('fi-FI', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
       </div>
 
       <div className="stats-grid">
