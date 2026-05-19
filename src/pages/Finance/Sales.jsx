@@ -17,6 +17,7 @@ const MAKSUTAVAT_TERAPIA = [
 const COMPANY_METHODS = ['Yrityslaskutus', 'Yrityskäynti']
 
 const VALMENNUS_PALVELUT = ['Jatkuva valmennus', 'Fysiikkavalmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Muu']
+const VALMENNUS_MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Edenred', 'SmartumPay', 'ePassi']
 const JASENYYSTUOTTEET = [
   { name: 'Kuntosali', price: 30 },
   { name: 'Päiväjäsenyys', price: 25 },
@@ -61,6 +62,7 @@ function TerapiaForm({ onSaved }) {
     price: '',
     payment_methods: [],
     splits: {},
+    hve_provider: '',
     company_id: '',
     company_person_id: '',
     company_person_name: '',
@@ -84,6 +86,7 @@ function TerapiaForm({ onSaved }) {
       return {
         ...f,
         payment_methods: methods,
+        hve_provider: methods.includes('Hyvinvointietu') ? f.hve_provider : '',
         company_id: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_id : '',
         company_person_id: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_person_id : '',
         company_person_name: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_person_name : '',
@@ -133,7 +136,9 @@ function TerapiaForm({ onSaved }) {
       }
     }
 
-    const paymentStr = form.payment_methods.join(', ')
+    const paymentStr = form.payment_methods.map(m =>
+      m === 'Hyvinvointietu' && form.hve_provider ? `Hyvinvointietu (${form.hve_provider})` : m
+    ).join(', ')
     const customerName = form.company_person_name || '—'
 
     await supabase.from('terapiamyynti').insert({
@@ -162,7 +167,7 @@ function TerapiaForm({ onSaved }) {
 
     setSaving(false)
     setReceipt(null)
-    setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, company_id: '', company_person_id: '', company_person_name: '', notes: '' })
+    setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, hve_provider: '', company_id: '', company_person_id: '', company_person_name: '', notes: '' })
     onSaved()
   }
 
@@ -230,11 +235,26 @@ function TerapiaForm({ onSaved }) {
           <label className="input-label">Maksutapa (voit valita useamman)</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem', marginTop: '.3rem' }}>
             {MAKSUTAVAT_TERAPIA.map(m => (
-              <label key={m} style={{ display: 'flex', alignItems: 'center', gap: '.65rem', cursor: 'pointer', fontSize: '.87rem', userSelect: 'none' }}>
-                <input type="checkbox" checked={form.payment_methods.includes(m)} onChange={() => togglePayment(m)}
-                  style={{ accentColor: 'var(--violet)', width: 16, height: 16, cursor: 'pointer' }} />
-                {m}
-              </label>
+              <div key={m}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '.65rem', cursor: 'pointer', fontSize: '.87rem', userSelect: 'none' }}>
+                  <input type="checkbox" checked={form.payment_methods.includes(m)} onChange={() => togglePayment(m)}
+                    style={{ accentColor: 'var(--violet)', width: 16, height: 16, cursor: 'pointer' }} />
+                  {m}
+                </label>
+                {m === 'Hyvinvointietu' && form.payment_methods.includes('Hyvinvointietu') && (
+                  <div style={{ display: 'flex', gap: '1rem', marginLeft: '1.65rem', marginTop: '.3rem' }}>
+                    {['Smartum', 'Epassi', 'Edenred'].map(p => (
+                      <label key={p} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer', fontSize: '.82rem', userSelect: 'none' }}>
+                        <input type="radio" name="hve_provider" value={p}
+                          checked={form.hve_provider === p}
+                          onChange={() => setForm(f => ({ ...f, hve_provider: p }))}
+                          style={{ accentColor: 'var(--violet)', cursor: 'pointer' }} />
+                        {p}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -338,7 +358,7 @@ function TerapiaForm({ onSaved }) {
 // ─── Valmennus form ───────────────────────────────────────────────────────────
 
 function ValmennusForm({ onSaved }) {
-  const [form, setForm] = useState({ visit_date: TODAY, customer_name: '', service: '', price: '', notes: '' })
+  const [form, setForm] = useState({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '' })
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit() {
@@ -348,10 +368,11 @@ function ValmennusForm({ onSaved }) {
       customer_name: form.customer_name.trim(),
       service: form.service,
       price: parseFloat(form.price),
+      payment_method: form.payment_method || null,
       notes: form.notes.trim() || null,
     })
     setSaving(false)
-    setForm({ visit_date: TODAY, customer_name: '', service: '', price: '', notes: '' })
+    setForm({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '' })
     onSaved()
   }
 
@@ -387,6 +408,13 @@ function ValmennusForm({ onSaved }) {
               style={{ paddingLeft: '2rem' }}
               value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
           </div>
+        </div>
+        <div className="input-group">
+          <label className="input-label">Maksutapa</label>
+          <select className="input-field" value={form.payment_method}
+            onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
+            {VALMENNUS_MAKSUTAVAT.map(m => <option key={m}>{m}</option>)}
+          </select>
         </div>
         <div className="input-group">
           <label className="input-label">Lisätiedot</label>
