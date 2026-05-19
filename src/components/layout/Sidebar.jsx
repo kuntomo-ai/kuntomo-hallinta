@@ -17,7 +17,7 @@ const NAV = [
   { section: 'Myynti' },
   { label: 'Myynti',         href: '/finance/myynti',                icon: Stethoscope },
   { label: 'Lahjakortit',    href: '/finance/lahjakortit',           icon: Gift },
-  { label: 'Ajokirjaus',     href: '/timelog',           icon: Car },
+  { label: 'Työaika / Ajo',  href: '/timelog',           icon: Car },
 
   { section: 'Asiakkaat' },
   { label: 'Yritykset',      href: '/customers/yritykset',     icon: Building2 },

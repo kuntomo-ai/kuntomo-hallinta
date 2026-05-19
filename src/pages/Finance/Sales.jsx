@@ -44,7 +44,7 @@ function TerapiaForm({ onSaved }) {
   })
 
   useEffect(() => {
-    supabase.from('hoitotuotteet').select('*').eq('active', true).order('name')
+    supabase.from('hoitotuotteet').select('*').eq('active', true).order('sort_order').order('name')
       .then(({ data }) => setProducts(data || []))
     supabase.from('companies').select('id, name').order('name')
       .then(({ data }) => setCompanies(data || []))
@@ -152,11 +152,18 @@ function TerapiaForm({ onSaved }) {
           <label className="input-label">Hoitotuote *</label>
           <select className="input-field" value={form.service} onChange={e => selectProduct(e.target.value)}>
             <option value="">Valitse hoitotuote</option>
-            {products.map(p => (
-              <option key={p.id} value={p.name}>
-                {p.name}{p.price > 0 ? ` — ${p.price} €` : ''}
-              </option>
-            ))}
+            {(() => {
+              const cats = [...new Set(products.map(p => p.category || 'Muu'))]
+              return cats.map(cat => (
+                <optgroup key={cat} label={cat}>
+                  {products.filter(p => (p.category || 'Muu') === cat).map(p => (
+                    <option key={p.id} value={p.name}>
+                      {p.name}{p.price > 0 ? ` — ${p.price} €` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              ))
+            })()}
           </select>
           {products.length === 0 && (
             <span style={{ fontSize: '.72rem', color: 'var(--orange)', marginTop: '.25rem', display: 'block' }}>
