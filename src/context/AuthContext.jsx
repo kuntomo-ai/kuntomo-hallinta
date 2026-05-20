@@ -3,6 +3,20 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+// Route-prefix → allowed non-admin roles (undefined = all roles allowed)
+const ROUTE_PERMISSIONS = {
+  '/timelog':                  ['myynti', 'terapia_valmennus', 'huolto', 'sport', 'respa'],
+  '/employees':                [],  // admin/manager only
+  '/inventory':                ['respa'],
+  '/laiteluettelo':            ['respa'],
+  '/finance/myynti':           ['myynti', 'terapia_valmennus', 'sport', 'respa'],
+  '/finance/lahjakortit':      ['terapia_valmennus', 'respa'],
+  '/finance/kirjanpito':       ['hallitus'],
+  '/finance/raportointi':      ['hallitus'],
+  '/customers/yritykset':      ['terapia_valmennus', 'respa'],
+  '/customers/sport-hockey':   ['sport'],
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -30,11 +44,22 @@ export function AuthProvider({ children }) {
 
   const signOut = () => supabase.auth.signOut()
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
-  const isHallitus = profile?.role === 'hallitus'
+  const role = profile?.role ?? null
+  const isAdmin = role === 'admin' || role === 'manager'
+  const isHallitus = role === 'hallitus'
+
+  function canAccess(path) {
+    if (!role) return false
+    if (isAdmin) return true
+    const entry = Object.entries(ROUTE_PERMISSIONS).find(([prefix]) => path.startsWith(prefix))
+    if (!entry) return true
+    const [, allowed] = entry
+    if (allowed.length === 0) return false
+    return allowed.includes(role)
+  }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, isAdmin, isHallitus }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, role, isAdmin, isHallitus, canAccess }}>
       {children}
     </AuthContext.Provider>
   )
