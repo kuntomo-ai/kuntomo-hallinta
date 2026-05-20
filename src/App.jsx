@@ -18,7 +18,6 @@ import Kirjanpito from './pages/Finance/Kirjanpito'
 import Tase from './pages/Finance/Tase'
 import Tulos from './pages/Finance/Tulos'
 import Kassavirta from './pages/Finance/Kassavirta'
-import KirjanpitoRaportit from './pages/Finance/KirjanpitoRaportit'
 import KirjanpitoTuonti from './pages/Finance/KirjanpitoTuonti'
 import Raportointi from './pages/Reporting/Raportointi'
 import RaportointiTerapia from './pages/Reporting/RaportointiTerapia'
@@ -64,7 +63,7 @@ function AppRoutes() {
               <Route path="/finance/kirjanpito/tase" element={<Tase />} />
               <Route path="/finance/kirjanpito/tulos" element={<Tulos />} />
               <Route path="/finance/kirjanpito/kassavirta" element={<Kassavirta />} />
-              <Route path="/finance/kirjanpito/raportit" element={<KirjanpitoRaportit />} />
+              <Route path="/finance/kirjanpito/raportit" element={<Navigate to="/finance/kirjanpito" replace />} />
               <Route path="/finance/kirjanpito/tuonti" element={<KirjanpitoTuonti />} />
               <Route path="/finance/raportointi" element={<Raportointi />} />
               <Route path="/finance/raportointi/terapiamyynti" element={<RaportointiTerapia />} />

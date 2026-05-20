@@ -5,8 +5,7 @@ const LINKS = [
   { label: 'Tase',          to: '/finance/kirjanpito/tase' },
   { label: 'Tuloslaskelma', to: '/finance/kirjanpito/tulos' },
   { label: 'Kassavirta',    to: '/finance/kirjanpito/kassavirta' },
-  { label: 'Raportit',      to: '/finance/kirjanpito/raportit' },
-  { label: 'CSV-tuonti',    to: '/finance/kirjanpito/tuonti' },
+  { label: 'Tuo CSV',       to: '/finance/kirjanpito/tuonti' },
 ]
 
 export default function KirjanpitoNav() {
