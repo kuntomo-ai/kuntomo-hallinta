@@ -112,7 +112,7 @@ export default function Tulos() {
           <div className="stat-value gold">{fmt(totalLiikevaihto)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Tilikauden tulos</div>
+          <div className="stat-label">Tilikauden tulos (tulos ennen veroja)</div>
           <div className="stat-value" style={{ color: colorVal(totalVoitto) }}>{fmt(totalVoitto)}</div>
         </div>
         <div className="stat-card">
@@ -124,7 +124,12 @@ export default function Tulos() {
           <div className="stat-value" style={{ fontSize: '1.1rem' }}>
             {bestMonth ? (MONTH_LABELS[bestMonth.period] || bestMonth.period) : '—'}
           </div>
-          <div style={{ fontSize: '.75rem', color: 'var(--text3)' }}>{bestMonth ? fmt(bestMonth.liikevaihto) : ''}</div>
+          <div style={{ fontSize: '.75rem', color: 'var(--text3)', marginTop: '.2rem' }}>
+            {bestMonth ? `LV: ${fmt(bestMonth.liikevaihto)}` : ''}
+          </div>
+          <div style={{ fontSize: '.75rem', color: colorVal(bestMonth?.tilikauden_voitto), fontWeight: 600 }}>
+            {bestMonth ? `Tulos: ${fmt(bestMonth.tilikauden_voitto)}` : ''}
+          </div>
         </div>
       </div>
 

@@ -5,8 +5,8 @@ import { useAuth } from '../../context/AuthContext'
 const PERIODS = [
   { label: 'Tänään', value: 'today' },
   { label: 'Tällä viikolla', value: 'week' },
-  { label: 'Tällä kuulla', value: 'month' },
-  { label: 'Tällä vuodella', value: 'year' },
+  { label: 'Tämä kuukausi', value: 'month' },
+  { label: 'Tämä vuosi', value: 'year' },
   { label: 'Mukautettu', value: 'custom' },
 ]
 
@@ -40,7 +40,9 @@ export default function RaportointiJasen() {
 
   useEffect(() => {
     if (canFilter) {
-      supabase.from('profiles').select('id, first_name, last_name').order('first_name')
+      supabase.from('profiles').select('id, first_name, last_name, role')
+        .in('role', ['myynti', 'terapia_valmennus', 'sport', 'respa', 'admin', 'manager'])
+        .order('first_name')
         .then(({ data }) => setEmployees(data || []))
     }
   }, [canFilter])

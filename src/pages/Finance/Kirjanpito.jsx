@@ -7,6 +7,13 @@ function fmt(v, decimals = 0) {
   return Number(v).toLocaleString('fi-FI', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + ' €'
 }
 
+// Tilikausi 1.5 – 30.4: huhtikuu on aina kuluvan kalenterivuoden huhtikuu
+function getFiscalYear() {
+  const now = new Date()
+  const fyYear = now.getFullYear()
+  return { fyStart: `${fyYear - 1}-05`, fyEnd: `${fyYear}-04`, fyLabel: `1.5.${fyYear - 1}–30.4.${fyYear}` }
+}
+
 export default function Kirjanpito() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -15,32 +22,34 @@ export default function Kirjanpito() {
 
   async function fetchData() {
     setLoading(true)
+    const { fyStart, fyEnd } = getFiscalYear()
+
     const [tulosRes, taseRes, kassaRes] = await Promise.all([
-      supabase.from('tulos_kuukausiraportti').select('*').order('period', { ascending: false }).limit(1),
+      supabase.from('tulos_kuukausiraportti').select('*')
+        .gte('period', fyStart).lte('period', fyEnd)
+        .order('period', { ascending: false }),
       supabase.from('tase_snapshot').select('sub_section, loppusaldo'),
       supabase.from('kassavirta_entries').select('amount, entry_type').order('entry_date', { ascending: false }).limit(200),
     ])
 
-    const tulos = tulosRes.data?.[0] || null
+    const tulosRows = tulosRes.data || []
+    const latest = tulosRows[0] || null                                          // viimeisin kuukausi
+    const fyVoitto = tulosRows.reduce((s, r) => s + (r.tilikauden_voitto || 0), 0) // koko tilikausi
+
     const taseRows = taseRes.data || []
     const kassaEntries = kassaRes.data || []
 
     const omaPaaoma = taseRows.filter(r => r.sub_section === 'oma_paaoma').reduce((s, r) => s + (r.loppusaldo || 0), 0)
-    const vastaavaa = taseRows.reduce((s, r) => {
-      const sideRows = taseRows.filter(x => ['aineettomat','aineelliset','sijoitukset','vaihto','saamiset','rahat'].includes(x.sub_section))
-      return s
-    }, 0)
     const rahat = taseRows.filter(r => r.sub_section === 'rahat').reduce((s, r) => s + (r.loppusaldo || 0), 0)
-
     const kassaTulot = kassaEntries.filter(r => r.entry_type === 'tulo').reduce((s, r) => s + (r.amount || 0), 0)
     const kassaMenot = kassaEntries.filter(r => r.entry_type === 'meno').reduce((s, r) => s + (r.amount || 0), 0)
 
-    setData({ tulos, omaPaaoma, rahat, kassaTulot, kassaMenot })
+    setData({ latest, fyVoitto, omaPaaoma, rahat, kassaTulot, kassaMenot })
     setLoading(false)
   }
 
-  const t = data?.tulos
-
+  const { fyLabel } = getFiscalYear()
+  const t = data?.latest
   const periodLabel = t?.period
     ? new Date(t.period + '-01').toLocaleDateString('fi-FI', { month: 'long', year: 'numeric' })
     : null
@@ -52,9 +61,7 @@ export default function Kirjanpito() {
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Kirjanpito</h1>
-          <p className="page-subtitle">
-            {periodLabel ? `Viimeisin jakso: ${periodLabel}` : 'Talouden hallinta ja seuranta'}
-          </p>
+          <p className="page-subtitle">Tilikausi {fyLabel}</p>
         </div>
       </div>
 
@@ -74,16 +81,14 @@ export default function Kirjanpito() {
               </div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">Tilikauden voitto</div>
-              <div className="stat-value" style={{ color: (t?.tilikauden_voitto || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                {fmt(t?.tilikauden_voitto)}
+              <div className="stat-label">Tilikauden voitto ({fyLabel})</div>
+              <div className="stat-value" style={{ color: (data?.fyVoitto || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {fmt(data?.fyVoitto)}
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Oma pääoma</div>
-              <div className="stat-value" style={{ color: 'var(--violet)' }}>
-                {fmt(data?.omaPaaoma)}
-              </div>
+              <div className="stat-value" style={{ color: 'var(--violet)' }}>{fmt(data?.omaPaaoma)}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Rahat &amp; pankkisaamiset</div>

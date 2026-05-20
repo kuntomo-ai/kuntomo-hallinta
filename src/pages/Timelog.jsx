@@ -24,14 +24,13 @@ function AjokirjausTab({ isAdmin, myName }) {
 
   useEffect(() => {
     function onVoiceTimelog(e) {
-      const name = profile?.full_name || profile?.email || ''
       setEditing(null)
-      setForm({ ...empty, driver_name: name, ...e.detail })
+      setForm({ ...emptyDrive, driver_name: myName, ...e.detail })
       setShowModal(true)
     }
     window.addEventListener('voice-timelog', onVoiceTimelog)
     return () => window.removeEventListener('voice-timelog', onVoiceTimelog)
-  }, [profile])
+  }, [myName])
 
   async function fetchData() {
     setLoading(true)
@@ -113,7 +112,7 @@ function AjokirjausTab({ isAdmin, myName }) {
 
       <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
         <div className="stat-card"><div className="stat-label">Ajettu tänään</div><div className="stat-value">{stats.today.toFixed(1)} km</div></div>
-        <div className="stat-card"><div className="stat-label">Tällä kuulla</div><div className="stat-value">{stats.month.toFixed(1)} km</div></div>
+        <div className="stat-card"><div className="stat-label">Tämä kuukausi</div><div className="stat-value">{stats.month.toFixed(1)} km</div></div>
         <div className="stat-card"><div className="stat-label">Kirjauksia kk</div><div className="stat-value">{stats.monthCount}</div></div>
       </div>
 
@@ -304,7 +303,7 @@ function WorkTimeTab({ isAdmin, myName }) {
       </div>
 
       <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
-        <div className="stat-card"><div className="stat-label">Työtunnit tällä kuulla</div><div className="stat-value gold">{monthHours.toFixed(1)} h</div></div>
+        <div className="stat-card"><div className="stat-label">Työtunnit tänä kuukautena</div><div className="stat-value gold">{monthHours.toFixed(1)} h</div></div>
         <div className="stat-card"><div className="stat-label">Kirjauksia yhteensä</div><div className="stat-value">{rows.length}</div></div>
       </div>
 
@@ -406,7 +405,9 @@ function WorkTimeTab({ isAdmin, myName }) {
 export default function Timelog() {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'hallitus'
-  const myName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : ''
+  const myName = profile
+    ? (`${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email || '')
+    : ''
 
   const [tab, setTab] = useState('tyoaika')
 
