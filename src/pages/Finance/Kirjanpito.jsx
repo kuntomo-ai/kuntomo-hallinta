@@ -15,6 +15,7 @@ const QUICK_CARDS = [
   { label: 'Tuloslaskelma', desc: 'Tuotot ja kulut', to: '/finance/kirjanpito/tulos' },
   { label: 'Kassavirta', desc: 'Tulot ja menot', to: '/finance/kirjanpito/kassavirta' },
   { label: 'Raportit', desc: 'Dokumentit ja raportit', to: '/finance/kirjanpito/raportit' },
+  { label: 'CSV-tuonti', desc: 'Tuo raportteja CSV-tiedostosta', to: '/finance/kirjanpito/tuonti' },
 ]
 
 export default function Kirjanpito() {
