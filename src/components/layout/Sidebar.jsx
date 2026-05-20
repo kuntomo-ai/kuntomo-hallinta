@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, Calendar, Car, Stethoscope, Dumbbell, Users2,
   Gift, Building2, ClipboardList, CheckSquare, MessageSquare,
-  FileText, Package, TrendingUp, BookOpen, LogOut, Menu
+  FileText, Package, TrendingUp, BookOpen, LogOut, Menu, Wrench
 } from 'lucide-react'
 import logo from '../../logo.svg'
 
@@ -30,7 +30,8 @@ const NAV = [
   { section: 'Hallinto' },
   { label: 'Henkilöstö',     href: '/employees',   icon: Users2,      roles: ['admin','hallitus'] },
   { label: 'Kyselyt',        href: '/surveys',     icon: ClipboardList },
-  { label: 'Inventaario',    href: '/inventory',   icon: Package },
+  { label: 'Inventaario',    href: '/inventory',      icon: Package },
+  { label: 'Laiteluettelo', href: '/laiteluettelo',  icon: Wrench },
   { label: 'Dokumentit',     href: '/documents',   icon: FileText },
 ]
 
