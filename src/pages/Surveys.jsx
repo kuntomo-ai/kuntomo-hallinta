@@ -10,6 +10,64 @@ const PRODUCTS = [
 ]
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 
+const SURVEY_QUESTIONS = [
+  { key: 'tyytyväisyys',   label: 'Kuinka tyytyväinen olet tämänhetkiseen työhösi?',  type: 'scale' },
+  { key: 'kuormitus',      label: 'Koetko työmääräsi sopivaksi?',                     type: 'scale' },
+  { key: 'yhteishenki',    label: 'Miten arvioisit tiimisi yhteishenkeä?',             type: 'scale' },
+  { key: 'esimies',        label: 'Saatko riittävästi tukea esihenkilöltäsi?',         type: 'scale' },
+  { key: 'suosittelu',     label: 'Suosittelisitko Kuntomoa työnantajana? (0–10)',     type: 'nps' },
+  { key: 'palaute',        label: 'Kehitysehdotuksia tai vapaata palautetta',          type: 'text' },
+]
+
+const SCALE_LABELS = { 1: 'Heikko', 2: 'Välttävä', 3: 'Kohtalainen', 4: 'Hyvä', 5: 'Erinomainen' }
+
+function ScalePicker({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+      {[1, 2, 3, 4, 5].map(n => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          style={{
+            width: 44, height: 44, borderRadius: 8, border: '2px solid',
+            borderColor: value === n ? 'var(--violet)' : 'var(--border)',
+            background: value === n ? 'var(--violet)' : 'var(--bg2)',
+            color: value === n ? '#fff' : 'var(--text1)',
+            fontWeight: 700, fontSize: '1rem', cursor: 'pointer', transition: 'all .12s',
+          }}
+        >
+          {n}
+        </button>
+      ))}
+      {value && <span style={{ alignSelf: 'center', color: 'var(--text3)', fontSize: '.82rem' }}>{SCALE_LABELS[value]}</span>}
+    </div>
+  )
+}
+
+function NpsPicker({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(n)}
+          style={{
+            width: 38, height: 38, borderRadius: 6, border: '2px solid',
+            borderColor: value === n ? 'var(--violet)' : 'var(--border)',
+            background: value === n ? 'var(--violet)' : 'var(--bg2)',
+            color: value === n ? '#fff' : 'var(--text1)',
+            fontWeight: 700, fontSize: '.9rem', cursor: 'pointer', transition: 'all .12s',
+          }}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function Surveys() {
   const { profile, isAdmin } = useAuth()
   const [tab, setTab] = useState('henkilosto')
@@ -17,18 +75,23 @@ export default function Surveys() {
   const [clothingOrders, setClothingOrders] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const [clothForm, setClothForm] = useState({
-    name: '',
-    products: [],
-    size: 'M',
-    notes: '',
-  })
+  // Survey form state
+  const emptyAnswers = () => Object.fromEntries(SURVEY_QUESTIONS.map(q => [q.key, q.type === 'text' ? '' : null]))
+  const [answers, setAnswers] = useState(emptyAnswers)
+  const [respondentName, setRespondentName] = useState('')
+  const [surveySaving, setSurveySaving] = useState(false)
+  const [surveySaved, setSurveySaved] = useState(false)
+
+  // Clothing order state
+  const [clothForm, setClothForm] = useState({ name: '', products: [], size: 'M', notes: '' })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     fetchData()
-    setClothForm(f => ({ ...f, name: profile?.full_name || profile?.email || '' }))
+    const name = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : ''
+    setRespondentName(name || profile?.email || '')
+    setClothForm(f => ({ ...f, name: name || profile?.email || '' }))
   }, [profile])
 
   async function fetchData() {
@@ -40,6 +103,25 @@ export default function Surveys() {
     setSurveyResponses(srRes.data || [])
     setClothingOrders(coRes.data || [])
     setLoading(false)
+  }
+
+  async function handleSurveySubmit() {
+    if (!respondentName.trim()) return
+    const hasAnswer = SURVEY_QUESTIONS.some(q => q.type === 'text' ? answers[q.key]?.trim() : answers[q.key] != null)
+    if (!hasAnswer) return
+    setSurveySaving(true)
+    await supabase.from('survey_responses').insert({
+      respondent_name: respondentName.trim(),
+      answers,
+    })
+    setSurveySaving(false)
+    setSurveySaved(true)
+    setAnswers(emptyAnswers())
+    fetchData()
+  }
+
+  function setAnswer(key, val) {
+    setAnswers(a => ({ ...a, [key]: val }))
   }
 
   function toggleProduct(id) {
@@ -64,12 +146,18 @@ export default function Surveys() {
     fetchData()
   }
 
-  // Admin summary helpers
   const productCounts = {}
   const sizeCounts = {}
   clothingOrders.forEach(o => {
     (o.products || []).forEach(p => { productCounts[p] = (productCounts[p] || 0) + 1 })
     if (o.size) sizeCounts[o.size] = (sizeCounts[o.size] || 0) + 1
+  })
+
+  // Admin summary: average per scale question
+  const avgScores = {}
+  SURVEY_QUESTIONS.filter(q => q.type === 'scale' || q.type === 'nps').forEach(q => {
+    const vals = surveyResponses.map(r => r.answers?.[q.key]).filter(v => v != null)
+    avgScores[q.key] = vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : null
   })
 
   return (
@@ -86,46 +174,105 @@ export default function Surveys() {
         <button className={`sub-tab${tab === 'vaatetus' ? ' active' : ''}`} onClick={() => setTab('vaatetus')}>Vaatetilaus</button>
       </div>
 
+      {/* ── Henkilöstökysely ─────────────────────────────────────────────────── */}
       {tab === 'henkilosto' && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Pvm</th>
-                <th>Vastaaja</th>
-                <th>Vastaukset</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={3} className="table-empty">Ladataan...</td></tr>
-              ) : surveyResponses.length === 0 ? (
-                <tr><td colSpan={3} className="table-empty">Ei vastauksia.</td></tr>
-              ) : surveyResponses.map(r => (
-                <tr key={r.id}>
-                  <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleDateString('fi-FI')}</td>
-                  <td style={{ fontWeight: 600 }}>{r.respondent_name || '—'}</td>
-                  <td style={{ fontSize: '.78rem', color: 'var(--text2)' }}>
-                    {r.answers ? (
-                      <details>
-                        <summary style={{ cursor: 'pointer', color: 'var(--violet)', fontWeight: 600 }}>Näytä vastaukset</summary>
-                        <pre style={{ marginTop: '.5rem', whiteSpace: 'pre-wrap', fontSize: '.75rem', color: 'var(--text2)' }}>{JSON.stringify(r.answers, null, 2)}</pre>
-                      </details>
-                    ) : '—'}
-                  </td>
-                </tr>
+        <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr' : '1fr', gap: '1.5rem', alignItems: 'start' }}>
+
+          {/* Lomake */}
+          <div className="card">
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '1.25rem' }}>
+              Täytä kysely
+            </h3>
+
+            {surveySaved && (
+              <div style={{ background: 'color-mix(in srgb, var(--green) 12%, var(--bg1))', border: '1px solid var(--green)', borderRadius: 'var(--radius)', padding: '.75rem 1rem', marginBottom: '1rem', color: 'var(--green)', fontWeight: 600, fontSize: '.85rem' }}>
+                Vastauksesi on tallennettu — kiitos!
+              </div>
+            )}
+
+            <div className="form-grid">
+              <div className="input-group">
+                <label className="input-label">Nimi</label>
+                <input className="input-field" value={respondentName} onChange={e => setRespondentName(e.target.value)} placeholder="Etunimi Sukunimi" />
+              </div>
+
+              {SURVEY_QUESTIONS.map(q => (
+                <div key={q.key} className="input-group">
+                  <label className="input-label">{q.label}</label>
+                  {q.type === 'scale' && <ScalePicker value={answers[q.key]} onChange={v => setAnswer(q.key, v)} />}
+                  {q.type === 'nps' && <NpsPicker value={answers[q.key]} onChange={v => setAnswer(q.key, v)} />}
+                  {q.type === 'text' && (
+                    <textarea className="input-field" rows={3} value={answers[q.key]} onChange={e => setAnswer(q.key, e.target.value)} style={{ resize: 'vertical' }} />
+                  )}
+                </div>
               ))}
-            </tbody>
-          </table>
+
+              <button className="btn btn-primary" onClick={handleSurveySubmit} disabled={surveySaving || !respondentName.trim()}>
+                {surveySaving ? 'Tallennetaan...' : 'Lähetä vastaukset'}
+              </button>
+            </div>
+          </div>
+
+          {/* Admin: yhteenveto + vastaukset */}
+          {isAdmin && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="card">
+                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>
+                  Yhteenveto ({surveyResponses.length} vastausta)
+                </h3>
+                {SURVEY_QUESTIONS.filter(q => q.type !== 'text').map(q => (
+                  <div key={q.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.45rem 0', borderBottom: '1px solid var(--border)', fontSize: '.83rem' }}>
+                    <span style={{ color: 'var(--text2)', maxWidth: '70%' }}>{q.label.replace(/ \(.*\)/, '')}</span>
+                    <strong style={{ color: avgScores[q.key] ? 'var(--violet)' : 'var(--text3)' }}>
+                      {avgScores[q.key] ? `⌀ ${avgScores[q.key]}` : '—'}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className="card">
+                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '.75rem' }}>Vastaukset</h3>
+                {loading ? <div style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ladataan...</div>
+                : surveyResponses.length === 0 ? <div style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ei vastauksia vielä.</div>
+                : surveyResponses.map(r => (
+                  <div key={r.id} style={{ padding: '.75rem 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.35rem' }}>
+                      <strong style={{ fontSize: '.85rem' }}>{r.respondent_name}</strong>
+                      <span style={{ color: 'var(--text3)', fontSize: '.75rem' }}>{new Date(r.created_at).toLocaleDateString('fi-FI')}</span>
+                    </div>
+                    {r.answers && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
+                        {SURVEY_QUESTIONS.map(q => {
+                          const v = r.answers[q.key]
+                          if (v == null || v === '') return null
+                          return (
+                            <span key={q.key} style={{ background: 'var(--bg3)', borderRadius: 4, padding: '2px 8px', fontSize: '.72rem', color: 'var(--text2)' }}>
+                              {q.key}: <strong>{v}</strong>
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {r.answers?.palaute && (
+                      <div style={{ marginTop: '.35rem', fontSize: '.78rem', color: 'var(--text3)', fontStyle: 'italic' }}>
+                        "{r.answers.palaute}"
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
+      {/* ── Vaatetilaus ─────────────────────────────────────────────────────────── */}
       {tab === 'vaatetus' && (
         <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr' : '1fr', gap: '1.5rem' }}>
           <div className="card">
             <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.15rem', marginBottom: '1.25rem' }}>Tee tilaus</h3>
             {saved && (
-              <div style={{ background: 'var(--green-subtle)', border: '1px solid rgba(0,184,148,.2)', borderRadius: 'var(--radius)', padding: '.75rem 1rem', marginBottom: '1rem', color: 'var(--green)', fontWeight: 600, fontSize: '.85rem' }}>
+              <div style={{ background: 'color-mix(in srgb, var(--green) 12%, var(--bg1))', border: '1px solid var(--green)', borderRadius: 'var(--radius)', padding: '.75rem 1rem', marginBottom: '1rem', color: 'var(--green)', fontWeight: 600, fontSize: '.85rem' }}>
                 Tilauksesi on tallennettu!
               </div>
             )}
@@ -169,7 +316,7 @@ export default function Surveys() {
 
           {isAdmin && (
             <div className="card">
-              <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.15rem', marginBottom: '1.25rem' }}>Koostekooste (Admin)</h3>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.15rem', marginBottom: '1.25rem' }}>Yhteenveto (Admin)</h3>
               <div className="stats-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: '1.5rem' }}>
                 <div className="stat-card">
                   <div className="stat-label">Tilauksia yhteensä</div>
@@ -192,8 +339,7 @@ export default function Surveys() {
                 <div style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--text3)', marginBottom: '.5rem' }}>Koot</div>
                 {SIZES.filter(s => sizeCounts[s]).map(s => (
                   <div key={s} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.83rem', padding: '.35rem 0', borderBottom: '1px solid var(--border)' }}>
-                    <span>{s}</span>
-                    <strong>{sizeCounts[s]} kpl</strong>
+                    <span>{s}</span><strong>{sizeCounts[s]} kpl</strong>
                   </div>
                 ))}
               </div>

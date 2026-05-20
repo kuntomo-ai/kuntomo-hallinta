@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
 
 const PERIODS = [
   { label: 'Tänään', value: 'today' },
@@ -11,10 +12,7 @@ const PERIODS = [
 
 function getRange(period, customFrom, customTo) {
   const now = new Date()
-  if (period === 'today') {
-    const d = now.toISOString().slice(0, 10)
-    return { from: d, to: d }
-  }
+  if (period === 'today') { const d = now.toISOString().slice(0, 10); return { from: d, to: d } }
   if (period === 'week') {
     const day = now.getDay() || 7
     const mon = new Date(now); mon.setDate(now.getDate() - day + 1)
@@ -22,54 +20,67 @@ function getRange(period, customFrom, customTo) {
     return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) }
   }
   if (period === 'month') {
-    const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-    const to = now.toISOString().slice(0, 10)
-    return { from, to }
+    return { from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, to: now.toISOString().slice(0, 10) }
   }
-  if (period === 'year') {
-    return { from: `${now.getFullYear()}-01-01`, to: now.toISOString().slice(0, 10) }
-  }
+  if (period === 'year') return { from: `${now.getFullYear()}-01-01`, to: now.toISOString().slice(0, 10) }
   return { from: customFrom, to: customTo }
 }
 
 export default function RaportointiTerapia() {
+  const { isAdmin, isHallitus } = useAuth()
+  const canFilter = isAdmin || isHallitus
+
   const [period, setPeriod] = useState('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [selectedEmployee, setSelectedEmployee] = useState('')
+  const [employees, setEmployees] = useState([])
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { fetchData() }, [period, customFrom, customTo])
+  useEffect(() => {
+    if (canFilter) {
+      supabase.from('profiles').select('id, first_name, last_name').order('first_name')
+        .then(({ data }) => setEmployees(data || []))
+    }
+  }, [canFilter])
+
+  useEffect(() => { fetchData() }, [period, customFrom, customTo, selectedEmployee])
 
   async function fetchData() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    const { data } = await supabase
-      .from('terapiamyynti')
-      .select('*')
-      .gte('created_at', from)
-      .lte('created_at', to + 'T23:59:59')
-      .order('created_at', { ascending: false })
+    let query = supabase.from('terapiamyynti').select('*').gte('created_at', from).lte('created_at', to + 'T23:59:59')
+    if (selectedEmployee) query = query.eq('employee_name', selectedEmployee)
+    const { data } = await query.order('created_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
 
   const total = rows.reduce((s, r) => s + (r.price || 0), 0)
   const avg = rows.length ? total / rows.length : 0
-
   const byService = {}
-  rows.forEach(r => {
-    byService[r.service] = (byService[r.service] || 0) + (r.price || 0)
-  })
+  rows.forEach(r => { byService[r.service] = (byService[r.service] || 0) + (r.price || 0) })
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Terapiamyynti — Raportti</h1>
-          <p className="page-subtitle">Terapiapalveluiden myyntiraportti</p>
+          <p className="page-subtitle">
+            {selectedEmployee ? `Myyjä: ${selectedEmployee}` : 'Terapiapalveluiden myyntiraportti'}
+          </p>
         </div>
+        {canFilter && (
+          <select className="input-field" value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} style={{ width: 200 }}>
+            <option value="">Kaikki myyjät</option>
+            {employees.map(e => {
+              const name = `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim()
+              return <option key={e.id} value={name}>{name}</option>
+            })}
+          </select>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -110,13 +121,14 @@ export default function RaportointiTerapia() {
                 <th>Palvelu</th>
                 <th>Hinta</th>
                 <th>Maksutapa</th>
+                {canFilter && <th>Myyjä</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="table-empty">Ladataan...</td></tr>
+                <tr><td colSpan={canFilter ? 6 : 5} className="table-empty">Ladataan...</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={5} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
+                <tr><td colSpan={canFilter ? 6 : 5} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
               ) : rows.map(r => (
                 <tr key={r.id}>
                   <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleDateString('fi-FI')}</td>
@@ -124,6 +136,7 @@ export default function RaportointiTerapia() {
                   <td>{r.service}</td>
                   <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
                   <td>{r.payment_method}</td>
+                  {canFilter && <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.employee_name || '—'}</td>}
                 </tr>
               ))}
             </tbody>

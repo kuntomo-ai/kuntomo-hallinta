@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
 
 const PERIODS = [
   { label: 'Tänään', value: 'today' },
@@ -26,19 +27,33 @@ function getRange(period, customFrom, customTo) {
 }
 
 export default function RaportointiJasen() {
+  const { isAdmin, isHallitus } = useAuth()
+  const canFilter = isAdmin || isHallitus
+
   const [period, setPeriod] = useState('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [selectedEmployee, setSelectedEmployee] = useState('')
+  const [employees, setEmployees] = useState([])
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { fetchData() }, [period, customFrom, customTo])
+  useEffect(() => {
+    if (canFilter) {
+      supabase.from('profiles').select('id, first_name, last_name').order('first_name')
+        .then(({ data }) => setEmployees(data || []))
+    }
+  }, [canFilter])
+
+  useEffect(() => { fetchData() }, [period, customFrom, customTo, selectedEmployee])
 
   async function fetchData() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    const { data } = await supabase.from('jasenmyynti').select('*').gte('created_at', from).lte('created_at', to + 'T23:59:59').order('created_at', { ascending: false })
+    let query = supabase.from('jasenmyynti').select('*').gte('created_at', from).lte('created_at', to + 'T23:59:59')
+    if (selectedEmployee) query = query.eq('employee_name', selectedEmployee)
+    const { data } = await query.order('created_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -53,8 +68,19 @@ export default function RaportointiJasen() {
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Jäsenmyynti — Raportti</h1>
-          <p className="page-subtitle">Jäsenyyksien myyntiraportti</p>
+          <p className="page-subtitle">
+            {selectedEmployee ? `Myyjä: ${selectedEmployee}` : 'Jäsenyyksien myyntiraportti'}
+          </p>
         </div>
+        {canFilter && (
+          <select className="input-field" value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} style={{ width: 200 }}>
+            <option value="">Kaikki myyjät</option>
+            {employees.map(e => {
+              const name = `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim()
+              return <option key={e.id} value={name}>{name}</option>
+            })}
+          </select>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -80,13 +106,16 @@ export default function RaportointiJasen() {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>Pvm</th><th>Asiakas</th><th>Jäsenyystyyppi</th><th>Hinta</th><th>Alkaa</th><th>Maksutapa</th></tr>
+              <tr>
+                <th>Pvm</th><th>Asiakas</th><th>Jäsenyystyyppi</th><th>Hinta</th><th>Alkaa</th><th>Maksutapa</th>
+                {canFilter && <th>Myyjä</th>}
+              </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="table-empty">Ladataan...</td></tr>
+                <tr><td colSpan={canFilter ? 7 : 6} className="table-empty">Ladataan...</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
+                <tr><td colSpan={canFilter ? 7 : 6} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
               ) : rows.map(r => (
                 <tr key={r.id}>
                   <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleDateString('fi-FI')}</td>
@@ -95,6 +124,7 @@ export default function RaportointiJasen() {
                   <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
                   <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.start_date ? new Date(r.start_date).toLocaleDateString('fi-FI') : '—'}</td>
                   <td>{r.payment_method}</td>
+                  {canFilter && <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.employee_name || '—'}</td>}
                 </tr>
               ))}
             </tbody>

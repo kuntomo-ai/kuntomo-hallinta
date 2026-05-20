@@ -150,6 +150,7 @@ function TerapiaForm({ onSaved }) {
     }).join(', ')
     const customerName = form.company_person_name || '—'
 
+    const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
     await supabase.from('terapiamyynti').insert({
       customer_name: customerName,
       service: form.service,
@@ -157,6 +158,8 @@ function TerapiaForm({ onSaved }) {
       payment_method: paymentStr,
       notes: form.notes.trim() || null,
       receipt_url,
+      employee_id: user?.id ?? null,
+      employee_name: empName || null,
     })
 
     if (needsCompany && form.company_id && form.company_person_id) {
@@ -412,18 +415,22 @@ function TerapiaForm({ onSaved }) {
 // ─── Valmennus form ───────────────────────────────────────────────────────────
 
 function ValmennusForm({ onSaved }) {
+  const { profile, user } = useAuth()
   const [form, setForm] = useState({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '' })
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit() {
     if (!form.customer_name.trim() || !form.service || !form.price) return
     setSaving(true)
+    const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
     await supabase.from('valmennusmyynti').insert({
       customer_name: form.customer_name.trim(),
       service: form.service,
       price: parseFloat(form.price),
       payment_method: form.payment_method || null,
       notes: form.notes.trim() || null,
+      employee_id: user?.id ?? null,
+      employee_name: empName || null,
     })
     setSaving(false)
     setForm({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '' })
@@ -493,6 +500,7 @@ function ValmennusForm({ onSaved }) {
 // ─── Jasen form ───────────────────────────────────────────────────────────────
 
 function JasenForm({ onSaved }) {
+  const { profile, user } = useAuth()
   const [form, setForm] = useState({ customer_name: '', customer_email: '', service: '', price: '', discount_info: '', start_date: '', notes: '' })
   const [saving, setSaving] = useState(false)
 
@@ -504,6 +512,7 @@ function JasenForm({ onSaved }) {
   async function handleSubmit() {
     if (!form.customer_name.trim() || !form.service || !form.price) return
     setSaving(true)
+    const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
     await supabase.from('jasenmyynti').insert({
       customer_name: form.customer_name.trim(),
       customer_email: form.customer_email.trim() || null,
@@ -512,6 +521,8 @@ function JasenForm({ onSaved }) {
       discount_info: form.discount_info.trim() || null,
       start_date: form.start_date || null,
       notes: form.notes.trim() || null,
+      employee_id: user?.id ?? null,
+      employee_name: empName || null,
     })
     setSaving(false)
     setForm({ customer_name: '', customer_email: '', service: '', price: '', discount_info: '', start_date: '', notes: '' })
