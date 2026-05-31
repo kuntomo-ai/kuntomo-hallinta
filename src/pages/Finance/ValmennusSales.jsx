@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 
-const PALVELUT = ['Fysiikkavalmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Pienryhmä', 'Muu']
+const PALVELUT = ['Fysiikkavalmennus', 'Jatkuva valmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Pienryhmä', 'Muu']
 const MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Eazybreak', 'SmartumPay', 'ePassi']
 
-const empty = { customer_name: '', service: PALVELUT[0], price: '', payment_method: MAKSUTAVAT[0], notes: '' }
+const empty = { customer_name: '', service: PALVELUT[0], price: '', payment_method: MAKSUTAVAT[0], notes: '', recurring_months: null }
 
 export default function ValmennusSales() {
   const [rows, setRows] = useState([])
@@ -21,7 +21,7 @@ export default function ValmennusSales() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase.from('valmennusmyynti').select('*').order('created_at', { ascending: false })
+    const { data } = await supabaseAdmin.from('valmennusmyynti').select('*').order('created_at', { ascending: false })
     setRows(data || [])
     const today = new Date().toISOString().slice(0, 10)
     const todayRows = (data || []).filter(r => r.created_at?.slice(0, 10) === today)
@@ -30,19 +30,41 @@ export default function ValmennusSales() {
   }
 
   function handleChange(e) {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }))
+    const { name, value } = e.target
+    setForm(f => ({
+      ...f,
+      [name]: value,
+      ...(name === 'service' && value !== 'Jatkuva valmennus' ? { recurring_months: null } : {}),
+    }))
   }
 
   async function handleSave() {
     if (!form.customer_name.trim() || !form.price) return
+    const isRecurring = form.service === 'Jatkuva valmennus'
+    if (isRecurring && !form.recurring_months) return
     setSaving(true)
-    await supabase.from('valmennusmyynti').insert({
+
+    const base = {
       customer_name: form.customer_name.trim(),
       service: form.service,
       price: parseFloat(form.price),
       payment_method: form.payment_method,
       notes: form.notes.trim() || null,
-    })
+      seller_id: null,
+    }
+
+    if (isRecurring) {
+      const months = parseInt(form.recurring_months)
+      const now = new Date()
+      const records = Array.from({ length: months }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+        return { ...base, created_at: d.toISOString() }
+      })
+      await supabaseAdmin.from('valmennusmyynti').insert(records)
+    } else {
+      await supabaseAdmin.from('valmennusmyynti').insert(base)
+    }
+
     setSaving(false)
     setShowModal(false)
     setForm(empty)
@@ -51,7 +73,7 @@ export default function ValmennusSales() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko myyntikirjaus?')) return
-    await supabase.from('valmennusmyynti').delete().eq('id', id)
+    await supabaseAdmin.from('valmennusmyynti').delete().eq('id', id)
     fetchData()
   }
 
@@ -152,6 +174,25 @@ export default function ValmennusSales() {
                 {MAKSUTAVAT.map(m => <option key={m}>{m}</option>)}
               </select>
             </div>
+            {form.service === 'Jatkuva valmennus' && (
+              <div className="input-group">
+                <label className="input-label">Laskutus jatkuu (kuukausia)</label>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                  {[1, 2, 3, 4, 5, 6].map(n => (
+                    <label key={n} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: form.recurring_months === String(n) ? 700 : 400 }}>
+                      <input
+                        type="radio"
+                        name="recurring_months"
+                        value={n}
+                        checked={form.recurring_months === String(n)}
+                        onChange={handleChange}
+                      />
+                      {n} kk
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="input-group">
               <label className="input-label">Muistiinpanot</label>
               <textarea className="input-field" name="notes" rows={3} value={form.notes} onChange={handleChange} style={{ resize: 'vertical' }} />
