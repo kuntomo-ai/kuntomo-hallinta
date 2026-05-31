@@ -11,7 +11,7 @@ const SERVICES = [
   { label: 'Hieronta 60 min – 55 €', value: 'Hieronta 60min', price: '55' },
   { label: 'Hieronta 75 min – 65 €', value: 'Hieronta 75min', price: '65' },
   { label: 'Hieronta 90 min – 75 €', value: 'Hieronta 90min', price: '75' },
-  { label: 'Hieronta 120 min – 85 €', value: 'Hieronta 120min', price: '85' },
+  { label: 'Hieronta 120 min – 95 €', value: 'Hieronta 120min', price: '95' },
   { label: 'Purentalihashieronta 45 min – 50 €', value: 'Purentalihashieronta 45min', price: '50' },
   { label: 'Hieronta & fysioterapia – 100 €', value: 'Hieronta & fysioterapia', price: '100' },
   { label: 'Äitiysfysioterapia ensikäynti – 83 €', value: 'Äitiysfysioterapia ensikäynti', price: '83' },
