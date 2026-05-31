@@ -57,7 +57,7 @@ export default function ValmennusSales() {
       const months = parseInt(form.recurring_months)
       const now = new Date()
       const records = Array.from({ length: months }, (_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+        const d = new Date(now.getFullYear(), now.getMonth() + 1 + i, 1)
         return { ...base, created_at: d.toISOString() }
       })
       await supabaseAdmin.from('valmennusmyynti').insert(records)
