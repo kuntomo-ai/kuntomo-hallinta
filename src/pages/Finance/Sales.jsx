@@ -601,16 +601,27 @@ function TerapiaForm({ onSaved }) {
 
 function ValmennusForm({ onSaved }) {
   const { profile, user } = useAuth()
-  const [form, setForm] = useState({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '' })
+  const [form, setForm] = useState({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '', recurring_months: null })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
+  function handleChange(e) {
+    const { name, value } = e.target
+    setForm(f => ({
+      ...f,
+      [name]: value,
+      ...(name === 'service' && value !== 'Jatkuva valmennus' ? { recurring_months: null } : {}),
+    }))
+  }
+
   async function handleSubmit() {
     if (!form.customer_name.trim() || !form.service || !form.price) return
+    const isRecurring = form.service === 'Jatkuva valmennus'
+    if (isRecurring && !form.recurring_months) return
     setSaving(true)
     setSaveError('')
     const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
-    const { error } = await supabaseAdmin.from('valmennusmyynti').insert({
+    const base = {
       customer_name: form.customer_name.trim(),
       service: form.service,
       price: parseFloat(form.price),
@@ -620,10 +631,24 @@ function ValmennusForm({ onSaved }) {
       employee_name: empName || null,
       seller_id: user?.id ?? null,
       visit_date: form.visit_date || null,
-    })
+    }
+
+    let error
+    if (isRecurring) {
+      const months = parseInt(form.recurring_months)
+      const now = new Date()
+      const records = Array.from({ length: months }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+        return { ...base, created_at: d.toISOString() }
+      });
+      ({ error } = await supabaseAdmin.from('valmennusmyynti').insert(records))
+    } else {
+      ({ error } = await supabaseAdmin.from('valmennusmyynti').insert(base))
+    }
+
     setSaving(false)
     if (error) { setSaveError(error.message); return }
-    setForm({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '' })
+    setForm({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '', recurring_months: null })
     onSaved()
   }
 
@@ -651,12 +676,24 @@ function ValmennusForm({ onSaved }) {
         </div>
         <div className="input-group">
           <label className="input-label">Palvelu *</label>
-          <select className="input-field" value={form.service}
-            onChange={e => setForm(f => ({ ...f, service: e.target.value }))}>
+          <select className="input-field" name="service" value={form.service} onChange={handleChange}>
             <option value="">Valitse palvelu</option>
             {VALMENNUS_PALVELUT.map(p => <option key={p}>{p}</option>)}
           </select>
         </div>
+        {form.service === 'Jatkuva valmennus' && (
+          <div className="input-group">
+            <label className="input-label">Laskutus jatkuu (kuukausia)</label>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+              {[1, 2, 3, 4, 5, 6].map(n => (
+                <label key={n} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: form.recurring_months === String(n) ? 700 : 400 }}>
+                  <input type="radio" name="recurring_months" value={n} checked={form.recurring_months === String(n)} onChange={handleChange} />
+                  {n} kk
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="input-group">
           <label className="input-label">Hinta (€) *</label>
           <div style={{ position: 'relative' }}>
