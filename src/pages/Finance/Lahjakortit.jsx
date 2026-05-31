@@ -62,7 +62,7 @@ export default function Lahjakortit() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('lahjakortit').select('*').order('created_at', { ascending: false })
+    const { data } = await supabaseAdmin.from('lahjakortit').select('*').order('sale_date', { ascending: false, nullsFirst: false })
     setRows(data || [])
     setLoading(false)
   }
