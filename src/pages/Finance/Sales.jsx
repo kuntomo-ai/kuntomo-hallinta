@@ -831,7 +831,7 @@ export default function Sales() {
     }
   }, [isAdmin])
 
-  async function fetchData(activeTab) {
+  async function fetchTerapia(activeTab) {
     setLoading(true)
     let q = supabaseAdmin.from('terapiamyynti').select('*').order('entry_date', { ascending: false })
     if (!isAdmin) q = q.eq('employee_id', user?.id)
