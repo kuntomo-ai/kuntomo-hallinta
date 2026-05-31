@@ -456,10 +456,11 @@ export default function Dashboard() {
     const today = new Date().toISOString().slice(0, 10)
 
     const baseFetches = [
-      supabaseAdmin.from('tasks').select('*').eq('status', 'avoin')
-        .order('priority', { ascending: true })
-        .order('due_date', { ascending: true })
-        .limit(3),
+      supabaseAdmin.from('tasks').select('*')
+        .or('status.is.null,status.eq.avoin')
+        .neq('completed', true)
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .limit(5),
       supabaseAdmin.from('calendar_events').select('*').gte('event_start', today)
         .order('event_start', { ascending: true }).limit(3),
     ]
