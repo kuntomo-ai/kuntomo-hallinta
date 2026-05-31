@@ -349,6 +349,7 @@ export default function Yritykset() {
                                 <div style={{ fontWeight: 700, color: visit.invoiced ? 'var(--green)' : 'var(--text)', marginBottom: 1 }}>
                                   {visit.company_person_name || visit.payment_type || '—'}
                                 </div>
+                                {visit.employee_name && <div style={{ color: 'var(--text3)', fontSize: '.65rem' }}>{visit.employee_name}</div>}
                                 <div style={{ color: 'var(--text3)' }}>{new Date(visit.visit_date).toLocaleDateString('fi-FI')}</div>
                                 <div style={{ color: 'var(--text2)' }}>{visit.service}</div>
                                 <div style={{ fontWeight: 700, color: 'var(--violet)' }}>{(visit.price || 0).toFixed(2)} €</div>

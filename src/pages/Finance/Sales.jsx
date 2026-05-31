@@ -224,6 +224,7 @@ function TerapiaForm({ onSaved }) {
         payment_type: 'Yrityslaskutus',
         invoiced: false,
         notes: form.notes.trim() || null,
+        employee_name: empName || null,
       })
     }
 
