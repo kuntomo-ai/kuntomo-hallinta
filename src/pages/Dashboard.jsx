@@ -458,7 +458,7 @@ export default function Dashboard() {
     const baseFetches = [
       supabaseAdmin.from('tasks').select('*')
         .or('status.is.null,status.eq.avoin')
-        .neq('completed', true)
+        .or('completed.is.null,completed.eq.false')
         .order('due_date', { ascending: true, nullsFirst: false })
         .limit(5),
       supabaseAdmin.from('calendar_events').select('*').gte('event_start', today)
