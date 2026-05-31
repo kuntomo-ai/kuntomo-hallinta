@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 function fmt(v, decimals = 0) {
@@ -25,11 +25,11 @@ export default function Kirjanpito() {
     const { fyStart, fyEnd } = getFiscalYear()
 
     const [tulosRes, taseRes, kassaRes] = await Promise.all([
-      supabase.from('tulos_kuukausiraportti').select('*')
+      supabaseAdmin.from('tulos_kuukausiraportti').select('*')
         .gte('period', fyStart).lte('period', fyEnd)
         .order('period', { ascending: false }),
-      supabase.from('tase_snapshot').select('sub_section, loppusaldo'),
-      supabase.from('kassavirta_entries').select('amount, entry_type').order('entry_date', { ascending: false }).limit(200),
+      supabaseAdmin.from('tase_snapshot').select('sub_section, loppusaldo'),
+      supabaseAdmin.from('kassavirta_entries').select('amount, entry_type').order('entry_date', { ascending: false }).limit(200),
     ])
 
     const tulosRows = tulosRes.data || []
@@ -102,22 +102,15 @@ export default function Kirjanpito() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-            {[
-              { label: 'Tase', desc: 'Vastaavaa ja vastattavaa', to: '/finance/kirjanpito/tase' },
-              { label: 'Tuloslaskelma', desc: 'Tuotot ja kulut', to: '/finance/kirjanpito/tulos' },
-              { label: 'Kassavirta', desc: 'Tulot ja menot', to: '/finance/kirjanpito/kassavirta' },
-              { label: 'Tuo CSV', desc: 'Tuo Netvisor-raportit', to: '/finance/kirjanpito/tuonti' },
-            ].map(c => (
-              <a key={c.to} href={c.to} style={{ textDecoration: 'none' }}>
-                <div className="card" style={{ cursor: 'pointer', transition: 'border-color .15s, box-shadow .15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--violet)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--violet-subtle)' }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = '' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.35rem' }}>{c.label}</div>
-                  <div style={{ fontSize: '.8rem', color: 'var(--text3)' }}>{c.desc}</div>
-                </div>
-              </a>
-            ))}
+          <div>
+            <a href="/finance/kirjanpito/tuonti" style={{ textDecoration: 'none' }}>
+              <div className="card" style={{ cursor: 'pointer', transition: 'border-color .15s, box-shadow .15s', display: 'inline-block', minWidth: 200 }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--violet)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--violet-subtle)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = '' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.35rem' }}>Tuo CSV</div>
+                <div style={{ fontSize: '.8rem', color: 'var(--text3)' }}>Tuo Netvisor-raportit</div>
+              </div>
+            </a>
           </div>
         </>
       )}

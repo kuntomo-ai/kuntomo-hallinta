@@ -1,5 +1,28 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { NavLink } from 'react-router-dom'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
+
+const REPORT_NAV = [
+  { label: 'Terapiamyynti', to: '/finance/raportointi/terapiamyynti' },
+  { label: 'Valmennusmyynti', to: '/finance/raportointi/valmennusmyynti' },
+  { label: 'Jäsenmyynti', to: '/finance/raportointi/jasenmyynti' },
+  { label: 'Lahjakortit', to: '/finance/raportointi/lahjakortit' },
+]
+
+function ReportNav() {
+  return (
+    <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <NavLink to="/finance/raportointi" end style={{ textDecoration: 'none' }}>
+        <button className="sub-tab">← Yhteenveto</button>
+      </NavLink>
+      {REPORT_NAV.map(r => (
+        <NavLink key={r.to} to={r.to} style={{ textDecoration: 'none' }}>
+          {({ isActive }) => <button className={`sub-tab${isActive ? ' active' : ''}`}>{r.label}</button>}
+        </NavLink>
+      ))}
+    </div>
+  )
+}
 
 const PERIODS = [
   { label: 'Tänään', value: 'today' },
@@ -45,7 +68,7 @@ export default function RaportointiLahjakortit() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    const { data } = await supabase.from('lahjakortit').select('*').gte('sold_at', from).lte('sold_at', to + 'T23:59:59').order('sold_at', { ascending: false })
+    const { data } = await supabaseAdmin.from('lahjakortit').select('*').gte('sold_at', from).lte('sold_at', to + 'T23:59:59').order('sold_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -57,6 +80,7 @@ export default function RaportointiLahjakortit() {
 
   return (
     <div>
+      <ReportNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Lahjakortit — Raportti</h1>

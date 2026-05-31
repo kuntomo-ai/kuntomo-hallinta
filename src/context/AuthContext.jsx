@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseAdmin } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
@@ -8,10 +8,11 @@ const ROUTE_PERMISSIONS = {
   '/timelog':                  ['myynti', 'terapia_valmennus', 'huolto', 'sport', 'respa'],
   '/employees':                [],  // admin/manager only
   '/inventory':                ['respa'],
-  '/laiteluettelo':            ['respa'],
+  '/laiteluettelo':            ['respa', 'huolto'],
   '/finance/myynti':           ['myynti', 'terapia_valmennus', 'sport', 'respa'],
   '/finance/lahjakortit':      ['terapia_valmennus', 'respa'],
   '/finance/kirjanpito':       ['hallitus'],
+  '/finance/raportointi/oma':  ['myynti', 'terapia_valmennus', 'sport'],
   '/finance/raportointi':      ['hallitus'],
   '/customers/yritykset':      ['terapia_valmennus', 'respa'],
   '/customers/sport-hockey':   ['sport'],
@@ -37,7 +38,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function fetchProfile(userId) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    const { data } = await supabaseAdmin.from('profiles').select('*').eq('id', userId).single()
     setProfile(data)
     setLoading(false)
   }

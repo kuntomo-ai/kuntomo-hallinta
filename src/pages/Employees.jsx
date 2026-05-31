@@ -44,16 +44,72 @@ export default function Employees() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
   const [anniversaryBanners, setAnniversaryBanners] = useState([])
 
   useEffect(() => { fetchData() }, [])
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase.from('employees').select('*').order('created_at', { ascending: false })
-    setRows(data || [])
+    // Fetch both profiles (all system users) and employees (HR data)
+    const [profRes, empRes] = await Promise.all([
+      supabaseAdmin.from('profiles').select('*').order('first_name'),
+      supabaseAdmin.from('employees').select('*'),
+    ])
+    const profiles = profRes.data || []
+    const employees = empRes.data || []
+
+    // Build email→employees map for fast lookup
+    const empByEmail = {}
+    employees.forEach(e => { if (e.email) empByEmail[e.email.toLowerCase()] = e })
+
+    // Merge: every profile gets shown, supplemented with employees HR data if it exists
+    const merged = profiles.map(p => {
+      const emp = empByEmail[p.email?.toLowerCase()] || {}
+      return {
+        // Identity from profile
+        profile_id: p.id,
+        first_name: p.first_name || emp.first_name || '',
+        last_name: p.last_name || emp.last_name || '',
+        email: p.email || emp.email || '',
+        role: p.role || emp.role || '',
+        // HR data from employees (may be empty)
+        employee_id: emp.id || null,
+        title: emp.title || '',
+        employment_type: emp.employment_type || '',
+        employment_start: emp.employment_start || '',
+        status: emp.status || 'active',
+        key_management: emp.key_management || '',
+        notes: emp.notes || '',
+        created_at: emp.created_at || p.created_at,
+      }
+    })
+
+    // Also show employees that have no matching profile (legacy records)
+    employees.forEach(e => {
+      if (!e.email || !profiles.find(p => p.email?.toLowerCase() === e.email?.toLowerCase())) {
+        merged.push({
+          profile_id: null,
+          employee_id: e.id,
+          first_name: e.first_name || '',
+          last_name: e.last_name || '',
+          email: e.email || '',
+          role: e.role || '',
+          title: e.title || '',
+          employment_type: e.employment_type || '',
+          employment_start: e.employment_start || '',
+          status: e.status || 'active',
+          key_management: e.key_management || '',
+          notes: e.notes || '',
+          created_at: e.created_at,
+        })
+      }
+    })
+
+    setRows(merged)
     if (isAdmin) {
-      const banners = (data || []).filter(e => {
+      const banners = merged.filter(e => {
         const d = daysUntilAnniversary(e.employment_start, 10)
         return d !== null && d >= 0 && d <= 30
       })
@@ -74,12 +130,13 @@ export default function Employees() {
   }
 
   function openEdit(row) {
-    setEditing(row.id)
+    // editing = employee_id (null if person has no employees record yet)
+    setEditing(row.employee_id || null)
     setForm({
       first_name: row.first_name || '',
       last_name: row.last_name || '',
       email: row.email || '',
-      roles: Array.isArray(row.role) ? row.role : (row.role ? row.role.split(',').map(r => r.trim()) : []),
+      roles: row.role ? row.role.split(',').map(r => r.trim()).filter(Boolean) : [],
       title: row.title || '',
       employment_type: row.employment_type || EMPLOYMENT_TYPES[0],
       employment_start: row.employment_start || '',
@@ -93,42 +150,135 @@ export default function Employees() {
   async function handleSave() {
     if (!form.first_name.trim() || !form.last_name.trim()) return
     setSaving(true)
+    setSaveError('')
     const payload = {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       email: form.email.trim() || null,
       role: form.roles.join(', ') || null,
       title: form.title.trim() || null,
-      employment_type: form.employment_type,
+      employment_type: form.employment_type || null,
       employment_start: form.employment_start || null,
       status: form.status,
       key_management: form.key_management.trim() || null,
       notes: form.notes.trim() || null,
     }
-    if (editing) {
-      await supabase.from('employees').update(payload).eq('id', editing)
-    } else {
-      await supabase.from('employees').insert(payload)
-      if (form.email.trim()) {
-        await supabaseAdmin.auth.admin.inviteUserByEmail(form.email.trim())
+    try {
+      if (editing) {
+        // Update existing employees row
+        const { error } = await supabaseAdmin.from('employees').update(payload).eq('id', editing)
+        if (error) throw error
+
+        // Sync name/role to matching profile if exists
+        if (payload.email) {
+          const { data: prof } = await supabaseAdmin.from('profiles').select('id').eq('email', payload.email).maybeSingle()
+          if (prof) {
+            await supabaseAdmin.from('profiles').update({
+              first_name: payload.first_name,
+              last_name: payload.last_name,
+              role: form.roles[0] || payload.role || null,
+            }).eq('id', prof.id)
+          }
+        }
+      } else {
+        // New person — insert employees row
+        const { error } = await supabaseAdmin.from('employees').insert(payload)
+        if (error) throw error
+
+        if (form.email.trim()) {
+          // Create auth user + profile
+          const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+            email: form.email.trim(),
+            email_confirm: true,
+            user_metadata: { first_name: payload.first_name, last_name: payload.last_name },
+          })
+          if (authErr) throw new Error(`Käyttäjätunnuksen luonti epäonnistui: ${authErr.message}`)
+
+          const uid = authData?.user?.id
+          if (uid) {
+            // Upsert profile
+            await supabaseAdmin.from('profiles').upsert({
+              id: uid,
+              first_name: payload.first_name,
+              last_name: payload.last_name,
+              email: form.email.trim(),
+              role: form.roles[0] || null,
+            })
+
+            // Send password reset so user can set their own password
+            await supabaseAdmin.auth.admin.generateLink({
+              type: 'recovery',
+              email: form.email.trim(),
+            }).catch(() => {})
+          }
+        }
       }
+      setShowModal(false)
+      setEditing(null)
+      setForm(empty)
+      fetchData()
+    } catch (err) {
+      setSaveError(err?.message || 'Tallennus epäonnistui')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    setShowModal(false)
-    setEditing(null)
-    setForm(empty)
-    fetchData()
   }
 
-  async function handleDelete(id) {
-    if (!confirm('Poistetaanko työntekijä?')) return
-    await supabase.from('employees').delete().eq('id', id)
+  async function handleDelete(row) {
+    const name = `${row.first_name} ${row.last_name}`.trim()
+    if (!confirm(`Poistetaanko ${name} kokonaan järjestelmästä?\n\nTämä poistaa henkilön HR-tiedot, profiilin ja käyttäjätunnuksen.`)) return
+    setDeleteError('')
+    setSaving(true)
+    try {
+      const uid = row.profile_id
+
+      // 1. Null out employee_id in all referencing tables (avoids FK constraint on auth user delete)
+      if (uid) {
+        await Promise.all([
+          supabaseAdmin.from('terapiamyynti').update({ employee_id: null }).eq('employee_id', uid),
+          supabaseAdmin.from('valmennusmyynti').update({ employee_id: null }).eq('employee_id', uid),
+          supabaseAdmin.from('jasenmyynti').update({ employee_id: null }).eq('employee_id', uid),
+          supabaseAdmin.from('work_logs').update({ employee_id: null }).eq('employee_id', uid),
+          supabaseAdmin.from('work_time_logs').update({ employee_id: null }).eq('employee_id', uid),
+          supabaseAdmin.from('drive_logs').update({ driver_id: null }).eq('driver_id', uid),
+        ])
+      }
+
+      // 2. Delete employees HR record
+      if (row.employee_id) {
+        const { error: empErr } = await supabaseAdmin.from('employees').delete().eq('id', row.employee_id)
+        if (empErr) throw new Error(`HR-tietojen poisto epäonnistui: ${empErr.message}`)
+      }
+
+      // 3. Delete profile row manually before auth delete
+      if (uid) {
+        await supabaseAdmin.from('profiles').delete().eq('id', uid)
+      }
+
+      // 4. Delete auth user — if blocked by DB constraints, ban instead (same effect)
+      if (uid) {
+        const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(uid)
+        if (authErr) {
+          // Fallback: ban user permanently so they can't log in
+          await supabaseAdmin.auth.admin.updateUserById(uid, {
+            ban_duration: '876000h', // 100 years
+            email: `deleted_${Date.now()}@poistettu.invalid`,
+          })
+        }
+      }
+    } catch (err) {
+      setDeleteError(err.message)
+      setSaving(false)
+      fetchData()
+      return
+    }
+    setSaving(false)
     fetchData()
   }
 
   const filtered = rows.filter(r => {
     const full = `${r.first_name} ${r.last_name}`.toLowerCase()
-    return full.includes(search.toLowerCase()) || r.email?.toLowerCase().includes(search.toLowerCase())
+    return !search || full.includes(search.toLowerCase()) || r.email?.toLowerCase().includes(search.toLowerCase())
   })
 
   return (
@@ -144,6 +294,13 @@ export default function Employees() {
           </button>
         )}
       </div>
+
+      {deleteError && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius)', padding: '.75rem 1.25rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: 'var(--red)', fontSize: '.85rem' }}>⚠️ {deleteError}</span>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: '1rem' }} onClick={() => setDeleteError('')}>✕</button>
+        </div>
+      )}
 
       {isAdmin && anniversaryBanners.length > 0 && anniversaryBanners.map(e => (
         <div key={e.id} style={{ background: 'var(--violet-subtle)', border: '1px solid var(--violet-border)', borderRadius: 'var(--radius)', padding: '.85rem 1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '.75rem' }}>
@@ -181,9 +338,9 @@ export default function Employees() {
             ) : filtered.length === 0 ? (
               <tr><td colSpan={isAdmin ? 8 : 7} className="table-empty">Ei henkilöstöä.</td></tr>
             ) : filtered.map(r => {
-              const roleList = Array.isArray(r.role) ? r.role : (r.role ? r.role.split(',').map(s => s.trim()) : [])
+              const roleList = r.role ? r.role.split(',').map(s => s.trim()).filter(Boolean) : []
               return (
-                <tr key={r.id}>
+                <tr key={r.employee_id || r.profile_id}>
                   <td>
                     <div className="emp-name-cell">
                       <div className="emp-avatar">{(r.first_name?.[0] || '') + (r.last_name?.[0] || '')}</div>
@@ -203,7 +360,7 @@ export default function Employees() {
                     <td>
                       <div style={{ display: 'flex', gap: '.4rem' }}>
                         <button className="btn btn-ghost btn-sm" onClick={() => openEdit(r)}>Muokkaa</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}>Poista</button>
+                        {(r.employee_id || r.profile_id) && <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r)}>Poista</button>}
                       </div>
                     </td>
                   )}
@@ -215,9 +372,10 @@ export default function Employees() {
       </div>
 
       {showModal && isAdmin && (
-        <Modal title={editing ? 'Muokkaa työntekijää' : 'Lisää työntekijä'} onClose={() => setShowModal(false)} wide footer={
+        <Modal title={editing ? 'Muokkaa työntekijää' : 'Lisää työntekijä'} onClose={() => { setShowModal(false); setSaveError('') }} wide footer={
           <>
-            <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Peruuta</button>
+            {saveError && <span style={{ color: 'var(--red)', fontSize: '.82rem', flex: 1 }}>{saveError}</span>}
+            <button className="btn btn-ghost" onClick={() => { setShowModal(false); setSaveError('') }}>Peruuta</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? 'Tallennetaan...' : editing ? 'Tallenna' : 'Lisää ja kutsu'}
             </button>

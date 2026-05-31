@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 
 const PALVELUT = [
@@ -28,7 +28,7 @@ export default function TerapiaSales() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase.from('terapiamyynti').select('*').order('created_at', { ascending: false })
+    const { data } = await supabaseAdmin.from('terapiamyynti').select('*').order('created_at', { ascending: false })
     setRows(data || [])
     const today = new Date().toISOString().slice(0, 10)
     const todayRows = (data || []).filter(r => r.created_at?.slice(0, 10) === today)
@@ -47,7 +47,7 @@ export default function TerapiaSales() {
 
   async function handleGiftOk() {
     if (giftCode.trim()) {
-      const { data } = await supabase.from('lahjakortit').select('*').eq('code', giftCode.trim()).single()
+      const { data } = await supabaseAdmin.from('lahjakortit').select('*').eq('code', giftCode.trim()).single()
       if (!data) {
         setForm(f => ({ ...f, notes: f.notes ? f.notes + ` [Lahjakortti ${giftCode} – ei löydy järjestelmästä]` : `Lahjakortti ${giftCode} – ei löydy järjestelmästä` }))
       } else {
@@ -60,12 +60,13 @@ export default function TerapiaSales() {
   async function handleSave() {
     if (!form.customer_name.trim() || !form.price) return
     setSaving(true)
-    await supabase.from('terapiamyynti').insert({
+    await supabaseAdmin.from('terapiamyynti').insert({
       customer_name: form.customer_name.trim(),
       service: form.service,
       price: parseFloat(form.price),
       payment_method: form.payment_method,
       notes: form.notes.trim() || null,
+      seller_id: null,
     })
     setSaving(false)
     setShowModal(false)
@@ -75,7 +76,7 @@ export default function TerapiaSales() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko myyntikirjaus?')) return
-    await supabase.from('terapiamyynti').delete().eq('id', id)
+    await supabaseAdmin.from('terapiamyynti').delete().eq('id', id)
     fetchData()
   }
 

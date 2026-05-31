@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabaseAdmin } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
+import { useAuth } from '../../context/AuthContext'
 
 const SERVICES = [
   { label: 'Valitse palvelu...', value: '', price: '' },
@@ -19,34 +20,30 @@ const SERVICES = [
 ]
 
 const PAYMENT_METHODS = [
-  'Verkkokauppa',
-  'Maksupääte',
-  'Hyvinvointietu',
-  'Käteinen',
-  'Lasku',
-  'MobilePay',
-  'Muu',
+  'Verkkokauppa', 'Maksupääte', 'Hyvinvointietu', 'Käteinen', 'Lasku', 'MobilePay', 'Muu',
 ]
+
+const TODAY = new Date().toISOString().slice(0, 10)
 
 const empty = {
   code: '',
   service: '',
-  value: '',
+  price: '',
   payment_method: '',
-  payment_details: '',
-  recipient_name: '',
-  expires_at: '',
+  sale_date: TODAY,
   notes: '',
 }
 
-function statusBadge(status) {
-  if (status === 'aktiivinen') return <span className="badge badge-green">Aktiivinen</span>
-  if (status === 'käytetty') return <span className="badge badge-gray">Käytetty</span>
-  if (status === 'vanhentunut') return <span className="badge badge-red">Vanhentunut</span>
-  return <span className="badge badge-gray">{status || '—'}</span>
+function statusBadge(r) {
+  const used = r.used_amount || 0
+  const price = r.price || 0
+  if (used >= price && price > 0) return <span className="badge badge-red">Käytetty</span>
+  if (used > 0) return <span className="badge badge-yellow">Osittain</span>
+  return <span className="badge badge-green">Aktiivinen</span>
 }
 
 export default function Lahjakortit() {
+  const { profile } = useAuth()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -58,7 +55,7 @@ export default function Lahjakortit() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase.from('lahjakortit').select('*').order('created_at', { ascending: false })
+    const { data } = await supabaseAdmin.from('lahjakortit').select('*').order('created_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -71,54 +68,44 @@ export default function Lahjakortit() {
   function handleServiceChange(e) {
     const val = e.target.value
     const svc = SERVICES.find(s => s.value === val)
-    setForm(f => ({
-      ...f,
-      service: val,
-      value: svc?.price ?? f.value,
-    }))
+    setForm(f => ({ ...f, service: val, price: svc?.price ?? f.price }))
   }
 
-  const isMuu = form.payment_method === 'Muu'
-  const canSave =
-    form.code.trim() &&
-    form.payment_method &&
-    (!isMuu || form.payment_details.trim())
+  const canSave = form.code.trim() && form.payment_method
 
   async function handleSave() {
     if (!canSave) return
     setSaving(true)
-    await supabase.from('lahjakortit').insert({
+    const { error } = await supabaseAdmin.from('lahjakortit').insert({
       code: form.code.trim(),
       service: form.service || null,
-      value: form.value !== '' ? parseFloat(form.value) : null,
+      price: form.price !== '' ? parseFloat(form.price) : null,
       payment_method: form.payment_method || null,
-      payment_details: form.payment_details.trim() || null,
-      recipient_name: form.recipient_name.trim() || null,
-      sold_at: new Date().toISOString(),
-      expires_at: form.expires_at || null,
-      status: 'aktiivinen',
+      sale_date: form.sale_date || TODAY,
       notes: form.notes.trim() || null,
+      created_by: profile?.id || null,
     })
     setSaving(false)
+    if (error) { alert('Tallennus epäonnistui: ' + error.message); return }
     setShowModal(false)
     setForm(empty)
-    fetchData()
+    await fetchData()
   }
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko lahjakortti?')) return
-    await supabase.from('lahjakortit').delete().eq('id', id)
+    await supabaseAdmin.from('lahjakortit').delete().eq('id', id)
     fetchData()
   }
 
   const filtered = rows.filter(r =>
     r.code?.toLowerCase().includes(search.toLowerCase()) ||
-    r.recipient_name?.toLowerCase().includes(search.toLowerCase()) ||
+    r.seller_name?.toLowerCase().includes(search.toLowerCase()) ||
     r.service?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const active = rows.filter(r => r.status === 'aktiivinen').length
-  const totalValue = rows.filter(r => r.status === 'aktiivinen').reduce((s, r) => s + (r.value || 0), 0)
+  const active = rows.filter(r => (r.used_amount || 0) < (r.price || 0)).length
+  const totalValue = rows.reduce((s, r) => s + (r.price || 0), 0)
 
   return (
     <div>
@@ -138,7 +125,7 @@ export default function Lahjakortit() {
           <div className="stat-value">{active}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Aktiivinen arvo</div>
+          <div className="stat-label">Kokonaisarvo</div>
           <div className="stat-value gold">{totalValue.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
@@ -150,7 +137,7 @@ export default function Lahjakortit() {
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
         <div className="search-wrap">
           <Search size={15} />
-          <input className="search-input" placeholder="Hae tunnuksella, saajalla tai palvelulla..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="search-input" placeholder="Hae tunnuksella, myyjällä tai palvelulla..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -161,10 +148,10 @@ export default function Lahjakortit() {
               <th>Tunnus / nro</th>
               <th>Palvelu</th>
               <th>Arvo</th>
+              <th>Käytetty</th>
               <th>Maksutapa</th>
-              <th>Saaja</th>
+              <th>Myyjä</th>
               <th>Myyty</th>
-              <th>Voimassa asti</th>
               <th>Tila</th>
               <th>Muistiinpanot</th>
               <th></th>
@@ -179,19 +166,12 @@ export default function Lahjakortit() {
               <tr key={r.id}>
                 <td style={{ fontWeight: 700, fontFamily: 'monospace', letterSpacing: '.05em' }}>{r.code}</td>
                 <td style={{ fontSize: '.82rem' }}>{r.service || '—'}</td>
-                <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{r.value != null ? r.value.toFixed(2) + ' €' : '—'}</td>
-                <td>
-                  {r.payment_method ? (
-                    <span>
-                      {r.payment_method}
-                      {r.payment_details ? <span style={{ color: 'var(--text3)', fontSize: '.75rem', display: 'block' }}>{r.payment_details}</span> : null}
-                    </span>
-                  ) : '—'}
-                </td>
-                <td>{r.recipient_name || '—'}</td>
-                <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.sold_at ? new Date(r.sold_at).toLocaleDateString('fi-FI') : '—'}</td>
-                <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.expires_at ? new Date(r.expires_at).toLocaleDateString('fi-FI') : '—'}</td>
-                <td>{statusBadge(r.status)}</td>
+                <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{r.price != null ? r.price.toFixed(2) + ' €' : '—'}</td>
+                <td style={{ color: 'var(--text3)' }}>{r.used_amount != null && r.used_amount > 0 ? r.used_amount.toFixed(2) + ' €' : '—'}</td>
+                <td>{r.payment_method || '—'}</td>
+                <td style={{ fontSize: '.82rem' }}>{r.seller_name || '—'}</td>
+                <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.sale_date ? new Date(r.sale_date).toLocaleDateString('fi-FI') : '—'}</td>
+                <td>{statusBadge(r)}</td>
                 <td style={{ color: 'var(--text3)', fontSize: '.78rem', maxWidth: 140 }}>{r.notes || '—'}</td>
                 <td>
                   <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}><Trash2 size={13} /></button>
@@ -213,35 +193,21 @@ export default function Lahjakortit() {
         }>
           <div className="form-grid">
 
-            {/* Tunnus */}
             <div className="input-group">
               <label className="input-label">Tunnus / nro <span style={{ color: 'var(--red)' }}>*</span></label>
               <input className="input-field" name="code" placeholder="Lahjakortin tunnus tai numero" value={form.code} onChange={handleChange} />
             </div>
 
-            {/* Palvelu */}
             <div className="input-group">
               <label className="input-label">Palvelu</label>
               <select className="input-field" name="service" value={form.service} onChange={handleServiceChange}>
-                {SERVICES.map(s => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
+                {SERVICES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
 
-            {/* Summa */}
             <div className="input-group">
               <label className="input-label">Summa (€)</label>
-              <input
-                className="input-field"
-                name="value"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={form.value}
-                onChange={handleChange}
-              />
+              <input className="input-field" name="price" type="number" step="0.01" min="0" placeholder="0.00" value={form.price} onChange={handleChange} />
               {form.service && form.service !== 'Vapaa summa' && (
                 <div style={{ fontSize: '.75rem', color: 'var(--text3)', marginTop: '.25rem' }}>
                   Oletushinta haettu palvelusta – voit muuttaa tarvittaessa
@@ -249,48 +215,19 @@ export default function Lahjakortit() {
               )}
             </div>
 
-            {/* Maksutapa */}
             <div className="input-group">
               <label className="input-label">Maksutapa <span style={{ color: 'var(--red)' }}>*</span></label>
               <select className="input-field" name="payment_method" value={form.payment_method} onChange={handleChange}>
                 <option value="">Valitse maksutapa...</option>
-                {PAYMENT_METHODS.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
+                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
 
-            {/* Lisätiedot – pakollinen jos Muu */}
-            {isMuu && (
-              <div className="input-group">
-                <label className="input-label">
-                  Lisätiedot <span style={{ color: 'var(--red)' }}>*</span>
-                  <span style={{ fontWeight: 400, color: 'var(--text3)', marginLeft: '.35rem' }}>pakollinen kun maksutapa on Muu</span>
-                </label>
-                <input
-                  className="input-field"
-                  name="payment_details"
-                  placeholder="Selitä maksutapa..."
-                  value={form.payment_details}
-                  onChange={handleChange}
-                  style={{ borderColor: !form.payment_details.trim() ? 'var(--red)' : '' }}
-                />
-              </div>
-            )}
-
-            {/* Saajan nimi */}
             <div className="input-group">
-              <label className="input-label">Saajan nimi</label>
-              <input className="input-field" name="recipient_name" placeholder="Etunimi Sukunimi" value={form.recipient_name} onChange={handleChange} />
+              <label className="input-label">Myyntipäivä</label>
+              <input className="input-field" name="sale_date" type="date" value={form.sale_date} onChange={handleChange} />
             </div>
 
-            {/* Voimassaolo */}
-            <div className="input-group">
-              <label className="input-label">Voimassa asti</label>
-              <input className="input-field" name="expires_at" type="date" value={form.expires_at} onChange={handleChange} />
-            </div>
-
-            {/* Muistiinpanot */}
             <div className="input-group">
               <label className="input-label">Muistiinpanot</label>
               <textarea className="input-field" name="notes" rows={2} value={form.notes} onChange={handleChange} style={{ resize: 'vertical' }} />

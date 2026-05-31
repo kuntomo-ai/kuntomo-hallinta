@@ -1,19 +1,21 @@
 import { useEffect, useState, useRef } from 'react'
-import { Plus, FileText, Download, Trash2, Upload, Lock, FileIcon } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { Plus, FileText, Download, Trash2, Upload, Lock, FileIcon, Eye, X } from 'lucide-react'
+import { supabase, supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 
-const DOC_TYPES = ['Tuloslaskelma', 'Tase', 'Sopimus', 'Ohje', 'Tiedote', 'Muu']
+const DOC_TYPES = ['Tuloslaskelma', 'Tase', 'Sopimus', 'Ohje', 'Tiedote', 'Kokouspöytäkirja', 'Muu']
 const FILTER_TYPES = ['Kaikki', ...DOC_TYPES]
 
-const ROLES = ['all', 'hallitus', 'terapeutti', 'valmentaja', 'toimisto']
+const ROLES = ['all', 'hallitus', 'terapia_valmennus', 'myynti', 'huolto', 'sport', 'respa']
 const ROLE_LABELS = {
   all: 'Kaikille',
   hallitus: 'Hallitus',
-  terapeutti: 'Terapeutit',
-  valmentaja: 'Valmentajat',
-  toimisto: 'Toimisto',
+  terapia_valmennus: 'Terapia & Valmennus',
+  myynti: 'Myynti',
+  huolto: 'Huolto',
+  sport: 'Sport',
+  respa: 'Respa',
 }
 
 const empty = { title: '', description: '', document_type: 'Muu', period: '', visible_to: 'all' }
@@ -24,29 +26,121 @@ function fileIcon(name) {
   return <FileIcon size={26} style={{ color: ext === 'pdf' ? '#e63946' : ext === 'xlsx' || ext === 'xls' ? '#2a9d8f' : 'var(--violet)' }} />
 }
 
+function PreviewOverlay({ doc, onClose }) {
+  const ext = doc.file_name ? doc.file_name.split('.').pop().toLowerCase() : ''
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)
+  const isPdf = ext === 'pdf'
+
+  useEffect(() => {
+    const handler = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,.72)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '1.5rem',
+      }}>
+      <div style={{
+        background: 'var(--bg)', borderRadius: 'var(--radius)',
+        width: '100%', maxWidth: 900, maxHeight: '90vh',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        boxShadow: '0 24px 64px rgba(0,0,0,.4)',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '.75rem 1.25rem', borderBottom: '1px solid var(--border)', flexShrink: 0,
+        }}>
+          <div>
+            <span style={{ fontWeight: 700, fontSize: '.95rem' }}>{doc.title}</span>
+            {doc.file_name && <span style={{ marginLeft: '.5rem', fontSize: '.78rem', color: 'var(--text3)' }}>{doc.file_name}</span>}
+          </div>
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+              <Download size={13} /> Lataa
+            </a>
+            <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ padding: '.3rem' }}><X size={16} /></button>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg2)' }}>
+          {isPdf && (
+            <iframe
+              src={doc.file_url}
+              title={doc.title}
+              style={{ width: '100%', height: '75vh', border: 'none', display: 'block' }}
+            />
+          )}
+          {isImage && (
+            <img
+              src={doc.file_url}
+              alt={doc.title}
+              style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', display: 'block' }}
+            />
+          )}
+          {!isPdf && !isImage && (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text3)' }}>
+              <FileIcon size={48} style={{ marginBottom: '1rem', color: 'var(--violet)' }} />
+              <div style={{ fontWeight: 600, marginBottom: '.5rem' }}>{doc.file_name}</div>
+              <div style={{ fontSize: '.82rem', marginBottom: '1.25rem' }}>Tiedostotyyppiä ei voi esikatsella suoraan.</div>
+              <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                <Download size={14} /> Lataa tiedosto
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Documents() {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'hallitus'
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [previewDoc, setPreviewDoc] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(empty)
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [typeFilter, setTypeFilter] = useState('Kaikki')
+  const [dragOver, setDragOver] = useState(false)
   const fileRef = useRef(null)
 
   useEffect(() => { fetchData() }, [])
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase
+    const { data } = await supabaseAdmin
       .from('kirjanpito_documents')
       .select('*')
       .order('created_at', { ascending: false })
 
-    const visible = (data || []).filter(d => {
+    const docs = data || []
+
+    // Resolve uploader names from profiles table
+    const uploaderIds = [...new Set(docs.filter(d => d.uploaded_by).map(d => d.uploaded_by))]
+    const nameMap = {}
+    if (uploaderIds.length) {
+      const { data: profileRows } = await supabaseAdmin
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', uploaderIds)
+      profileRows?.forEach(p => {
+        nameMap[p.id] = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || null
+      })
+    }
+
+    const withNames = docs.map(d => ({ ...d, uploader_name: nameMap[d.uploaded_by] ?? null }))
+
+    const visible = withNames.filter(d => {
       if (isAdmin) return true
       if (!d.visible_to || d.visible_to === 'all') return true
       if (d.visible_to === profile?.role) return true
@@ -63,6 +157,7 @@ export default function Documents() {
   async function handleSave() {
     if (!form.title.trim()) return
     setUploading(true)
+    setSaveError('')
 
     let file_url = null
     let file_name = null
@@ -70,15 +165,18 @@ export default function Documents() {
     if (file) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `${Date.now()}-${safeName}`
-      const { error } = await supabase.storage.from('documents').upload(path, file)
-      if (!error) {
-        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-        file_url = urlData.publicUrl
-        file_name = file.name
+      const { error: uploadError } = await supabaseAdmin.storage.from('documents').upload(path, file)
+      if (uploadError) {
+        setSaveError('Tiedoston lataus epäonnistui: ' + uploadError.message)
+        setUploading(false)
+        return
       }
+      const { data: urlData } = supabaseAdmin.storage.from('documents').getPublicUrl(path)
+      file_url = urlData.publicUrl
+      file_name = file.name
     }
 
-    await supabase.from('kirjanpito_documents').insert({
+    const { error: insertError } = await supabaseAdmin.from('kirjanpito_documents').insert({
       title: form.title.trim(),
       description: form.description.trim() || null,
       document_type: form.document_type,
@@ -86,10 +184,12 @@ export default function Documents() {
       visible_to: form.visible_to,
       file_url,
       file_name,
-      uploaded_by: profile?.full_name || profile?.email || null,
+      file_path: file_url,
+      uploaded_by: profile?.id ?? null,
     })
 
     setUploading(false)
+    if (insertError) { setSaveError('Tallennus epäonnistui: ' + insertError.message); return }
     setShowModal(false)
     setForm(empty)
     setFile(null)
@@ -98,8 +198,15 @@ export default function Documents() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko dokumentti?')) return
-    await supabase.from('kirjanpito_documents').delete().eq('id', id)
+    await supabaseAdmin.from('kirjanpito_documents').delete().eq('id', id)
     fetchData()
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setDragOver(false)
+    const dropped = e.dataTransfer.files[0]
+    if (dropped) setFile(dropped)
   }
 
   const filtered = typeFilter === 'Kaikki' ? rows : rows.filter(r => r.document_type === typeFilter)
@@ -163,14 +270,19 @@ export default function Documents() {
                 )}
                 <div style={{ fontSize: '.7rem', color: 'var(--text4)' }}>
                   {new Date(r.created_at).toLocaleDateString('fi-FI')}
-                  {r.uploaded_by && ` · ${r.uploaded_by}`}
+                  {r.uploader_name && ` · ${r.uploader_name}`}
                   {r.file_name && ` · ${r.file_name}`}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '.4rem', flexShrink: 0 }}>
                 {r.file_url && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setPreviewDoc(r)}>
+                    <Eye size={13} /> Esikatselu
+                  </button>
+                )}
+                {r.file_url && (
                   <a href={r.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
-                    <Download size={13} /> Lataa
+                    <Download size={13} />
                   </a>
                 )}
                 {isAdmin && (
@@ -184,10 +296,12 @@ export default function Documents() {
         </div>
       )}
 
+      {previewDoc && <PreviewOverlay doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
+
       {showModal && isAdmin && (
-        <Modal title="Uusi dokumentti" onClose={() => setShowModal(false)} footer={
+        <Modal title="Uusi dokumentti" onClose={() => { setShowModal(false); setSaveError('') }} footer={
           <>
-            <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Peruuta</button>
+            <button className="btn btn-ghost" onClick={() => { setShowModal(false); setSaveError('') }}>Peruuta</button>
             <button className="btn btn-primary" onClick={handleSave} disabled={uploading || !form.title.trim()}>
               {uploading ? 'Tallennetaan...' : 'Tallenna'}
             </button>
@@ -240,27 +354,38 @@ export default function Documents() {
               <label className="input-label">Tiedosto</label>
               <div
                 onClick={() => fileRef.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragEnter={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
                 style={{
-                  border: `2px dashed ${file ? 'var(--violet)' : 'var(--border)'}`,
+                  border: `2px dashed ${dragOver ? 'var(--violet)' : file ? 'var(--violet)' : 'var(--border)'}`,
                   borderRadius: 'var(--radius)',
                   padding: '1.75rem',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  background: file ? 'var(--violet-subtle)' : 'var(--bg2)',
+                  background: dragOver ? 'var(--violet-subtle)' : file ? 'var(--violet-subtle)' : 'var(--bg2)',
                   transition: 'all .15s',
                 }}>
-                <Upload size={22} style={{ color: file ? 'var(--violet)' : 'var(--text3)', marginBottom: '.4rem' }} />
-                <div style={{ fontSize: '.83rem', color: file ? 'var(--violet)' : 'var(--text3)', fontWeight: file ? 600 : 400 }}>
-                  {file ? file.name : 'Klikkaa valitaksesi tiedoston'}
+                <Upload size={22} style={{ color: (file || dragOver) ? 'var(--violet)' : 'var(--text3)', marginBottom: '.4rem' }} />
+                <div style={{ fontSize: '.83rem', color: (file || dragOver) ? 'var(--violet)' : 'var(--text3)', fontWeight: (file || dragOver) ? 600 : 400 }}>
+                  {dragOver ? 'Pudota tiedosto tähän' : file ? file.name : 'Klikkaa tai vedä tiedosto tähän'}
                 </div>
-                {file && (
+                {file && !dragOver && (
                   <div style={{ fontSize: '.72rem', color: 'var(--text4)', marginTop: '.25rem' }}>
-                    {(file.size / 1024).toFixed(0)} KB
+                    {(file.size / 1024).toFixed(0)} KB · <span
+                      style={{ color: 'var(--red)', cursor: 'pointer' }}
+                      onClick={e => { e.stopPropagation(); setFile(null) }}>Poista</span>
                   </div>
                 )}
               </div>
               <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0] || null)} />
             </div>
+            {saveError && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.82rem', color: 'var(--red)' }}>
+                ⚠️ {saveError}
+              </div>
+            )}
           </div>
         </Modal>
       )}

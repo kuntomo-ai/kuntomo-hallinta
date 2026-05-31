@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Timelog from './pages/Timelog'
 import Employees from './pages/Employees'
+import Kausityontekijat from './pages/Employees/Kausityontekijat'
 import Surveys from './pages/Surveys'
 import Tasks from './pages/Tasks'
 import CalendarPage from './pages/CalendarPage'
@@ -19,14 +20,17 @@ import Tase from './pages/Finance/Tase'
 import Tulos from './pages/Finance/Tulos'
 import Kassavirta from './pages/Finance/Kassavirta'
 import KirjanpitoTuonti from './pages/Finance/KirjanpitoTuonti'
+import Tilinpaatos from './pages/Finance/Tilinpaatos'
 import Raportointi from './pages/Reporting/Raportointi'
 import RaportointiTerapia from './pages/Reporting/RaportointiTerapia'
 import RaportointiValmennus from './pages/Reporting/RaportointiValmennus'
 import RaportointiJasen from './pages/Reporting/RaportointiJasen'
 import RaportointiLahjakortit from './pages/Reporting/RaportointiLahjakortit'
+import RaportointiOma from './pages/Reporting/RaportointiOma'
 import Yritykset from './pages/Customers/Yritykset'
 import SportHockey from './pages/Customers/SportHockey'
-import VoiceControl from './components/VoiceControl'
+import UserSettings from './pages/UserSettings'
+import ResetPassword from './pages/ResetPassword'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -49,6 +53,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/*" element={
         <PrivateRoute>
           <Layout>
@@ -62,6 +67,7 @@ function AppRoutes() {
 
               <Route path="/timelog" element={<RoleRoute><Timelog /></RoleRoute>} />
               <Route path="/employees" element={<RoleRoute><Employees /></RoleRoute>} />
+              <Route path="/employees/kausityontekijat" element={<RoleRoute><Kausityontekijat /></RoleRoute>} />
               <Route path="/inventory" element={<RoleRoute><Inventory /></RoleRoute>} />
               <Route path="/laiteluettelo" element={<RoleRoute><Laiteluettelo /></RoleRoute>} />
 
@@ -76,8 +82,10 @@ function AppRoutes() {
               <Route path="/finance/kirjanpito/tulos" element={<RoleRoute><Tulos /></RoleRoute>} />
               <Route path="/finance/kirjanpito/kassavirta" element={<RoleRoute><Kassavirta /></RoleRoute>} />
               <Route path="/finance/kirjanpito/raportit" element={<Navigate to="/finance/kirjanpito" replace />} />
+              <Route path="/finance/kirjanpito/tilinpaatos" element={<RoleRoute><Tilinpaatos /></RoleRoute>} />
               <Route path="/finance/kirjanpito/tuonti" element={<RoleRoute><KirjanpitoTuonti /></RoleRoute>} />
 
+              <Route path="/finance/raportointi/oma" element={<RoleRoute><RaportointiOma /></RoleRoute>} />
               <Route path="/finance/raportointi" element={<RoleRoute><Raportointi /></RoleRoute>} />
               <Route path="/finance/raportointi/terapiamyynti" element={<RoleRoute><RaportointiTerapia /></RoleRoute>} />
               <Route path="/finance/raportointi/valmennusmyynti" element={<RoleRoute><RaportointiValmennus /></RoleRoute>} />
@@ -87,9 +95,10 @@ function AppRoutes() {
               <Route path="/customers/yritykset" element={<RoleRoute><Yritykset /></RoleRoute>} />
               <Route path="/customers/sport-hockey" element={<RoleRoute><SportHockey /></RoleRoute>} />
 
+              <Route path="/settings" element={<UserSettings />} />
+
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-            <VoiceControl />
           </Layout>
         </PrivateRoute>
       } />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 
 const CARDS = [
   { label: 'Terapiamyynti', to: '/finance/raportointi/terapiamyynti', table: 'terapiamyynti', color: 'var(--violet)' },
@@ -20,12 +20,12 @@ export default function Raportointi() {
   async function fetchTotals() {
     const monthStart = new Date().toISOString().slice(0, 7) + '-01'
     const results = await Promise.all(
-      CARDS.map(c => supabase.from(c.table).select('price, value').gte('created_at', monthStart))
+      CARDS.map(c => supabaseAdmin.from(c.table).select('price').gte('created_at', monthStart))
     )
     const t = {}
     CARDS.forEach((c, i) => {
       const data = results[i].data || []
-      t[c.table] = data.reduce((s, r) => s + (r.price || r.value || 0), 0)
+      t[c.table] = data.reduce((s, r) => s + (r.price || 0), 0)
     })
     setTotals(t)
     setLoading(false)

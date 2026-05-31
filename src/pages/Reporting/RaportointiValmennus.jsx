@@ -1,10 +1,34 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { NavLink } from 'react-router-dom'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+
+const REPORT_NAV = [
+  { label: 'Terapiamyynti', to: '/finance/raportointi/terapiamyynti' },
+  { label: 'Valmennusmyynti', to: '/finance/raportointi/valmennusmyynti' },
+  { label: 'Jäsenmyynti', to: '/finance/raportointi/jasenmyynti' },
+  { label: 'Lahjakortit', to: '/finance/raportointi/lahjakortit' },
+]
+
+function ReportNav() {
+  return (
+    <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <NavLink to="/finance/raportointi" end style={{ textDecoration: 'none' }}>
+        <button className="sub-tab">← Yhteenveto</button>
+      </NavLink>
+      {REPORT_NAV.map(r => (
+        <NavLink key={r.to} to={r.to} style={{ textDecoration: 'none' }}>
+          {({ isActive }) => <button className={`sub-tab${isActive ? ' active' : ''}`}>{r.label}</button>}
+        </NavLink>
+      ))}
+    </div>
+  )
+}
 
 const PERIODS = [
   { label: 'Tänään', value: 'today' },
   { label: 'Tällä viikolla', value: 'week' },
+  { label: 'Viime kuukausi', value: 'lastmonth' },
   { label: 'Tämä kuukausi', value: 'month' },
   { label: 'Tämä vuosi', value: 'year' },
   { label: 'Mukautettu', value: 'custom' },
@@ -19,6 +43,12 @@ function getRange(period, customFrom, customTo) {
     const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
     return { from: mon.toISOString().slice(0, 10), to: sun.toISOString().slice(0, 10) }
   }
+  if (period === 'lastmonth') {
+    const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+    const m = now.getMonth() === 0 ? 12 : now.getMonth()
+    const last = new Date(y, m, 0).getDate()
+    return { from: `${y}-${String(m).padStart(2, '0')}-01`, to: `${y}-${String(m).padStart(2, '0')}-${last}` }
+  }
   if (period === 'month') {
     return { from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, to: now.toISOString().slice(0, 10) }
   }
@@ -30,7 +60,7 @@ export default function RaportointiValmennus() {
   const { isAdmin, isHallitus } = useAuth()
   const canFilter = isAdmin || isHallitus
 
-  const [period, setPeriod] = useState('month')
+  const [period, setPeriod] = useState('year')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [selectedEmployee, setSelectedEmployee] = useState('')
@@ -40,10 +70,17 @@ export default function RaportointiValmennus() {
 
   useEffect(() => {
     if (canFilter) {
-      supabase.from('profiles').select('id, first_name, last_name, role')
-        .in('role', ['myynti', 'terapia_valmennus', 'sport', 'respa', 'admin', 'manager'])
-        .order('first_name')
-        .then(({ data }) => setEmployees(data || []))
+      Promise.all([
+        supabaseAdmin.from('employees').select('first_name, last_name').order('first_name'),
+        supabaseAdmin.from('valmennusmyynti').select('employee_name').not('employee_name', 'is', null),
+      ]).then(([empRes, salesRes]) => {
+        const fromEmp = (empRes.data || [])
+          .map(e => `${e.first_name || ''} ${e.last_name || ''}`.trim())
+          .filter(Boolean)
+        const fromSales = (salesRes.data || []).map(r => r.employee_name).filter(Boolean)
+        const names = [...new Set([...fromEmp, ...fromSales])].sort()
+        setEmployees(names)
+      })
     }
   }, [canFilter])
 
@@ -53,9 +90,9 @@ export default function RaportointiValmennus() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    let query = supabase.from('valmennusmyynti').select('*').gte('created_at', from).lte('created_at', to + 'T23:59:59')
+    let query = supabaseAdmin.from('valmennusmyynti').select('*').gte('visit_date', from).lte('visit_date', to)
     if (selectedEmployee) query = query.eq('employee_name', selectedEmployee)
-    const { data } = await query.order('created_at', { ascending: false })
+    const { data } = await query.order('visit_date', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -67,6 +104,7 @@ export default function RaportointiValmennus() {
 
   return (
     <div>
+      <ReportNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Valmennusmyynti — Raportti</h1>
@@ -77,10 +115,7 @@ export default function RaportointiValmennus() {
         {canFilter && (
           <select className="input-field" value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} style={{ width: 200 }}>
             <option value="">Kaikki myyjät</option>
-            {employees.map(e => {
-              const name = `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim()
-              return <option key={e.id} value={name}>{name}</option>
-            })}
+            {employees.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
         )}
       </div>

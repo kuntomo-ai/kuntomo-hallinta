@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
@@ -18,7 +18,7 @@ export default function Kassavirta() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase.from('kassavirta_entries').select('*').order('entry_date', { ascending: false })
+    const { data } = await supabaseAdmin.from('kassavirta_entries').select('*').order('entry_date', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -50,9 +50,9 @@ export default function Kassavirta() {
       notes: form.notes.trim() || null,
     }
     if (editing) {
-      await supabase.from('kassavirta_entries').update(payload).eq('id', editing)
+      await supabaseAdmin.from('kassavirta_entries').update(payload).eq('id', editing)
     } else {
-      await supabase.from('kassavirta_entries').insert(payload)
+      await supabaseAdmin.from('kassavirta_entries').insert(payload)
     }
     setSaving(false)
     setShowModal(false)
@@ -63,7 +63,7 @@ export default function Kassavirta() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko kirjaus?')) return
-    await supabase.from('kassavirta_entries').delete().eq('id', id)
+    await supabaseAdmin.from('kassavirta_entries').delete().eq('id', id)
     fetchData()
   }
 

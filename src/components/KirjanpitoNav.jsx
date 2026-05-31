@@ -5,6 +5,7 @@ const LINKS = [
   { label: 'Tase',          to: '/finance/kirjanpito/tase' },
   { label: 'Tuloslaskelma', to: '/finance/kirjanpito/tulos' },
   { label: 'Kassavirta',    to: '/finance/kirjanpito/kassavirta' },
+  { label: 'Tilinpäätös',   to: '/finance/kirjanpito/tilinpaatos' },
   { label: 'Tuo CSV',       to: '/finance/kirjanpito/tuonti' },
 ]
 

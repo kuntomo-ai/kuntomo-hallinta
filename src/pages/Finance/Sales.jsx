@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Search, Trash2, Camera, ChevronLeft, ChevronRight } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { Search, Trash2, Camera, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
+import Modal from '../../components/ui/Modal'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,12 @@ function TerapiaForm({ onSaved }) {
   const [persons, setPersons] = useState([])
   const [saving, setSaving] = useState(false)
   const [splitError, setSplitError] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [receipt, setReceipt] = useState(null)
+  const [giftCode, setGiftCode] = useState('')
+  const [giftCard, setGiftCard] = useState(null)       // found lahjakortti row
+  const [giftNotFound, setGiftNotFound] = useState(false)
+  const [giftChecking, setGiftChecking] = useState(false)
 
   const [form, setForm] = useState({
     visit_date: TODAY,
@@ -71,17 +77,20 @@ function TerapiaForm({ onSaved }) {
     company_id: '',
     company_person_id: '',
     company_person_name: '',
+    yritys_name: '',
+    kuntomo_laskuttaa: 'ei',
     notes: '',
   })
 
   useEffect(() => {
-    supabase.from('hoitotuotteet').select('*').eq('active', true).order('sort_order').order('name')
+    supabaseAdmin.from('hoitotuotteet').select('*').eq('active', true).order('sort_order').order('name')
       .then(({ data }) => setProducts(data || []))
-    supabase.from('companies').select('id, name').order('name')
+    supabaseAdmin.from('companies').select('id, name').order('name')
       .then(({ data }) => setCompanies(data || []))
   }, [])
 
-  const needsCompany = form.payment_methods.some(m => COMPANY_METHODS.includes(m))
+  const needsCompany = form.payment_methods.includes('Yrityslaskutus')
+  const needsYrityskäynti = form.payment_methods.includes('Yrityskäynti')
 
   function togglePayment(m) {
     setForm(f => {
@@ -94,11 +103,38 @@ function TerapiaForm({ onSaved }) {
         hve_provider: methods.includes('Hyvinvointietu') ? f.hve_provider : '',
         muu_details: methods.includes('Muu') ? f.muu_details : '',
         notify_admin: methods.includes('Muu') ? f.notify_admin : 'ei',
-        company_id: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_id : '',
-        company_person_id: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_person_id : '',
-        company_person_name: methods.some(x => COMPANY_METHODS.includes(x)) ? f.company_person_name : '',
+        company_id: methods.includes('Yrityslaskutus') ? f.company_id : '',
+        company_person_id: methods.includes('Yrityslaskutus') ? f.company_person_id : '',
+        company_person_name: methods.includes('Yrityslaskutus') ? f.company_person_name : '',
+        yritys_name: methods.includes('Yrityskäynti') ? f.yritys_name : '',
+        kuntomo_laskuttaa: methods.includes('Yrityskäynti') ? f.kuntomo_laskuttaa : 'ei',
       }
     })
+    if (m === 'Lahjakortti') {
+      setGiftCode('')
+      setGiftCard(null)
+      setGiftNotFound(false)
+    }
+  }
+
+  async function lookupGiftCard(code) {
+    if (!code.trim()) { setGiftCard(null); setGiftNotFound(false); return }
+    setGiftChecking(true)
+    const { data } = await supabaseAdmin.from('lahjakortit').select('*').eq('code', code.trim()).maybeSingle()
+    setGiftChecking(false)
+    if (!data) {
+      setGiftCard(null)
+      setGiftNotFound(true)
+    } else {
+      setGiftCard(data)
+      setGiftNotFound(false)
+      // Auto-populate split for gift card if multi-payment
+      const remaining = data.price - (data.used_amount || 0)
+      const saleAmt = parseFloat(form.price) || 0
+      if (saleAmt > remaining) {
+        setForm(f => ({ ...f, splits: { ...f.splits, Lahjakortti: String(remaining.toFixed(2)) } }))
+      }
+    }
   }
 
   function selectProduct(name) {
@@ -108,7 +144,7 @@ function TerapiaForm({ onSaved }) {
 
   async function selectCompany(id, name) {
     setForm(f => ({ ...f, company_id: id, company_person_id: '', company_person_name: '' }))
-    const { data } = await supabase.from('company_persons').select('*').eq('company_id', id).order('name')
+    const { data } = await supabaseAdmin.from('company_persons').select('*').eq('company_id', id).order('name')
     setPersons(data || [])
   }
 
@@ -125,20 +161,28 @@ function TerapiaForm({ onSaved }) {
     return Math.abs(splitSum() - (parseFloat(form.price) || 0)) < 0.01
   }
 
+  // Lahjakortti insufficient → need 2nd payment method
+  const giftCardRemaining = giftCard ? giftCard.price - (giftCard.used_amount || 0) : 0
+  const giftCardInsufficient = giftCard && (parseFloat(form.price) || 0) > giftCardRemaining
+  const needsSecondPayment = giftCardInsufficient && form.payment_methods.filter(m => m !== 'Lahjakortti').length === 0
+
   async function handleSubmit() {
     if (!form.service || !form.price || form.payment_methods.length === 0) return
     if (needsCompany && (!form.company_id || !form.company_person_id)) return
+    if (needsYrityskäynti && !form.yritys_name.trim()) return
+    if (needsSecondPayment) { setSplitError(true); return }
     if (!splitsValid()) { setSplitError(true); return }
     setSplitError(false)
+    setSaveError('')
     setSaving(true)
 
     let receipt_url = null
     if (receipt) {
       const blob = await compressImg(receipt)
       const path = `terapia/${Date.now()}.jpg`
-      const { data: upData } = await supabase.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
+      const { data: upData } = await supabaseAdmin.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
       if (upData) {
-        const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
+        const { data: urlData } = supabaseAdmin.storage.from('receipts').getPublicUrl(path)
         receipt_url = urlData.publicUrl
       }
     }
@@ -148,10 +192,10 @@ function TerapiaForm({ onSaved }) {
       if (m === 'Muu' && form.muu_details) return `Muu: ${form.muu_details}`
       return m
     }).join(', ')
-    const customerName = form.company_person_name || '—'
+    const customerName = needsYrityskäynti ? form.yritys_name.trim() : (form.company_person_name || '—')
 
     const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
-    await supabase.from('terapiamyynti').insert({
+    const { error: insertError } = await supabaseAdmin.from('terapiamyynti').insert({
       customer_name: customerName,
       service: form.service,
       price: parseFloat(form.price),
@@ -160,25 +204,43 @@ function TerapiaForm({ onSaved }) {
       receipt_url,
       employee_id: user?.id ?? null,
       employee_name: empName || null,
+      seller_id: user?.id ?? null,
+      visit_date: form.visit_date || null,
     })
+    if (insertError) {
+      setSaveError(insertError.message)
+      setSaving(false)
+      return
+    }
 
     if (needsCompany && form.company_id && form.company_person_id) {
-      const payType = form.payment_methods.find(m => COMPANY_METHODS.includes(m))
-      await supabase.from('company_visits').insert({
+      await supabaseAdmin.from('company_visits').insert({
         company_id: form.company_id,
         company_person_id: form.company_person_id,
         company_person_name: form.company_person_name,
         visit_date: form.visit_date,
         service: form.service,
         price: parseFloat(form.price),
-        payment_type: payType,
+        payment_type: 'Yrityslaskutus',
         invoiced: false,
         notes: form.notes.trim() || null,
       })
     }
 
+    if (needsYrityskäynti && form.kuntomo_laskuttaa === 'kylla') {
+      await supabaseAdmin.from('tasks').insert({
+        title: `Yrityskäyntilasku: ${form.yritys_name.trim()}`,
+        description: `Palvelu: ${form.service} — ${parseFloat(form.price).toFixed(2)} €. Kirjannut: ${empName || '—'}`,
+        status: 'avoin',
+        priority: 'normal',
+        due_date: null,
+        assigned_to: 'admin',
+        created_by: empName || 'Järjestelmä',
+      })
+    }
+
     if (form.notify_admin === 'kylla') {
-      await supabase.from('channel_messages').insert({
+      await supabaseAdmin.from('channel_messages').insert({
         content: `🔔 Hoitomyynti-ilmoitus: ${form.service} — ${parseFloat(form.price).toFixed(2)} € (${paymentStr})${form.notes ? '. ' + form.notes : ''}`,
         sender_name: profile?.full_name || profile?.email || 'Järjestelmä',
         sender_id: user?.id || null,
@@ -187,9 +249,44 @@ function TerapiaForm({ onSaved }) {
       })
     }
 
+    // ── Lahjakortti-käsittely (try/catch jotta onSaved() aina kutsutaan) ────────
+    try {
+      if (form.payment_methods.includes('Lahjakortti') && giftCode.trim()) {
+        if (giftNotFound || !giftCard) {
+          // Lahjakorttia ei löydy → luo tehtävä adminille
+          await supabaseAdmin.from('tasks').insert({
+            title: `Lahjakortti ${giftCode.trim()} ei löydy järjestelmästä`,
+            description: `Hoitomyynnissä käytetty lahjakortti "${giftCode.trim()}" ei löydy järjestelmästä. Palvelu: ${form.service} — ${parseFloat(form.price).toFixed(2)} €. Kirjannut: ${empName || '—'}`,
+            status: 'avoin',
+            priority: 'high',
+            assigned_to: 'admin',
+            created_by: empName || 'Järjestelmä',
+          })
+        } else {
+          // Lahjakortti löytyi → veloita ja lisää muistiinpano
+          const saleAmt = parseFloat(form.price) || 0
+          const remaining = giftCard.price - (giftCard.used_amount || 0)
+          const deduct = Math.min(saleAmt, remaining)
+          const newUsed = (giftCard.used_amount || 0) + deduct
+          const dateStr = new Date().toLocaleDateString('fi-FI')
+          const noteEntry = `${dateStr}: ${deduct.toFixed(2)} € käytetty (${form.service})`
+          const newNotes = giftCard.notes ? `${giftCard.notes}\n${noteEntry}` : noteEntry
+          await supabaseAdmin.from('lahjakortit').update({
+            used_amount: newUsed,
+            notes: newNotes,
+          }).eq('id', giftCard.id)
+        }
+      }
+    } catch (e) {
+      console.error('Lahjakortti-käsittely epäonnistui:', e)
+    }
+
     setSaving(false)
     setReceipt(null)
-    setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, hve_provider: '', muu_details: '', notify_admin: 'ei', company_id: '', company_person_id: '', company_person_name: '', notes: '' })
+    setGiftCode('')
+    setGiftCard(null)
+    setGiftNotFound(false)
+    setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, hve_provider: '', muu_details: '', notify_admin: 'ei', company_id: '', company_person_id: '', company_person_name: '', yritys_name: '', kuntomo_laskuttaa: 'ei', notes: '' })
     onSaved()
   }
 
@@ -286,6 +383,56 @@ function TerapiaForm({ onSaved }) {
                     ))}
                   </div>
                 )}
+                {m === 'Lahjakortti' && form.payment_methods.includes('Lahjakortti') && (
+                  <div style={{ marginLeft: '1.65rem', marginTop: '.5rem', padding: '.75rem', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                    <div className="input-group" style={{ margin: 0 }}>
+                      <label className="input-label">Lahjakortin tunnus / nro *</label>
+                      <input
+                        className="input-field"
+                        placeholder="Syötä lahjakortin tunnus"
+                        value={giftCode}
+                        onChange={e => { setGiftCode(e.target.value); setGiftCard(null); setGiftNotFound(false) }}
+                        onBlur={() => lookupGiftCard(giftCode)}
+                      />
+                    </div>
+                    {giftChecking && (
+                      <div style={{ fontSize: '.78rem', color: 'var(--text3)' }}>Tarkistetaan...</div>
+                    )}
+                    {giftNotFound && giftCode.trim() && (
+                      <div style={{ fontSize: '.78rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, padding: '.45rem .7rem', color: 'var(--red)' }}>
+                        ⚠️ Lahjakorttia <strong>{giftCode.trim()}</strong> ei löydy järjestelmästä.
+                        Tallennuksen yhteydessä luodaan tehtävä Admin-käyttäjälle.
+                      </div>
+                    )}
+                    {giftCard && (() => {
+                      const remaining = giftCard.price - (giftCard.used_amount || 0)
+                      const saleAmt = parseFloat(form.price) || 0
+                      const insufficient = saleAmt > remaining
+                      return (
+                        <div style={{ fontSize: '.78rem', background: insufficient ? '#FFF7ED' : 'var(--green-subtle)', border: `1px solid ${insufficient ? '#FED7AA' : 'var(--green)'}`, borderRadius: 6, padding: '.45rem .7rem' }}>
+                          {insufficient ? (
+                            <>
+                              <div style={{ color: '#C2410C', fontWeight: 700 }}>⚠️ Lahjakortti ei kata koko summaa</div>
+                              <div style={{ color: 'var(--text2)', marginTop: '.2rem' }}>
+                                Kortin arvo: {giftCard.price?.toFixed(2)} € — käytetty: {(giftCard.used_amount || 0).toFixed(2)} € — <strong>jäljellä: {remaining.toFixed(2)} €</strong>
+                              </div>
+                              <div style={{ color: 'var(--text2)', marginTop: '.2rem' }}>
+                                Valitse alla toinen maksutapa loppusummalle <strong>{(saleAmt - remaining).toFixed(2)} €</strong>.
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ color: 'var(--green)', fontWeight: 700 }}>✓ Lahjakortti löytyi</div>
+                              <div style={{ color: 'var(--text2)', marginTop: '.2rem' }}>
+                                Jäljellä: {remaining.toFixed(2)} € — veloitetaan: <strong>{saleAmt.toFixed(2)} €</strong> — jää: {(remaining - saleAmt).toFixed(2)} €
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
                 {m === 'Muu' && form.payment_methods.includes('Muu') && (
                   <div style={{ marginLeft: '1.65rem', marginTop: '.5rem', padding: '.8rem', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
                     <div className="input-group" style={{ margin: 0 }}>
@@ -335,13 +482,46 @@ function TerapiaForm({ onSaved }) {
             </div>
             {splitError && (
               <div style={{ fontSize: '.75rem', color: 'var(--red)', marginTop: '.2rem' }}>
-                Summien on täsmättävä kokonaishintaan.
+                {needsSecondPayment
+                  ? `Lahjakortti kattaa vain ${giftCardRemaining.toFixed(2)} €. Valitse toinen maksutapa loppusummalle.`
+                  : 'Summien on täsmättävä kokonaishintaan.'}
               </div>
             )}
           </div>
         )}
 
-        {/* Company + person picker */}
+        {/* Yrityskäynti: text field + billing radio */}
+        {needsYrityskäynti && (
+          <>
+            <div className="input-group">
+              <label className="input-label">Yrityksen nimi *</label>
+              <input className="input-field" placeholder="Esim. Yritys Oy"
+                value={form.yritys_name}
+                onChange={e => setForm(f => ({ ...f, yritys_name: e.target.value }))} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Kuntomo laskuttaa</label>
+              <div style={{ display: 'flex', gap: '1.5rem', marginTop: '.3rem' }}>
+                {[['kylla', 'Kyllä'], ['ei', 'Ei']].map(([v, l]) => (
+                  <label key={v} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer', fontSize: '.85rem', userSelect: 'none' }}>
+                    <input type="radio" name="kuntomo_laskuttaa" value={v}
+                      checked={form.kuntomo_laskuttaa === v}
+                      onChange={() => setForm(f => ({ ...f, kuntomo_laskuttaa: v }))}
+                      style={{ accentColor: 'var(--violet)', cursor: 'pointer' }} />
+                    {l}
+                  </label>
+                ))}
+              </div>
+              {form.kuntomo_laskuttaa === 'kylla' && (
+                <div style={{ marginTop: '.45rem', fontSize: '.75rem', color: 'var(--text3)', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '.5rem .75rem' }}>
+                  Laskutettavasta käynnistä luodaan automaattisesti tehtävä Admin-käyttäjälle.
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Company + person picker for Yrityslaskutus */}
         {needsCompany && (
           <>
             <div className="input-group">
@@ -404,6 +584,11 @@ function TerapiaForm({ onSaved }) {
           )}
         </div>
 
+        {saveError && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.82rem', color: 'var(--red)' }}>
+            ⚠️ Tallennus epäonnistui: {saveError}
+          </div>
+        )}
         <button className="btn btn-primary" onClick={handleSubmit} disabled={saving} style={{ width: '100%', marginTop: '.25rem' }}>
           {saving ? 'Tallennetaan...' : 'Lähetä'}
         </button>
@@ -418,12 +603,14 @@ function ValmennusForm({ onSaved }) {
   const { profile, user } = useAuth()
   const [form, setForm] = useState({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '' })
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   async function handleSubmit() {
     if (!form.customer_name.trim() || !form.service || !form.price) return
     setSaving(true)
+    setSaveError('')
     const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
-    await supabase.from('valmennusmyynti').insert({
+    const { error } = await supabaseAdmin.from('valmennusmyynti').insert({
       customer_name: form.customer_name.trim(),
       service: form.service,
       price: parseFloat(form.price),
@@ -431,8 +618,11 @@ function ValmennusForm({ onSaved }) {
       notes: form.notes.trim() || null,
       employee_id: user?.id ?? null,
       employee_name: empName || null,
+      seller_id: user?.id ?? null,
+      visit_date: form.visit_date || null,
     })
     setSaving(false)
+    if (error) { setSaveError(error.message); return }
     setForm({ visit_date: TODAY, customer_name: '', service: '', price: '', payment_method: VALMENNUS_MAKSUTAVAT[0], notes: '' })
     onSaved()
   }
@@ -501,7 +691,7 @@ function ValmennusForm({ onSaved }) {
 
 function JasenForm({ onSaved }) {
   const { profile, user } = useAuth()
-  const [form, setForm] = useState({ customer_name: '', customer_email: '', service: '', price: '', discount_info: '', start_date: '', notes: '' })
+  const [form, setForm] = useState({ customer_name: '', customer_email: '', visit_date: TODAY, service: '', price: '', discount_info: '', start_date: '', notes: '' })
   const [saving, setSaving] = useState(false)
 
   function selectService(name) {
@@ -513,9 +703,11 @@ function JasenForm({ onSaved }) {
     if (!form.customer_name.trim() || !form.service || !form.price) return
     setSaving(true)
     const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
-    await supabase.from('jasenmyynti').insert({
+    const { error: jasenError } = await supabaseAdmin.from('jasenmyynti').insert({
       customer_name: form.customer_name.trim(),
       customer_email: form.customer_email.trim() || null,
+      visit_date: form.visit_date || null,
+      service: form.service,
       membership_type: form.service,
       price: parseFloat(form.price),
       discount_info: form.discount_info.trim() || null,
@@ -523,9 +715,11 @@ function JasenForm({ onSaved }) {
       notes: form.notes.trim() || null,
       employee_id: user?.id ?? null,
       employee_name: empName || null,
+      seller_id: user?.id ?? null,
     })
     setSaving(false)
-    setForm({ customer_name: '', customer_email: '', service: '', price: '', discount_info: '', start_date: '', notes: '' })
+    if (jasenError) { alert('Tallennus epäonnistui: ' + jasenError.message); return }
+    setForm({ customer_name: '', customer_email: '', visit_date: TODAY, service: '', price: '', discount_info: '', start_date: '', notes: '' })
     onSaved()
   }
 
@@ -544,6 +738,11 @@ function JasenForm({ onSaved }) {
           <label className="input-label">Asiakkaan email</label>
           <input className="input-field" type="email" placeholder="asiakas@email.com" value={form.customer_email}
             onChange={e => setForm(f => ({ ...f, customer_email: e.target.value }))} />
+        </div>
+        <div className="input-group">
+          <label className="input-label">Myyntipäivä</label>
+          <input className="input-field" type="date" value={form.visit_date}
+            onChange={e => setForm(f => ({ ...f, visit_date: e.target.value }))} />
         </div>
         <div className="input-group">
           <label className="input-label">Palvelu *</label>
@@ -591,7 +790,7 @@ function JasenForm({ onSaved }) {
 // ─── Main Sales page ──────────────────────────────────────────────────────────
 
 export default function Sales() {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'hallitus'
 
   const [tab, setTab] = useState('terapia')
@@ -613,37 +812,44 @@ export default function Sales() {
   }, [tab])
 
   useEffect(() => {
-    function onVoiceTerapia(e) {
-      setTab('terapia')
-      setForm(f => ({ ...emptyTerapia, ...e.detail }))
+    if (isAdmin) {
+      Promise.all([
+        supabaseAdmin.from('employees').select('first_name, last_name').eq('status', 'active').order('first_name'),
+        supabaseAdmin.from('terapiamyynti').select('employee_name').not('employee_name', 'is', null),
+        supabaseAdmin.from('valmennusmyynti').select('employee_name').not('employee_name', 'is', null),
+        supabaseAdmin.from('jasenmyynti').select('employee_name').not('employee_name', 'is', null),
+      ]).then(([empRes, tRes, vRes, jRes]) => {
+        const fromEmp = (empRes.data || []).map(e => `${e.first_name || ''} ${e.last_name || ''}`.trim()).filter(Boolean)
+        const fromSales = [
+          ...(tRes.data || []).map(r => r.employee_name),
+          ...(vRes.data || []).map(r => r.employee_name),
+          ...(jRes.data || []).map(r => r.employee_name),
+        ].filter(Boolean)
+        const names = [...new Set([...fromEmp, ...fromSales])].sort()
+        setUsers(names.map(n => ({ id: n, first_name: n, last_name: '', full_name: n })))
+      })
     }
-    function onVoiceValmennus(e) {
-      setTab('valmennus')
-      setForm(f => ({ ...emptyValmennus, ...e.detail }))
-    }
-    window.addEventListener('voice-terapia', onVoiceTerapia)
-    window.addEventListener('voice-valmennus', onVoiceValmennus)
-    return () => {
-      window.removeEventListener('voice-terapia', onVoiceTerapia)
-      window.removeEventListener('voice-valmennus', onVoiceValmennus)
-    }
-  }, [])
+  }, [isAdmin])
 
   async function fetchData(activeTab) {
     setLoading(true)
-    const { data } = await supabase.from('terapiamyynti').select('*').order('created_at', { ascending: false })
+    let q = supabaseAdmin.from('terapiamyynti').select('*').order('entry_date', { ascending: false })
+    if (!isAdmin) q = q.eq('employee_id', user?.id)
+    const { data } = await q
     setRows(data || [])
     const today = new Date().toISOString().slice(0, 10)
-    setTodayTotal((data || []).filter(r => r.created_at?.slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
+    setTodayTotal((data || []).filter(r => (r.entry_date || r.created_at || '').slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
     setLoading(false)
   }
 
   async function fetchOther(t) {
     setLoading(true)
-    const { data } = await supabase.from(TABLE_MAP[t]).select('*').order('created_at', { ascending: false })
+    let q = supabaseAdmin.from(TABLE_MAP[t]).select('*').order('created_at', { ascending: false })
+    if (!isAdmin) q = q.eq('employee_id', user?.id)
+    const { data } = await q
     setRows(data || [])
     const today = new Date().toISOString().slice(0, 10)
-    setTodayTotal((data || []).filter(r => r.created_at?.slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
+    setTodayTotal((data || []).filter(r => (r.visit_date || r.created_at || '').slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
     setLoading(false)
   }
 
@@ -667,18 +873,105 @@ export default function Sales() {
   async function handleDelete(id) {
     if (!confirm('Poistetaanko kirjaus?')) return
     const t = tab === 'terapia' ? 'terapiamyynti' : TABLE_MAP[tab]
-    await supabase.from(t).delete().eq('id', id)
+    await supabaseAdmin.from(t).delete().eq('id', id)
     tab === 'terapia' ? fetchTerapia() : fetchOther(tab)
+  }
+
+  const [editRow, setEditRow] = useState(null)
+  const [editForm, setEditForm] = useState({})
+  const [editSaving, setEditSaving] = useState(false)
+
+  function openEdit(r) {
+    setEditRow(r)
+    if (tab === 'terapia') {
+      setEditForm({
+        visit_date: (r.entry_date || r.visit_date || r.created_at || '').slice(0, 10),
+        customer_name: r.customer_name || '',
+        service: r.service || '',
+        price: r.price != null ? String(r.price) : '',
+        payment_method: r.payment_method || '',
+        notes: r.notes || '',
+      })
+    } else if (tab === 'valmennus') {
+      setEditForm({
+        visit_date: (r.visit_date || r.created_at || '').slice(0, 10),
+        customer_name: r.customer_name || '',
+        service: r.service || '',
+        price: r.price != null ? String(r.price) : '',
+        payment_method: r.payment_method || '',
+        notes: r.notes || '',
+      })
+    } else {
+      setEditForm({
+        customer_name: r.customer_name || '',
+        customer_email: r.customer_email || '',
+        visit_date: (r.visit_date || r.created_at || '').slice(0, 10),
+        membership_type: r.membership_type || r.service || '',
+        price: r.price != null ? String(r.price) : '',
+        start_date: (r.start_date || '').slice(0, 10),
+        notes: r.notes || '',
+      })
+    }
+  }
+
+  async function handleEditSave() {
+    if (!editRow) return
+    setEditSaving(true)
+    let table, payload
+    if (tab === 'terapia') {
+      table = 'terapiamyynti'
+      payload = {
+        entry_date: editForm.visit_date || null,
+        visit_date: editForm.visit_date || null,
+        customer_name: editForm.customer_name.trim() || null,
+        service: editForm.service || null,
+        price: parseFloat(editForm.price) || 0,
+        payment_method: editForm.payment_method || null,
+        notes: editForm.notes.trim() || null,
+      }
+    } else if (tab === 'valmennus') {
+      table = 'valmennusmyynti'
+      payload = {
+        visit_date: editForm.visit_date || null,
+        customer_name: editForm.customer_name.trim() || null,
+        service: editForm.service || null,
+        price: parseFloat(editForm.price) || 0,
+        payment_method: editForm.payment_method || null,
+        notes: editForm.notes.trim() || null,
+      }
+    } else {
+      table = 'jasenmyynti'
+      payload = {
+        customer_name: editForm.customer_name.trim() || null,
+        customer_email: editForm.customer_email.trim() || null,
+        visit_date: editForm.visit_date || null,
+        service: editForm.membership_type || null,
+        membership_type: editForm.membership_type || null,
+        price: parseFloat(editForm.price) || 0,
+        start_date: editForm.start_date || null,
+        notes: editForm.notes.trim() || null,
+      }
+    }
+    await supabaseAdmin.from(table).update(payload).eq('id', editRow.id)
+    setEditSaving(false)
+    setEditRow(null)
+    tab === 'terapia' ? fetchTerapia() : fetchOther(tab)
+  }
+
+  function rowDate(r) {
+    if (tab === 'terapia') return (r.entry_date || r.created_at || '').slice(0, 10)
+    if (tab === 'valmennus') return (r.visit_date || r.created_at || '').slice(0, 10)
+    return (r.visit_date || r.created_at || '').slice(0, 10)
   }
 
   const navDateStr = navDate.toISOString().slice(0, 10)
   const filtered = rows.filter(r => {
-    if (!r.customer_name?.toLowerCase().includes(search.toLowerCase())) return false
-    const dateStr = (r.created_at || '').slice(0, 10)
+    if (search && !(r.customer_name?.toLowerCase() ?? '').includes(search.toLowerCase())) return false
+    const dateStr = rowDate(r)
     if (period === 'paiva' && dateStr !== navDateStr) return false
     if (period === 'kuukausi' && dateStr.slice(0, 7) !== navDateStr.slice(0, 7)) return false
     if (period === 'vuosi' && dateStr.slice(0, 4) !== navDateStr.slice(0, 4)) return false
-    if (filterUser && r.customer_name !== filterUser) return false
+    if (filterUser && r.employee_name !== filterUser) return false
     return true
   })
   const filteredTotal = filtered.reduce((s, r) => s + (r.price || 0), 0)
@@ -700,25 +993,15 @@ export default function Sales() {
         ))}
       </div>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', marginBottom: '1.25rem' }}>
-        <div className="stat-card">
-          <div className="stat-label">Myynti tänään</div>
-          <div className="stat-value gold">{todayTotal.toFixed(2)} €</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Kirjauksia yhteensä</div>
-          <div className="stat-value">{rows.length}</div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.25rem', alignItems: 'start' }}>
+      <div className="grid-sidebar-main" style={{ alignItems: 'start' }}>
 
         {tab === 'terapia' && <TerapiaForm onSaved={fetchTerapia} />}
         {tab === 'valmennus' && <ValmennusForm onSaved={() => fetchOther('valmennus')} />}
         {tab === 'jasen' && <JasenForm onSaved={() => fetchOther('jasen')} />}
 
         <div>
-          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '.75rem' }}>
+          {/* Period selector */}
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1rem' }}>
             {[['paiva', 'Päivä'], ['kuukausi', 'Kuukausi'], ['vuosi', 'Vuosi'], ['kaikki', 'Kaikki']].map(([v, l]) => (
               <button key={v} className={`sub-tab${period === v ? ' active' : ''}`}
                 onClick={() => setPeriod(v)}
@@ -729,30 +1012,52 @@ export default function Sales() {
             {period !== 'kaikki' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '.2rem' }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => movePeriod(-1)} style={{ padding: '.25rem .35rem' }}><ChevronLeft size={14} /></button>
-                <span style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text2)', minWidth: 150, textAlign: 'center' }}>{periodLabel()}</span>
+                <span style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text2)', minWidth: 90, textAlign: 'center' }}>{periodLabel()}</span>
                 <button className="btn btn-ghost btn-sm" onClick={() => movePeriod(1)} style={{ padding: '.25rem .35rem' }}><ChevronRight size={14} /></button>
               </div>
             )}
             {isAdmin && users.length > 0 && (
-              <select className="input-field" style={{ width: 'auto', fontSize: '.82rem', padding: '.35rem .6rem', height: 'auto' }}
+              <select className="input-field" style={{ width: 'auto', fontSize: '.82rem', padding: '.35rem .6rem', height: 'auto', marginLeft: 'auto' }}
                 value={filterUser} onChange={e => setFilterUser(e.target.value)}>
-                <option value="">Kaikki käyttäjät</option>
+                <option value="">Kaikki myyjät</option>
                 {users.map(u => {
                   const name = u.full_name || `${u.first_name || ''} ${u.last_name || ''}`.trim()
                   return <option key={u.id} value={name}>{name}</option>
                 })}
               </select>
             )}
-            <div className="search-wrap" style={{ marginLeft: 'auto' }}>
-              <Search size={15} />
-              <input className="search-input" placeholder="Hae asiakkaalla..." value={search} onChange={e => setSearch(e.target.value)} />
-            </div>
-          </div>
-          <div style={{ fontSize: '.78rem', color: 'var(--text3)', marginBottom: '.5rem', textAlign: 'right' }}>
-            {filtered.length} kirjausta · {filteredTotal.toFixed(2)} €
           </div>
 
-          <div className="table-wrap">
+          {/* Stats */}
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', marginBottom: '1rem' }}>
+            <div className="stat-card">
+              <div className="stat-label">Myynti tänään</div>
+              <div className="stat-value gold">{todayTotal.toFixed(2)} €</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Jakson myynti</div>
+              <div className="stat-value gold">{filteredTotal.toFixed(2)} €</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Kirjauksia</div>
+              <div className="stat-value">{filtered.length}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Keskiarvo / kirjaus</div>
+              <div className="stat-value">{filtered.length ? (filteredTotal / filtered.length).toFixed(2) : '0.00'} €</div>
+            </div>
+          </div>
+
+          {/* Table + breakdown */}
+          <div className="grid-main-aside">
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.5rem' }}>
+                <div className="search-wrap" style={{ flex: 1 }}>
+                  <Search size={15} />
+                  <input className="search-input" placeholder="Hae asiakkaalla..." value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+              </div>
+              <div className="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -774,7 +1079,7 @@ export default function Sales() {
                     : filtered.map(r => (
                       <tr key={r.id}>
                         <td style={{ whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: '.78rem' }}>
-                          {new Date(r.created_at).toLocaleDateString('fi-FI')}
+                          {new Date(rowDate(r)).toLocaleDateString('fi-FI')}
                         </td>
                         <td style={{ fontWeight: 600 }}>{r.customer_name}</td>
                         <td>{tab === 'jasen' ? r.membership_type : r.service}</td>
@@ -783,7 +1088,10 @@ export default function Sales() {
                         <td style={{ fontSize: '.78rem' }}>{r.payment_method}</td>
                         <td style={{ color: 'var(--text3)', fontSize: '.78rem', maxWidth: 160 }}>{r.notes || '—'}</td>
                         <td>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}><Trash2 size={13} /></button>
+                          <div style={{ display: 'flex', gap: '.3rem' }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => openEdit(r)}><Edit2 size={13} /></button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}><Trash2 size={13} /></button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -818,8 +1126,148 @@ export default function Sales() {
               </div>
             )
           })()}
+            </div>
+
+            {/* Palveluittain / Maksutavoittain */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="card" style={{ padding: '1rem' }}>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.9rem', marginBottom: '.75rem' }}>Palveluittain</h3>
+                {(() => {
+                  const byService = {}
+                  filtered.forEach(r => {
+                    const key = r.service || r.membership_type || '—'
+                    byService[key] = (byService[key] || 0) + (r.price || 0)
+                  })
+                  const entries = Object.entries(byService).sort((a, b) => b[1] - a[1])
+                  return entries.length === 0
+                    ? <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Ei dataa.</p>
+                    : entries.map(([service, sum]) => (
+                      <div key={service} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.3rem 0', borderBottom: '1px solid var(--border)', fontSize: '.8rem' }}>
+                        <span style={{ color: 'var(--text2)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{service}</span>
+                        <strong style={{ color: 'var(--violet)', flexShrink: 0, marginLeft: '.5rem' }}>{sum.toFixed(2)} €</strong>
+                      </div>
+                    ))
+                })()}
+              </div>
+
+              <div className="card" style={{ padding: '1rem' }}>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.9rem', marginBottom: '.75rem' }}>Maksutavoittain</h3>
+                {(() => {
+                  const byMethod = {}
+                  filtered.forEach(r => {
+                    const key = r.payment_method || '—'
+                    byMethod[key] = (byMethod[key] || 0) + (r.price || 0)
+                  })
+                  const entries = Object.entries(byMethod).sort((a, b) => b[1] - a[1])
+                  return entries.length === 0
+                    ? <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Ei dataa.</p>
+                    : entries.map(([method, sum]) => (
+                      <div key={method} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.3rem 0', borderBottom: '1px solid var(--border)', fontSize: '.8rem' }}>
+                        <span style={{ color: 'var(--text2)' }}>{method}</span>
+                        <strong style={{ color: 'var(--violet)' }}>{sum.toFixed(2)} €</strong>
+                      </div>
+                    ))
+                })()}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      {editRow && (
+        <Modal
+          title="Muokkaa kirjausta"
+          onClose={() => setEditRow(null)}
+          footer={
+            <>
+              <button className="btn btn-ghost" onClick={() => setEditRow(null)}>Peruuta</button>
+              <button className="btn btn-primary" onClick={handleEditSave} disabled={editSaving}>
+                {editSaving ? 'Tallennetaan...' : 'Tallenna'}
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            {tab !== 'jasen' && (
+              <div className="input-group">
+                <label className="input-label">Päivämäärä</label>
+                <input className="input-field" type="date" value={editForm.visit_date}
+                  onChange={e => setEditForm(f => ({ ...f, visit_date: e.target.value }))} />
+              </div>
+            )}
+            <div className="input-group">
+              <label className="input-label">Asiakas</label>
+              <input className="input-field" value={editForm.customer_name}
+                onChange={e => setEditForm(f => ({ ...f, customer_name: e.target.value }))} />
+            </div>
+            {tab === 'jasen' && (
+              <div className="input-group">
+                <label className="input-label">Email</label>
+                <input className="input-field" type="email" value={editForm.customer_email}
+                  onChange={e => setEditForm(f => ({ ...f, customer_email: e.target.value }))} />
+              </div>
+            )}
+            <div className="input-group">
+              <label className="input-label">{tab === 'jasen' ? 'Jäsenyystyyppi' : 'Palvelu'}</label>
+              {tab === 'jasen' ? (
+                <select className="input-field" value={editForm.membership_type}
+                  onChange={e => setEditForm(f => ({ ...f, membership_type: e.target.value }))}>
+                  <option value="">Valitse</option>
+                  {JASENYYSTUOTTEET.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                </select>
+              ) : tab === 'valmennus' ? (
+                <select className="input-field" value={editForm.service}
+                  onChange={e => setEditForm(f => ({ ...f, service: e.target.value }))}>
+                  <option value="">Valitse</option>
+                  {VALMENNUS_PALVELUT.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              ) : (
+                <input className="input-field" value={editForm.service}
+                  onChange={e => setEditForm(f => ({ ...f, service: e.target.value }))} />
+              )}
+            </div>
+            <div className="input-group">
+              <label className="input-label">Hinta (€)</label>
+              <input className="input-field" type="number" step="0.01" min="0" value={editForm.price}
+                onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} />
+            </div>
+            {tab !== 'jasen' && (
+              <div className="input-group">
+                <label className="input-label">Maksutapa</label>
+                {tab === 'valmennus' ? (
+                  <select className="input-field" value={editForm.payment_method}
+                    onChange={e => setEditForm(f => ({ ...f, payment_method: e.target.value }))}>
+                    {VALMENNUS_MAKSUTAVAT.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                ) : (
+                  <input className="input-field" value={editForm.payment_method}
+                    onChange={e => setEditForm(f => ({ ...f, payment_method: e.target.value }))} />
+                )}
+              </div>
+            )}
+            {tab === 'jasen' && isAdmin && (
+              <div className="input-group">
+                <label className="input-label">Myyntipäivä</label>
+                <input className="input-field" type="date" value={editForm.visit_date || ''}
+                  onChange={e => setEditForm(f => ({ ...f, visit_date: e.target.value }))} />
+              </div>
+            )}
+            {tab === 'jasen' && (
+              <div className="input-group">
+                <label className="input-label">Alkaa</label>
+                <input className="input-field" type="date" value={editForm.start_date}
+                  onChange={e => setEditForm(f => ({ ...f, start_date: e.target.value }))} />
+              </div>
+            )}
+            <div className="input-group">
+              <label className="input-label">Muistiinpanot</label>
+              <textarea className="input-field" rows={2} value={editForm.notes}
+                onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                style={{ resize: 'vertical' }} />
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

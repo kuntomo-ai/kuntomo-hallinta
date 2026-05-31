@@ -1,6 +1,29 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { NavLink } from 'react-router-dom'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+
+const REPORT_NAV = [
+  { label: 'Terapiamyynti', to: '/finance/raportointi/terapiamyynti' },
+  { label: 'Valmennusmyynti', to: '/finance/raportointi/valmennusmyynti' },
+  { label: 'Jäsenmyynti', to: '/finance/raportointi/jasenmyynti' },
+  { label: 'Lahjakortit', to: '/finance/raportointi/lahjakortit' },
+]
+
+function ReportNav() {
+  return (
+    <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <NavLink to="/finance/raportointi" end style={{ textDecoration: 'none' }}>
+        <button className="sub-tab">← Yhteenveto</button>
+      </NavLink>
+      {REPORT_NAV.map(r => (
+        <NavLink key={r.to} to={r.to} style={{ textDecoration: 'none' }}>
+          {({ isActive }) => <button className={`sub-tab${isActive ? ' active' : ''}`}>{r.label}</button>}
+        </NavLink>
+      ))}
+    </div>
+  )
+}
 
 const PERIODS = [
   { label: 'Tänään', value: 'today' },
@@ -40,10 +63,17 @@ export default function RaportointiJasen() {
 
   useEffect(() => {
     if (canFilter) {
-      supabase.from('profiles').select('id, first_name, last_name, role')
-        .in('role', ['myynti', 'terapia_valmennus', 'sport', 'respa', 'admin', 'manager'])
-        .order('first_name')
-        .then(({ data }) => setEmployees(data || []))
+      Promise.all([
+        supabaseAdmin.from('profiles').select('first_name, last_name').order('first_name'),
+        supabaseAdmin.from('jasenmyynti').select('employee_name').not('employee_name', 'is', null),
+      ]).then(([profRes, salesRes]) => {
+        const fromProfiles = (profRes.data || [])
+          .map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim())
+          .filter(Boolean)
+        const fromSales = (salesRes.data || []).map(r => r.employee_name).filter(Boolean)
+        const names = [...new Set([...fromSales, ...fromProfiles])].sort()
+        setEmployees(names)
+      })
     }
   }, [canFilter])
 
@@ -53,7 +83,7 @@ export default function RaportointiJasen() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    let query = supabase.from('jasenmyynti').select('*').gte('created_at', from).lte('created_at', to + 'T23:59:59')
+    let query = supabaseAdmin.from('jasenmyynti').select('*').gte('created_at', from).lte('created_at', to + 'T23:59:59')
     if (selectedEmployee) query = query.eq('employee_name', selectedEmployee)
     const { data } = await query.order('created_at', { ascending: false })
     setRows(data || [])
@@ -67,6 +97,7 @@ export default function RaportointiJasen() {
 
   return (
     <div>
+      <ReportNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Jäsenmyynti — Raportti</h1>
@@ -77,10 +108,7 @@ export default function RaportointiJasen() {
         {canFilter && (
           <select className="input-field" value={selectedEmployee} onChange={e => setSelectedEmployee(e.target.value)} style={{ width: 200 }}>
             <option value="">Kaikki myyjät</option>
-            {employees.map(e => {
-              const name = `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim()
-              return <option key={e.id} value={name}>{name}</option>
-            })}
+            {employees.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
         )}
       </div>

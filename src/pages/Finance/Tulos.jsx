@@ -3,7 +3,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine
 } from 'recharts'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 const MONTH_LABELS = {
@@ -47,7 +47,7 @@ export default function Tulos() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase
+    const { data } = await supabaseAdmin
       .from('tulos_kuukausiraportti')
       .select('*')
       .order('period')
@@ -255,7 +255,7 @@ export default function Tulos() {
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', marginBottom: '1.25rem' }}>
             {MONTH_LABELS[sel.period] || sel.period} – Erittely
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div className="grid-cols-2" style={{ gap: '1.5rem' }}>
             <div>
               {[
                 { label: 'Liikevaihto', val: sel.liikevaihto, bold: true },

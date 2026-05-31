@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 import VoiceMicButton, { parseVoiceAjo, parseVoiceWorkTime } from '../components/VoiceInput'
@@ -9,7 +9,61 @@ const TODAY = new Date().toISOString().slice(0, 10)
 
 // ─── Ajokirjaus tab ───────────────────────────────────────────────────────────
 
-const emptyDrive = { driver_name: '', from_location: '', to_location: '', distance_km: '', odometer_before: '', odometer_after: '', notes: '' }
+const emptyDrive = { driver_name: '', drive_date: TODAY, from_location: '', to_location: '', distance_km: '', odometer_before: '', odometer_after: '', notes: '' }
+const KM_KORVAUS = 0.55
+
+const PERIOD_TABS = [
+  { key: 'paiva',    label: 'Päivä' },
+  { key: 'viikko',   label: 'Viikko' },
+  { key: 'kuukausi', label: 'Kuukausi' },
+  { key: 'vuosi',    label: 'Vuosi' },
+  { key: 'kaikki',   label: 'Kaikki' },
+]
+
+function getDateRange(tab) {
+  const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
+  switch (tab) {
+    case 'paiva': return { from: todayStr, to: todayStr }
+    case 'viikko': {
+      const d = new Date(today)
+      const day = d.getDay() || 7
+      d.setDate(d.getDate() - day + 1)
+      const from = d.toISOString().slice(0, 10)
+      d.setDate(d.getDate() + 6)
+      return { from, to: d.toISOString().slice(0, 10) }
+    }
+    case 'kuukausi': {
+      const y = today.getFullYear(), m = today.getMonth()
+      return { from: new Date(y, m, 1).toISOString().slice(0, 10), to: new Date(y, m + 1, 0).toISOString().slice(0, 10) }
+    }
+    case 'vuosi': {
+      const y = today.getFullYear()
+      return { from: `${y}-01-01`, to: `${y}-12-31` }
+    }
+    default: return { from: null, to: null }
+  }
+}
+
+function getPeriodKey(tab) {
+  const today = new Date()
+  switch (tab) {
+    case 'paiva': return today.toISOString().slice(0, 10)
+    case 'viikko': {
+      const d = new Date(today)
+      const day = d.getDay() || 7
+      d.setDate(d.getDate() - day + 1)
+      return `w_${d.toISOString().slice(0, 10)}`
+    }
+    case 'kuukausi': return today.toISOString().slice(0, 7)
+    case 'vuosi': return `${today.getFullYear()}`
+    default: return 'all'
+  }
+}
+
+function driveNotesKey(tab, driver) {
+  return `drive_notes_${tab}_${getPeriodKey(tab)}_${driver || 'all'}`
+}
 
 function AjokirjausTab({ isAdmin, myName }) {
   const [rows, setRows] = useState([])
@@ -18,9 +72,18 @@ function AjokirjausTab({ isAdmin, myName }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyDrive)
   const [saving, setSaving] = useState(false)
-  const [stats, setStats] = useState({ today: 0, month: 0, monthCount: 0 })
+  const [saveError, setSaveError] = useState('')
+  const [periodTab, setPeriodTab] = useState('kuukausi')
+  const [selectedDriver, setSelectedDriver] = useState('')
+  const [drivers, setDrivers] = useState([])
+  const [periodNotes, setPeriodNotes] = useState('')
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { if (isAdmin) fetchDrivers() }, [isAdmin])
+  useEffect(() => { fetchData() }, [periodTab, selectedDriver])
+  useEffect(() => {
+    if (periodTab === 'kaikki') { setPeriodNotes(''); return }
+    setPeriodNotes(localStorage.getItem(driveNotesKey(periodTab, selectedDriver)) || '')
+  }, [periodTab, selectedDriver])
 
   useEffect(() => {
     function onVoiceTimelog(e) {
@@ -32,30 +95,43 @@ function AjokirjausTab({ isAdmin, myName }) {
     return () => window.removeEventListener('voice-timelog', onVoiceTimelog)
   }, [myName])
 
+  async function fetchDrivers() {
+    const { data } = await supabaseAdmin.from('drive_logs').select('driver_name').not('driver_name', 'is', null)
+    const unique = [...new Set((data || []).map(r => r.driver_name).filter(Boolean))].sort()
+    setDrivers(unique)
+  }
+
   async function fetchData() {
     setLoading(true)
-    let q = supabase.from('drive_logs').select('*').order('created_at', { ascending: false })
-    if (!isAdmin) q = q.eq('driver_name', myName)
+    const { from, to } = getDateRange(periodTab)
+    let q = supabaseAdmin.from('drive_logs').select('*').order('drive_date', { ascending: false })
+    if (from) q = q.gte('drive_date', from)
+    if (to) q = q.lte('drive_date', to)
+    if (isAdmin && selectedDriver) q = q.eq('driver_name', selectedDriver)
+    else if (!isAdmin) q = q.eq('driver_name', myName)
     const { data } = await q
     setRows(data || [])
-    const today = new Date().toISOString().slice(0, 10)
-    const monthStart = new Date().toISOString().slice(0, 7)
-    const todayKm = (data || []).filter(r => r.created_at?.slice(0, 10) === today).reduce((s, r) => s + (r.distance_km || 0), 0)
-    const monthRows = (data || []).filter(r => r.created_at?.slice(0, 7) === monthStart)
-    setStats({ today: todayKm, month: monthRows.reduce((s, r) => s + (r.distance_km || 0), 0), monthCount: monthRows.length })
     setLoading(false)
+  }
+
+  function saveNotes(val) {
+    setPeriodNotes(val)
+    localStorage.setItem(driveNotesKey(periodTab, selectedDriver), val)
   }
 
   function openNew() {
     setEditing(null)
-    setForm({ ...emptyDrive, driver_name: myName })
+    setSaveError('')
+    setForm({ ...emptyDrive, driver_name: isAdmin && selectedDriver ? selectedDriver : myName, drive_date: TODAY })
     setShowModal(true)
   }
 
   function openEdit(row) {
     setEditing(row.id)
+    setSaveError('')
     setForm({
       driver_name: row.driver_name || '',
+      drive_date: row.drive_date || TODAY,
       from_location: row.from_location || '',
       to_location: row.to_location || '',
       distance_km: row.distance_km != null ? String(row.distance_km) : '',
@@ -81,18 +157,23 @@ function AjokirjausTab({ isAdmin, myName }) {
   async function handleSave() {
     if (!form.driver_name.trim() || !form.from_location.trim() || !form.to_location.trim()) return
     setSaving(true)
+    setSaveError('')
+    const km = form.distance_km ? parseFloat(form.distance_km) : null
     const payload = {
       driver_name: form.driver_name.trim(),
+      drive_date: form.drive_date || TODAY,
       from_location: form.from_location.trim(),
       to_location: form.to_location.trim(),
-      distance_km: form.distance_km ? parseFloat(form.distance_km) : null,
+      distance_km: km,
       odometer_before: form.odometer_before ? parseFloat(form.odometer_before) : null,
       odometer_after: form.odometer_after ? parseFloat(form.odometer_after) : null,
       notes: form.notes.trim() || null,
     }
-    if (editing) await supabase.from('drive_logs').update(payload).eq('id', editing)
-    else await supabase.from('drive_logs').insert(payload)
+    const { error } = editing
+      ? await supabaseAdmin.from('drive_logs').update(payload).eq('id', editing)
+      : await supabaseAdmin.from('drive_logs').insert(payload)
     setSaving(false)
+    if (error) { setSaveError(error.message); return }
     setShowModal(false)
     setEditing(null)
     fetchData()
@@ -100,20 +181,59 @@ function AjokirjausTab({ isAdmin, myName }) {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko ajokirjaus?')) return
-    await supabase.from('drive_logs').delete().eq('id', id)
+    await supabaseAdmin.from('drive_logs').delete().eq('id', id)
     fetchData()
   }
 
+  const totalKm = rows.reduce((s, r) => s + (r.distance_km || 0), 0)
+  const totalComp = totalKm * KM_KORVAUS
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-        <button className="btn btn-primary" onClick={openNew}><Plus size={16} /> Uusi ajokirjaus</button>
+      {/* Header: title + user filter + period tabs + new button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text1)' }}>Ajot</span>
+        {isAdmin && (
+          <select className="input-field" style={{ width: 'auto' }} value={selectedDriver} onChange={e => setSelectedDriver(e.target.value)}>
+            <option value="">Kaikki käyttäjät</option>
+            {drivers.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
+        <div style={{ display: 'flex' }}>
+          {PERIOD_TABS.map((t, i) => (
+            <button key={t.key} onClick={() => setPeriodTab(t.key)} style={{
+              padding: '.3rem .75rem',
+              border: '1px solid var(--border)',
+              borderLeft: i === 0 ? '1px solid var(--border)' : 'none',
+              borderRadius: i === 0 ? '6px 0 0 6px' : i === PERIOD_TABS.length - 1 ? '0 6px 6px 0' : '0',
+              fontWeight: periodTab === t.key ? 700 : 400,
+              color: periodTab === t.key ? 'var(--violet)' : 'var(--text3)',
+              background: periodTab === t.key ? 'var(--violet-subtle, #F5F3FF)' : 'transparent',
+              cursor: 'pointer',
+              fontSize: '.83rem',
+            }}>{t.label}</button>
+          ))}
+        </div>
+        <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={openNew}><Plus size={16} /> Uusi ajokirjaus</button>
       </div>
 
+      {/* Period notes */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <textarea
+          className="input-field"
+          placeholder="Muistiinpanot – esim. maksettu / maksamatta..."
+          value={periodNotes}
+          onChange={e => saveNotes(e.target.value)}
+          rows={2}
+          style={{ resize: 'vertical', fontSize: '.85rem' }}
+        />
+      </div>
+
+      {/* Stats */}
       <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
-        <div className="stat-card"><div className="stat-label">Ajettu tänään</div><div className="stat-value">{stats.today.toFixed(1)} km</div></div>
-        <div className="stat-card"><div className="stat-label">Tämä kuukausi</div><div className="stat-value">{stats.month.toFixed(1)} km</div></div>
-        <div className="stat-card"><div className="stat-label">Kirjauksia kk</div><div className="stat-value">{stats.monthCount}</div></div>
+        <div className="stat-card"><div className="stat-label">Km yhteensä</div><div className="stat-value">{totalKm.toFixed(1)} km</div></div>
+        <div className="stat-card"><div className="stat-label">Korvauksia yhteensä</div><div className="stat-value gold">{totalComp.toFixed(2)} €</div></div>
+        <div className="stat-card"><div className="stat-label">Kirjauksia</div><div className="stat-value">{rows.length}</div></div>
       </div>
 
       <div className="table-wrap">
@@ -125,6 +245,7 @@ function AjokirjausTab({ isAdmin, myName }) {
               <th>Lähtöpaikka</th>
               <th>Määränpää</th>
               <th>Matka</th>
+              <th>Km-korvaus</th>
               <th>Mittari ennen</th>
               <th>Mittari jälkeen</th>
               <th>Muistiinpanot</th>
@@ -133,16 +254,17 @@ function AjokirjausTab({ isAdmin, myName }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={isAdmin ? 9 : 8} className="table-empty">Ladataan...</td></tr>
+              <tr><td colSpan={isAdmin ? 10 : 9} className="table-empty">Ladataan...</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={isAdmin ? 9 : 8} className="table-empty">Ei ajokirjauksia.</td></tr>
+              <tr><td colSpan={isAdmin ? 10 : 9} className="table-empty">Ei ajokirjauksia valitulla ajanjaksolla.</td></tr>
             ) : rows.map(r => (
               <tr key={r.id}>
-                <td style={{ whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: '.78rem' }}>{new Date(r.created_at).toLocaleDateString('fi-FI')}</td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: '.78rem' }}>{r.drive_date ? new Date(r.drive_date).toLocaleDateString('fi-FI') : new Date(r.created_at).toLocaleDateString('fi-FI')}</td>
                 {isAdmin && <td style={{ fontWeight: 600 }}>{r.driver_name}</td>}
                 <td>{r.from_location}</td>
                 <td>{r.to_location}</td>
                 <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{r.distance_km != null ? r.distance_km + ' km' : '—'}</td>
+                <td style={{ fontWeight: 600, color: 'var(--green)' }}>{r.distance_km != null ? (r.distance_km * KM_KORVAUS).toFixed(2) + ' €' : '—'}</td>
                 <td style={{ color: 'var(--text3)' }}>{r.odometer_before ?? '—'}</td>
                 <td style={{ color: 'var(--text3)' }}>{r.odometer_after ?? '—'}</td>
                 <td style={{ color: 'var(--text3)', fontSize: '.78rem', maxWidth: 140 }}>{r.notes || '—'}</td>
@@ -172,9 +294,15 @@ function AjokirjausTab({ isAdmin, myName }) {
           </>
         }>
           <div className="form-grid">
-            <div className="input-group">
-              <label className="input-label">Kuljettaja</label>
-              <input className="input-field" name="driver_name" placeholder="Etunimi Sukunimi" value={form.driver_name} onChange={handleChange} readOnly={!isAdmin} style={!isAdmin ? { background: 'var(--bg3)' } : {}} />
+            <div className="form-grid form-grid-2">
+              <div className="input-group">
+                <label className="input-label">Kuljettaja</label>
+                <input className="input-field" name="driver_name" placeholder="Etunimi Sukunimi" value={form.driver_name} onChange={handleChange} readOnly={!isAdmin} style={!isAdmin ? { background: 'var(--bg3)' } : {}} />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Päivämäärä</label>
+                <input className="input-field" name="drive_date" type="date" value={form.drive_date} onChange={handleChange} />
+              </div>
             </div>
             <div className="form-grid form-grid-2">
               <div className="input-group">
@@ -196,6 +324,11 @@ function AjokirjausTab({ isAdmin, myName }) {
                 <input className="input-field" name="distance_km" type="number" step="0.1" placeholder="24.5" value={form.distance_km} onChange={handleChange} />
               </div>
             </div>
+            {form.distance_km && parseFloat(form.distance_km) > 0 && (
+              <div style={{ fontSize: '.83rem', color: 'var(--green)', fontWeight: 700, padding: '.5rem .75rem', background: 'var(--green-subtle, #F0FDF4)', borderRadius: 6 }}>
+                Km-korvaus: {(parseFloat(form.distance_km) * KM_KORVAUS).toFixed(2)} € ({KM_KORVAUS} €/km)
+              </div>
+            )}
             <div className="input-group">
               <label className="input-label">Mittarilukema jälkeen (lasketaan automaattisesti)</label>
               <input className="input-field" name="odometer_after" type="number" step="0.1" value={form.odometer_after} readOnly style={{ background: 'var(--bg3)' }} />
@@ -204,6 +337,11 @@ function AjokirjausTab({ isAdmin, myName }) {
               <label className="input-label">Muistiinpanot</label>
               <textarea className="input-field" name="notes" rows={2} value={form.notes} onChange={handleChange} style={{ resize: 'vertical' }} />
             </div>
+            {saveError && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.82rem', color: 'var(--red)' }}>
+                ⚠️ {saveError}
+              </div>
+            )}
           </div>
         </Modal>
       )}
@@ -222,12 +360,13 @@ function WorkTimeTab({ isAdmin, myName }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyWork)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   useEffect(() => { fetchData() }, [])
 
   async function fetchData() {
     setLoading(true)
-    let q = supabase.from('work_time_logs').select('*').order('work_date', { ascending: false }).order('start_time', { ascending: false })
+    let q = supabaseAdmin.from('work_time_logs').select('*').order('work_date', { ascending: false }).order('start_time', { ascending: false })
     if (!isAdmin) q = q.eq('employee_name', myName)
     const { data } = await q
     setRows(data || [])
@@ -245,12 +384,14 @@ function WorkTimeTab({ isAdmin, myName }) {
 
   function openNew() {
     setEditing(null)
+    setSaveError('')
     setForm({ ...emptyWork, employee_name: myName })
     setShowModal(true)
   }
 
   function openEdit(row) {
     setEditing(row.id)
+    setSaveError('')
     setForm({
       employee_name: row.employee_name || '',
       work_date: row.work_date || TODAY,
@@ -269,6 +410,7 @@ function WorkTimeTab({ isAdmin, myName }) {
   async function handleSave() {
     if (!form.employee_name.trim() || !form.work_date || !form.start_time || !form.end_time) return
     setSaving(true)
+    setSaveError('')
     const hours = calcHours(form.start_time, form.end_time, form.break_minutes)
     const payload = {
       employee_name: form.employee_name.trim(),
@@ -279,9 +421,11 @@ function WorkTimeTab({ isAdmin, myName }) {
       hours_total: hours ? parseFloat(hours) : null,
       notes: form.notes.trim() || null,
     }
-    if (editing) await supabase.from('work_time_logs').update(payload).eq('id', editing)
-    else await supabase.from('work_time_logs').insert(payload)
+    const { error } = editing
+      ? await supabaseAdmin.from('work_time_logs').update(payload).eq('id', editing)
+      : await supabaseAdmin.from('work_time_logs').insert(payload)
     setSaving(false)
+    if (error) { setSaveError(error.message); return }
     setShowModal(false)
     setEditing(null)
     fetchData()
@@ -289,7 +433,7 @@ function WorkTimeTab({ isAdmin, myName }) {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko työaikakirjaus?')) return
-    await supabase.from('work_time_logs').delete().eq('id', id)
+    await supabaseAdmin.from('work_time_logs').delete().eq('id', id)
     fetchData()
   }
 
@@ -393,6 +537,11 @@ function WorkTimeTab({ isAdmin, myName }) {
               <label className="input-label">Muistiinpanot</label>
               <textarea className="input-field" name="notes" rows={2} value={form.notes} onChange={handleChange} style={{ resize: 'vertical' }} />
             </div>
+            {saveError && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.82rem', color: 'var(--red)' }}>
+                ⚠️ {saveError}
+              </div>
+            )}
           </div>
         </Modal>
       )}

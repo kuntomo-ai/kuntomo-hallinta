@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 const SECTIONS = {
@@ -127,7 +127,7 @@ export default function Tase() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase.from('tase_snapshot').select('*').order('side').order('section').order('sub_section').order('account_code')
+    const { data } = await supabaseAdmin.from('tase_snapshot').select('*').order('side').order('section').order('sub_section').order('account_code')
     const items = data || []
     setRows(items)
     if (items.length) setPeriod(items[0].period)

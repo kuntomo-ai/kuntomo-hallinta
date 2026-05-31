@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2, ChevronLeft, ChevronRight, Upload } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/AuthContext'
 
@@ -38,7 +38,7 @@ export default function Yritykset() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabase.from('companies').select('*').order('name')
+    const { data } = await supabaseAdmin.from('companies').select('*').order('name')
     setRows(data || [])
     setLoading(false)
   }
@@ -50,9 +50,9 @@ export default function Yritykset() {
 
   async function fetchCompanyData(company_id, year) {
     const [personsRes, visitsRes, notesRes] = await Promise.all([
-      supabase.from('company_persons').select('*').eq('company_id', company_id).order('name'),
-      supabase.from('company_visits').select('*').eq('company_id', company_id).gte('visit_date', `${year}-01-01`).lte('visit_date', `${year}-12-31`),
-      supabase.from('company_notes').select('*').eq('company_id', company_id).eq('year', year).maybeSingle(),
+      supabaseAdmin.from('company_persons').select('*').eq('company_id', company_id).order('name'),
+      supabaseAdmin.from('company_visits').select('*').eq('company_id', company_id).gte('visit_date', `${year}-01-01`).lte('visit_date', `${year}-12-31`),
+      supabaseAdmin.from('company_notes').select('*').eq('company_id', company_id).eq('year', year).maybeSingle(),
     ])
     setPersons(personsRes.data || [])
     setVisits(visitsRes.data || [])
@@ -66,7 +66,7 @@ export default function Yritykset() {
   async function addPerson() {
     if (!newPersonName.trim() || !selected) return
     setAddingPerson(true)
-    await supabase.from('company_persons').insert({ company_id: selected.id, name: newPersonName.trim() })
+    await supabaseAdmin.from('company_persons').insert({ company_id: selected.id, name: newPersonName.trim() })
     setNewPersonName('')
     setAddingPerson(false)
     fetchCompanyData(selected.id, viewYear)
@@ -81,7 +81,7 @@ export default function Yritykset() {
     const startIdx = (firstLower === 'name' || firstLower === 'nimi' || firstLower === 'henkilö') ? 1 : 0
     const names = lines.slice(startIdx).map(l => l.split(',')[0].trim()).filter(Boolean)
     if (names.length > 0) {
-      await supabase.from('company_persons').insert(names.map(name => ({ company_id: selected.id, name })))
+      await supabaseAdmin.from('company_persons').insert(names.map(name => ({ company_id: selected.id, name })))
     }
     setCsvImporting(false)
     fetchCompanyData(selected.id, viewYear)
@@ -89,17 +89,17 @@ export default function Yritykset() {
 
   async function deletePerson(id) {
     if (!confirm('Poistetaanko henkilö?')) return
-    await supabase.from('company_persons').delete().eq('id', id)
+    await supabaseAdmin.from('company_persons').delete().eq('id', id)
     fetchCompanyData(selected.id, viewYear)
   }
 
   async function saveNotes() {
     setNotesSaving(true)
-    const existing = await supabase.from('company_notes').select('id').eq('company_id', selected.id).eq('year', viewYear).maybeSingle()
+    const existing = await supabaseAdmin.from('company_notes').select('id').eq('company_id', selected.id).eq('year', viewYear).maybeSingle()
     if (existing.data) {
-      await supabase.from('company_notes').update({ notes }).eq('id', existing.data.id)
+      await supabaseAdmin.from('company_notes').update({ notes }).eq('id', existing.data.id)
     } else {
-      await supabase.from('company_notes').insert({ company_id: selected.id, year: viewYear, notes })
+      await supabaseAdmin.from('company_notes').insert({ company_id: selected.id, year: viewYear, notes })
     }
     setNotesSaving(false)
     setEditingNotes(false)
@@ -108,7 +108,7 @@ export default function Yritykset() {
   async function handleSave() {
     if (!form.name.trim()) return
     setSaving(true)
-    await supabase.from('companies').insert({
+    await supabaseAdmin.from('companies').insert({
       name: form.name.trim(),
       contact_person: form.contact_person.trim() || null,
       email: form.email.trim() || null,
@@ -125,7 +125,7 @@ export default function Yritykset() {
   async function handleUpdateCompany() {
     if (!editForm.name.trim()) return
     setSaving(true)
-    await supabase.from('companies').update({
+    await supabaseAdmin.from('companies').update({
       name: editForm.name.trim(),
       contact_person: editForm.contact_person.trim() || null,
       email: editForm.email.trim() || null,
@@ -141,14 +141,24 @@ export default function Yritykset() {
 
   async function toggleInvoiced(visit) {
     if (!isAdmin) return
-    await supabase.from('company_visits').update({ invoiced: !visit.invoiced }).eq('id', visit.id)
+    await supabaseAdmin.from('company_visits').update({ invoiced: !visit.invoiced }).eq('id', visit.id)
     fetchCompanyData(selected.id, viewYear)
   }
 
   async function deleteVisit(id) {
     if (!confirm('Poistetaanko käyntikirjaus?')) return
-    await supabase.from('company_visits').delete().eq('id', id)
+    await supabaseAdmin.from('company_visits').delete().eq('id', id)
     fetchCompanyData(selected.id, viewYear)
+  }
+
+  async function handleDeleteCompany(e, id) {
+    e.stopPropagation()
+    if (!confirm('Poistetaanko yritys? Tämä poistaa myös kaikki henkilöt, käynnit ja muistiinpanot.')) return
+    await supabaseAdmin.from('company_persons').delete().eq('company_id', id)
+    await supabaseAdmin.from('company_visits').delete().eq('company_id', id)
+    await supabaseAdmin.from('company_notes').delete().eq('company_id', id)
+    await supabaseAdmin.from('companies').delete().eq('id', id)
+    fetchData()
   }
 
   function handleChange(e) { setForm(f => ({ ...f, [e.target.name]: e.target.value })) }
@@ -195,26 +205,26 @@ export default function Yritykset() {
               <thead>
                 <tr>
                   <th>Yritys</th>
-                  <th>Yhteyshenkilö</th>
-                  <th>Sähköposti</th>
-                  <th>Puhelin</th>
-                  <th>Kaupunki</th>
                   <th>Lisätty</th>
+                  {isAdmin && <th></th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="table-empty">Ladataan...</td></tr>
+                  <tr><td colSpan={isAdmin ? 3 : 2} className="table-empty">Ladataan...</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="table-empty">Ei yrityksiä.</td></tr>
+                  <tr><td colSpan={isAdmin ? 3 : 2} className="table-empty">Ei yrityksiä.</td></tr>
                 ) : filtered.map(r => (
                   <tr key={r.id} onClick={() => handleRowClick(r)} style={{ cursor: 'pointer' }}>
                     <td style={{ fontWeight: 700 }}>{r.name}</td>
-                    <td>{r.contact_person || '—'}</td>
-                    <td style={{ color: 'var(--text3)', fontSize: '.82rem' }}>{r.email || '—'}</td>
-                    <td style={{ color: 'var(--text3)', fontSize: '.82rem' }}>{r.phone || '—'}</td>
-                    <td>{r.city || '—'}</td>
                     <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleDateString('fi-FI')}</td>
+                    {isAdmin && (
+                      <td onClick={e => e.stopPropagation()}>
+                        <button className="btn btn-danger btn-sm" onClick={e => handleDeleteCompany(e, r.id)}>
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
