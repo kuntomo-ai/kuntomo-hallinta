@@ -639,8 +639,8 @@ function ValmennusForm({ onSaved }) {
       const months = parseInt(form.recurring_months)
       const now = new Date()
       const records = Array.from({ length: months }, (_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth() + 1 + i, 1)
-        return { ...base, created_at: d.toISOString() }
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1 + i, 0)
+        return { ...base, visit_date: lastDay.toISOString().slice(0, 10) }
       });
       ({ error } = await supabaseAdmin.from('valmennusmyynti').insert(records))
     } else {

@@ -57,8 +57,8 @@ export default function ValmennusSales() {
       const months = parseInt(form.recurring_months)
       const now = new Date()
       const records = Array.from({ length: months }, (_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth() + 1 + i, 1)
-        return { ...base, created_at: d.toISOString() }
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1 + i, 0)
+        return { ...base, visit_date: lastDay.toISOString().slice(0, 10) }
       })
       await supabaseAdmin.from('valmennusmyynti').insert(records)
     } else {
@@ -129,7 +129,7 @@ export default function ValmennusSales() {
               <tr><td colSpan={7} className="table-empty">Ei myyntikirjauksia.</td></tr>
             ) : filtered.map(r => (
               <tr key={r.id}>
-                <td style={{ whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: '.78rem' }}>{new Date(r.created_at).toLocaleDateString('fi-FI')}</td>
+                <td style={{ whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: '.78rem' }}>{new Date(r.visit_date || r.created_at).toLocaleDateString('fi-FI')}</td>
                 <td style={{ fontWeight: 600 }}>{r.customer_name}</td>
                 <td>{r.service}</td>
                 <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
