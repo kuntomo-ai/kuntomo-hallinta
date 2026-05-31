@@ -851,19 +851,27 @@ export default function Sales() {
   useEffect(() => {
     if (isAdmin) {
       Promise.all([
-        supabaseAdmin.from('employees').select('first_name, last_name').eq('status', 'active').order('first_name'),
+        supabaseAdmin.from('employees').select('first_name, last_name').eq('status', 'active'),
         supabaseAdmin.from('terapiamyynti').select('employee_name').not('employee_name', 'is', null),
         supabaseAdmin.from('valmennusmyynti').select('employee_name').not('employee_name', 'is', null),
         supabaseAdmin.from('jasenmyynti').select('employee_name').not('employee_name', 'is', null),
       ]).then(([empRes, tRes, vRes, jRes]) => {
-        const fromEmp = (empRes.data || []).map(e => `${e.first_name || ''} ${e.last_name || ''}`.trim()).filter(Boolean)
-        const fromSales = [
+        const fromEmp = (empRes.data || []).map(e => ({
+          full_name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
+          last_name: e.last_name || '',
+        })).filter(e => e.full_name)
+        const salesNames = [
           ...(tRes.data || []).map(r => r.employee_name),
           ...(vRes.data || []).map(r => r.employee_name),
           ...(jRes.data || []).map(r => r.employee_name),
         ].filter(Boolean)
-        const names = [...new Set([...fromEmp, ...fromSales])].sort()
-        setUsers(names.map(n => ({ id: n, first_name: n, last_name: '', full_name: n })))
+        const empNames = new Set(fromEmp.map(e => e.full_name))
+        const fromSales = salesNames
+          .filter(n => !empNames.has(n))
+          .map(n => { const parts = n.trim().split(' '); return { full_name: n, last_name: parts.length > 1 ? parts[parts.length - 1] : n } })
+        const all = [...fromEmp, ...[...new Map(fromSales.map(e => [e.full_name, e])).values()]]
+        all.sort((a, b) => a.last_name.localeCompare(b.last_name, 'fi'))
+        setUsers(all.map(e => ({ id: e.full_name, full_name: e.full_name })))
       })
     }
   }, [isAdmin])
