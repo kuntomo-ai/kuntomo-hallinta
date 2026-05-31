@@ -58,6 +58,10 @@ export default function Lahjakortit() {
   const [saleNotes, setSaleNotes] = useState('')
   const [saleSaving, setSaleSaving] = useState(false)
 
+  // Jaksonvalitsin
+  const [period, setPeriod] = useState('month')
+  const [periodDate, setPeriodDate] = useState(new Date())
+
   useEffect(() => { fetchData() }, [])
 
   async function fetchData() {
@@ -172,6 +176,39 @@ export default function Lahjakortit() {
     fetchData()
   }
 
+  function periodRows() {
+    if (period === 'all') return rows
+    return rows.filter(r => {
+      if (!r.sale_date) return false
+      const d = new Date(r.sale_date)
+      if (period === 'day') return r.sale_date === periodDate.toISOString().slice(0, 10)
+      if (period === 'month') return d.getFullYear() === periodDate.getFullYear() && d.getMonth() === periodDate.getMonth()
+      if (period === 'year') return d.getFullYear() === periodDate.getFullYear()
+      return true
+    })
+  }
+
+  function periodLabel() {
+    if (period === 'all') return null
+    if (period === 'day') return periodDate.toLocaleDateString('fi-FI')
+    if (period === 'month') return periodDate.toLocaleDateString('fi-FI', { month: 'long', year: 'numeric' })
+    return String(periodDate.getFullYear())
+  }
+
+  function navigate(dir) {
+    const d = new Date(periodDate)
+    if (period === 'day') d.setDate(d.getDate() + dir)
+    else if (period === 'month') d.setMonth(d.getMonth() + dir)
+    else if (period === 'year') d.setFullYear(d.getFullYear() + dir)
+    setPeriodDate(d)
+  }
+
+  const pRows = periodRows()
+  const todayTotal = rows.filter(r => r.sale_date === TODAY).reduce((s, r) => s + (r.price || 0), 0)
+  const periodTotal = pRows.reduce((s, r) => s + (r.price || 0), 0)
+  const periodCount = pRows.length
+  const periodAvg = periodCount > 0 ? periodTotal / periodCount : 0
+
   const filtered = rows.filter(r =>
     r.code?.toLowerCase().includes(search.toLowerCase()) ||
     r.seller_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -194,6 +231,55 @@ export default function Lahjakortit() {
         </button>
       </div>
 
+      {/* Jaksonvalitsin */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        {['day', 'month', 'year', 'all'].map(p => (
+          <button
+            key={p}
+            onClick={() => { setPeriod(p); setPeriodDate(new Date()) }}
+            style={{
+              padding: '0.4rem 1rem',
+              borderRadius: 20,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: period === p ? 700 : 400,
+              background: period === p ? 'var(--white, #fff)' : 'transparent',
+              color: period === p ? 'var(--violet)' : 'var(--text3)',
+              boxShadow: period === p ? '0 1px 4px rgba(0,0,0,.12)' : 'none',
+              fontSize: '.9rem',
+            }}
+          >
+            {p === 'day' ? 'Päivä' : p === 'month' ? 'Kuukausi' : p === 'year' ? 'Vuosi' : 'Kaikki'}
+          </button>
+        ))}
+        {period !== 'all' && (
+          <>
+            <button onClick={() => navigate(-1)} style={{ background: 'var(--white, #fff)', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>‹</button>
+            <span style={{ fontWeight: 600, minWidth: 130, textAlign: 'center', fontSize: '.9rem' }}>{periodLabel()}</span>
+            <button onClick={() => navigate(1)} style={{ background: 'var(--white, #fff)', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>›</button>
+          </>
+        )}
+      </div>
+
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', marginBottom: '1.5rem' }}>
+        <div className="stat-card">
+          <div className="stat-label">Myynti tänään</div>
+          <div className="stat-value gold">{todayTotal.toFixed(2)} €</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Jakson myynti</div>
+          <div className="stat-value gold">{periodTotal.toFixed(2)} €</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Kirjauksia</div>
+          <div className="stat-value">{periodCount}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Keskiarvo / kirjaus</div>
+          <div className="stat-value">{periodAvg.toFixed(2)} €</div>
+        </div>
+      </div>
+
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
         <div className="stat-card">
           <div className="stat-label">Aktiiviset kortit</div>
@@ -201,7 +287,7 @@ export default function Lahjakortit() {
         </div>
         <div className="stat-card">
           <div className="stat-label">Kokonaisarvo</div>
-          <div className="stat-value gold">{totalValue.toFixed(2)} €</div>
+          <div className="stat-value">{totalValue.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Jäljellä yhteensä</div>
