@@ -12,6 +12,7 @@ import CalendarPage from './pages/CalendarPage'
 import Communication from './pages/Communication'
 import Inventory from './pages/Inventory'
 import Laiteluettelo from './pages/Laiteluettelo'
+import Kaapit from './pages/Kaapit'
 import Documents from './pages/Documents'
 import Lahjakortit from './pages/Finance/Lahjakortit'
 import Sales from './pages/Finance/Sales'
@@ -71,6 +72,7 @@ function AppRoutes() {
               <Route path="/employees/kausityontekijat" element={<RoleRoute><Kausityontekijat /></RoleRoute>} />
               <Route path="/inventory" element={<RoleRoute><Inventory /></RoleRoute>} />
               <Route path="/laiteluettelo" element={<RoleRoute><Laiteluettelo /></RoleRoute>} />
+              <Route path="/laiteluettelo/kaapit" element={<RoleRoute><Kaapit /></RoleRoute>} />
 
               <Route path="/finance/myynti" element={<RoleRoute><Sales /></RoleRoute>} />
               <Route path="/finance/myynti/terapiamyynti" element={<Navigate to="/finance/myynti" replace />} />

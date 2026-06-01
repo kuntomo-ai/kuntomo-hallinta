@@ -47,6 +47,7 @@ const NAV = [
   { label: 'Kyselyt',        href: '/surveys',                  icon: ClipboardList },
   { label: 'Inventaario',    href: '/inventory',                icon: Package,       roles: VARASTO },
   { label: 'Laiteluettelo',  href: '/laiteluettelo',            icon: Wrench,        roles: LAITE },
+  { label: 'Kaapit',        href: '/laiteluettelo/kaapit',     icon: Wrench,        roles: LAITE },
   { label: 'Dokumentit',     href: '/documents',                icon: FileText },
 ]
 
