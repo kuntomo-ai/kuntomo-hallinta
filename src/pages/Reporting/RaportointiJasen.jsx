@@ -148,7 +148,7 @@ export default function RaportointiJasen() {
                 <tr><td colSpan={canFilter ? 7 : 6} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
               ) : rows.map(r => (
                 <tr key={r.id}>
-                  <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleDateString('fi-FI')}</td>
+                  <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{new Date(r.entry_date || r.visit_date || r.created_at).toLocaleDateString('fi-FI')}</td>
                   <td style={{ fontWeight: 600 }}>{r.customer_name}</td>
                   <td>{r.membership_type}</td>
                   <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
