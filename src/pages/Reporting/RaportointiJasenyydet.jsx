@@ -146,11 +146,9 @@ export default function RaportointiJasenyydet() {
 
   // Latest stats
   const latest = rows.length > 0 ? rows[rows.length - 1] : null
-  const now = new Date()
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const thisMonthRows = rows.filter(r => r.week_start >= monthStart)
-  const thisMonthNew = thisMonthRows.reduce((s, r) => s + (r.new_members || 0), 0)
-  const thisMonthEnded = thisMonthRows.reduce((s, r) => s + (r.ended_members || 0), 0)
+  const last4 = rows.slice(-4)
+  const thisMonthNew = last4.reduce((s, r) => s + (r.new_members || 0), 0)
+  const thisMonthEnded = last4.reduce((s, r) => s + (r.ended_members || 0), 0)
 
   const chartData = chartView === 'month' ? monthlyData : yearlyData
   const xKey = chartView === 'month' ? 'viikko' : 'kk'
@@ -180,15 +178,15 @@ export default function RaportointiJasenyydet() {
           <div className="stat-value">{latest?.total_members ?? '—'}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Uudet tässä kk</div>
+          <div className="stat-label">Uudet viim. 4 vk</div>
           <div className="stat-value" style={{ color: 'var(--green)' }}>+{thisMonthNew}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Päättyneet tässä kk</div>
+          <div className="stat-label">Päättyneet viim. 4 vk</div>
           <div className="stat-value" style={{ color: 'var(--red)' }}>-{thisMonthEnded}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Nettomuutos tässä kk</div>
+          <div className="stat-label">Nettomuutos viim. 4 vk</div>
           <div className="stat-value" style={{ color: (thisMonthNew - thisMonthEnded) >= 0 ? 'var(--green)' : 'var(--red)' }}>
             {thisMonthNew - thisMonthEnded >= 0 ? '+' : ''}{thisMonthNew - thisMonthEnded}
           </div>
