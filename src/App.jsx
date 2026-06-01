@@ -27,6 +27,7 @@ import RaportointiValmennus from './pages/Reporting/RaportointiValmennus'
 import RaportointiJasen from './pages/Reporting/RaportointiJasen'
 import RaportointiLahjakortit from './pages/Reporting/RaportointiLahjakortit'
 import RaportointiOma from './pages/Reporting/RaportointiOma'
+import RaportointiJasenyydet from './pages/Reporting/RaportointiJasenyydet'
 import Yritykset from './pages/Customers/Yritykset'
 import SportHockey from './pages/Customers/SportHockey'
 import UserSettings from './pages/UserSettings'
@@ -91,6 +92,7 @@ function AppRoutes() {
               <Route path="/finance/raportointi/valmennusmyynti" element={<RoleRoute><RaportointiValmennus /></RoleRoute>} />
               <Route path="/finance/raportointi/jasenmyynti" element={<RoleRoute><RaportointiJasen /></RoleRoute>} />
               <Route path="/finance/raportointi/lahjakortit" element={<RoleRoute><RaportointiLahjakortit /></RoleRoute>} />
+              <Route path="/finance/raportointi/jasenyydet" element={<RoleRoute><RaportointiJasenyydet /></RoleRoute>} />
 
               <Route path="/customers/yritykset" element={<RoleRoute><Yritykset /></RoleRoute>} />
               <Route path="/customers/sport-hockey" element={<RoleRoute><SportHockey /></RoleRoute>} />
