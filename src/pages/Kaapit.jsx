@@ -76,7 +76,7 @@ export default function Kaapit() {
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">Kaapit</h1>
+          <h1 className="page-title">Pukukaapit</h1>
           <p className="page-subtitle">Pukukaappien tiedot ja kunnossapito</p>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Edit2, Trash2, Wrench, CheckCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { supabase, supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
@@ -227,11 +228,16 @@ export default function Laiteluettelo() {
           <h1 className="page-title">Laiteluettelo</h1>
           <p className="page-subtitle">Kuntosalin laitteet ja varusteet</p>
         </div>
-        {isAdmin && (
-          <button className="btn btn-primary" onClick={openNew}>
-            <Plus size={16} /> Uusi laite
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center' }}>
+          <Link to="/laiteluettelo/kaapit">
+            <button className="btn btn-ghost">Pukukaapit</button>
+          </Link>
+          {isAdmin && (
+            <button className="btn btn-primary" onClick={openNew}>
+              <Plus size={16} /> Uusi laite
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
