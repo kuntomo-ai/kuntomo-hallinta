@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, Legend, ComposedChart, Area,
+  ResponsiveContainer, CartesianGrid, Legend, ComposedChart, Area, AreaChart,
 } from 'recharts'
 import { Plus, Edit2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { supabaseAdmin } from '../../lib/supabase'
@@ -193,7 +193,37 @@ export default function RaportointiJasenyydet() {
         </div>
       </div>
 
-      {/* Graafi */}
+      {/* Jäsenmäärän kehitys — koko historia */}
+      {rows.filter(r => r.total_members != null).length > 1 && (
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1.25rem' }}>
+            Jäsenmäärän kehitys
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart
+              data={rows.filter(r => r.total_members != null).map(r => ({
+                pvm: fmtWeek(r.week_start),
+                'Jäseniä': r.total_members,
+              }))}
+              margin={{ top: 4, right: 8, bottom: 0, left: 0 }}
+            >
+              <defs>
+                <linearGradient id="memberGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--violet)" stopOpacity={0.18} />
+                  <stop offset="95%" stopColor="var(--violet)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="pvm" tick={{ fontSize: 10, fill: 'var(--text3)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ fontSize: '.78rem', border: '1px solid var(--border)', background: 'var(--bg)' }} />
+              <Area type="monotone" dataKey="Jäseniä" stroke="var(--violet)" strokeWidth={2.5} fill="url(#memberGrad)" dot={false} activeDot={{ r: 5 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Uudet / päättyneet graafi */}
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '.4rem' }}>
