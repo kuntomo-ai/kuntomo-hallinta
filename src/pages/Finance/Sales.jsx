@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Trash2, Camera, ChevronLeft, ChevronRight, Edit2, CheckCircle } from 'lucide-react'
+import { Search, Trash2, Camera, ChevronLeft, ChevronRight, Edit2, CheckCircle, Receipt, ExternalLink } from 'lucide-react'
 import { supabase, supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
@@ -882,6 +882,7 @@ export default function Sales() {
   const [navDate, setNavDate] = useState(new Date())
   const [filterUser, setFilterUser] = useState('')
   const [users, setUsers] = useState([])
+  const [receiptModal, setReceiptModal] = useState(null)
 
   const TABLE_MAP = { valmennus: 'valmennusmyynti', jasen: 'jasenmyynti' }
 
@@ -1197,6 +1198,11 @@ export default function Sales() {
                               </button>
                             )}
                             <button className="btn btn-ghost btn-sm" onClick={() => openEdit(r)}><Edit2 size={13} /></button>
+                            {r.receipt_url && (isAdmin || r.seller_id === user?.id) && (
+                              <button className="btn btn-ghost btn-sm" title="Näytä kuitti" style={{ color: 'var(--violet)' }} onClick={() => setReceiptModal(r.receipt_url)}>
+                                <Receipt size={13} />
+                              </button>
+                            )}
                             <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}><Trash2 size={13} /></button>
                           </div>
                         </td>
@@ -1375,6 +1381,29 @@ export default function Sales() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {receiptModal && (
+        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setReceiptModal(null) }}>
+          <div className="modal" style={{ maxWidth: 720 }}>
+            <div className="modal-header">
+              <span className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <Receipt size={16} /> Kuitti
+              </span>
+              <a href={receiptModal} target="_blank" rel="noopener noreferrer"
+                style={{ color: 'var(--violet)', fontSize: '.82rem', display: 'flex', alignItems: 'center', gap: '.25rem', textDecoration: 'none' }}>
+                Avaa <ExternalLink size={13} />
+              </a>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center', padding: '1rem' }}>
+              <img src={receiptModal} alt="Kuitti"
+                style={{ maxWidth: '100%', maxHeight: '72vh', objectFit: 'contain', borderRadius: 6, boxShadow: '0 2px 16px rgba(0,0,0,.12)' }} />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setReceiptModal(null)}>Sulje</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
