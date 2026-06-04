@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, Receipt, ExternalLink } from 'lucide-react'
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 
@@ -47,6 +47,78 @@ function fmtEur(v) {
   return Number(v || 0).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
+const FI_MONTHS = ['Tammi', 'Helmi', 'Maalis', 'Huhti', 'Touko', 'Kesä', 'Heinä', 'Elo', 'Syys', 'Loka', 'Marras', 'Joulu']
+const FI_DAYS = ['Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su']
+
+function buildChartData(terapiaRows, valmennusRows, period) {
+  if (period === 'year') {
+    const map = FI_MONTHS.map(label => ({ label, terapia: 0, valmennus: 0 }))
+    terapiaRows.forEach(r => { const m = new Date(r.created_at).getMonth(); map[m].terapia += r.price || 0 })
+    valmennusRows.forEach(r => { const m = new Date(r.created_at).getMonth(); map[m].valmennus += r.price || 0 })
+    return map.map(d => ({ ...d, terapia: +d.terapia.toFixed(2), valmennus: +d.valmennus.toFixed(2) }))
+  }
+
+  if (period === 'week') {
+    const now = new Date(); const dow = now.getDay() || 7
+    const slots = {}
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(now); d.setDate(now.getDate() - dow + i)
+      const key = d.toISOString().slice(0, 10)
+      slots[key] = { label: `${FI_DAYS[i - 1]} ${d.getDate()}.`, terapia: 0, valmennus: 0 }
+    }
+    terapiaRows.forEach(r => { const k = r.created_at.slice(0, 10); if (slots[k]) slots[k].terapia += r.price || 0 })
+    valmennusRows.forEach(r => { const k = r.created_at.slice(0, 10); if (slots[k]) slots[k].valmennus += r.price || 0 })
+    return Object.values(slots).map(d => ({ ...d, terapia: +d.terapia.toFixed(2), valmennus: +d.valmennus.toFixed(2) }))
+  }
+
+  if (period === 'month') {
+    const now = new Date(); const y = now.getFullYear(), m = now.getMonth()
+    const daysInMonth = new Date(y, m + 1, 0).getDate()
+    const slots = {}
+    for (let day = 1; day <= daysInMonth; day++) {
+      const key = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      slots[key] = { label: `${day}.`, terapia: 0, valmennus: 0 }
+    }
+    terapiaRows.forEach(r => { const k = r.created_at.slice(0, 10); if (slots[k]) slots[k].terapia += r.price || 0 })
+    valmennusRows.forEach(r => { const k = r.created_at.slice(0, 10); if (slots[k]) slots[k].valmennus += r.price || 0 })
+    return Object.values(slots).map(d => ({ ...d, terapia: +d.terapia.toFixed(2), valmennus: +d.valmennus.toFixed(2) }))
+  }
+
+  // today / custom
+  const dayMap = {}
+  terapiaRows.forEach(r => {
+    const d = r.created_at.slice(0, 10)
+    if (!dayMap[d]) dayMap[d] = { terapia: 0, valmennus: 0 }
+    dayMap[d].terapia += r.price || 0
+  })
+  valmennusRows.forEach(r => {
+    const d = r.created_at.slice(0, 10)
+    if (!dayMap[d]) dayMap[d] = { terapia: 0, valmennus: 0 }
+    dayMap[d].valmennus += r.price || 0
+  })
+  return Object.entries(dayMap).sort().map(([k, v]) => ({
+    label: new Date(k).toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' }),
+    terapia: +v.terapia.toFixed(2),
+    valmennus: +v.valmennus.toFixed(2),
+  }))
+}
+
+function buildCumulativeData(chartData) {
+  let cum = 0
+  return chartData.map(d => {
+    cum += (d.terapia || 0) + (d.valmennus || 0)
+    return { label: d.label, kumulatiivinen: +cum.toFixed(2) }
+  })
+}
+
+function getChartLabel(period) {
+  if (period === 'year') return 'kuukausittain'
+  if (period === 'week') return 'tämä viikko — päivittäin'
+  if (period === 'month') return 'tämä kuukausi — päivittäin'
+  if (period === 'today') return 'tänään'
+  return ''
+}
+
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
@@ -74,8 +146,8 @@ export default function RaportointiOma() {
   const [loading, setLoading] = useState(true)
   const [showTable, setShowTable] = useState(true)
   const [tableSort, setTableSort] = useState({ col: 'date', dir: 'desc' })
+  const [receiptModal, setReceiptModal] = useState(null)
 
-  // Sport – Jääkiekon kesäryhmä
   const [sportRows, setSportRows] = useState([])
   const [sportLoading, setSportLoading] = useState(false)
 
@@ -93,17 +165,16 @@ export default function RaportointiOma() {
     setLoading(true)
 
     const [tr, vr] = await Promise.all([
-      supabaseAdmin.from('terapiamyynti').select('price, service, created_at, payment_method')
+      supabaseAdmin.from('terapiamyynti').select('id, price, service, created_at, payment_method, receipt_url')
         .eq('employee_name', empName).gte('created_at', from).lte('created_at', to + 'T23:59:59')
         .order('created_at', { ascending: true }),
-      supabaseAdmin.from('valmennusmyynti').select('price, service, created_at, payment_method')
+      supabaseAdmin.from('valmennusmyynti').select('id, price, service, created_at, payment_method, receipt_url')
         .eq('employee_name', empName).gte('created_at', from).lte('created_at', to + 'T23:59:59')
         .order('created_at', { ascending: true }),
     ])
     setTerapiaRows(tr.data || [])
     setValmennusRows(vr.data || [])
 
-    // Previous period comparison (only for month)
     const prev = getPrevRange(period, customFrom, customTo)
     if (prev) {
       const [pt, pv] = await Promise.all([
@@ -139,26 +210,10 @@ export default function RaportointiOma() {
   const avg = allRows.length ? total / allRows.length : 0
   const change = prevTotal != null && prevTotal > 0 ? ((total - prevTotal) / prevTotal * 100) : null
 
-  // Daily chart data
-  const dayMap = {}
-  terapiaRows.forEach(r => {
-    const d = r.created_at.slice(0, 10)
-    if (!dayMap[d]) dayMap[d] = { pvm: d, terapia: 0, valmennus: 0 }
-    dayMap[d].terapia += r.price || 0
-  })
-  valmennusRows.forEach(r => {
-    const d = r.created_at.slice(0, 10)
-    if (!dayMap[d]) dayMap[d] = { pvm: d, terapia: 0, valmennus: 0 }
-    dayMap[d].valmennus += r.price || 0
-  })
-  const dailyData = Object.values(dayMap).sort((a, b) => a.pvm.localeCompare(b.pvm)).map(d => ({
-    ...d,
-    pvm: new Date(d.pvm).toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' }),
-    terapia: +d.terapia.toFixed(2),
-    valmennus: +d.valmennus.toFixed(2),
-  }))
+  const chartData = buildChartData(terapiaRows, valmennusRows, period)
+  const cumulativeData = buildCumulativeData(chartData)
+  const hasChartData = chartData.some(d => d.terapia > 0 || d.valmennus > 0)
 
-  // Service breakdown
   const serviceMap = {}
   allRows.forEach(r => {
     if (!r.service) return
@@ -229,6 +284,100 @@ export default function RaportointiOma() {
         )}
       </div>
 
+      {/* ── Myynnin kehitysgraafi ── */}
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '.6rem', marginBottom: '1.25rem' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', margin: 0 }}>
+            Myynnin kehitys
+          </h2>
+          <span style={{ fontSize: '.72rem', color: 'var(--text3)', fontWeight: 500 }}>
+            {getChartLabel(period)}
+          </span>
+        </div>
+
+        {loading ? (
+          <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: '.83rem' }}>
+            Ladataan...
+          </div>
+        ) : !hasChartData ? (
+          <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: '.83rem' }}>
+            Ei myyntiä valitulla aikavälillä.
+          </div>
+        ) : (
+          <>
+            {/* Palkkigraafi: terapia + valmennus */}
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }} barCategoryGap="25%">
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: period === 'month' ? 10 : 11, fill: 'var(--text3)' }}
+                  tickLine={false}
+                  interval={period === 'month' ? 2 : 0}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: 'var(--text3)' }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={v => v === 0 ? '0' : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                  width={36}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: '.78rem', paddingTop: '.5rem' }} />
+                <Bar dataKey="terapia" name="Terapia" fill="var(--violet)" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                <Bar dataKey="valmennus" name="Valmennus" fill="#3B82F6" radius={[3, 3, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+
+            {/* Kumulatiivinen kehitysviiva */}
+            {cumulativeData.length > 1 && (
+              <>
+                <div style={{ margin: '1.25rem 0 .75rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem', display: 'flex', alignItems: 'baseline', gap: '.5rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--text)' }}>Kumulatiivinen kehitys</span>
+                  <span style={{ fontSize: '.72rem', color: 'var(--text3)' }}>
+                    yhteensä {fmtEur(cumulativeData[cumulativeData.length - 1]?.kumulatiivinen || 0)}
+                  </span>
+                </div>
+                <ResponsiveContainer width="100%" height={160}>
+                  <AreaChart data={cumulativeData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                    <defs>
+                      <linearGradient id="gradKum" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--violet)" stopOpacity={0.18} />
+                        <stop offset="95%" stopColor="var(--violet)" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: period === 'month' ? 10 : 11, fill: 'var(--text3)' }}
+                      tickLine={false}
+                      interval={period === 'month' ? 2 : 0}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: 'var(--text3)' }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                      width={36}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="kumulatiivinen"
+                      name="Kumulatiivinen"
+                      stroke="var(--violet)"
+                      strokeWidth={2.5}
+                      fill="url(#gradKum)"
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Transaction table */}
       {!loading && (() => {
         const combined = [
@@ -277,11 +426,12 @@ export default function RaportointiOma() {
                         Hinta <SortIcon col="price" />
                       </th>
                       <th>Maksutapa</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedRows.length === 0 ? (
-                      <tr><td colSpan={5} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
+                      <tr><td colSpan={6} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
                     ) : sortedRows.map((r, i) => (
                       <tr key={i}>
                         <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>
@@ -298,6 +448,18 @@ export default function RaportointiOma() {
                         <td style={{ fontSize: '.82rem' }}>{r.service || '—'}</td>
                         <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
                         <td style={{ fontSize: '.78rem', color: 'var(--text3)' }}>{r.payment_method || '—'}</td>
+                        <td>
+                          {r.receipt_url && (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              title="Näytä kuitti"
+                              onClick={() => setReceiptModal(r.receipt_url)}
+                              style={{ color: 'var(--violet)' }}
+                            >
+                              <Receipt size={14} />
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -306,7 +468,7 @@ export default function RaportointiOma() {
                       <tr style={{ background: 'var(--bg2)', fontWeight: 700 }}>
                         <td colSpan={3}>Yhteensä ({sortedRows.length} kirjausta)</td>
                         <td style={{ color: 'var(--violet)' }}>{sortedRows.reduce((s, r) => s + (r.price || 0), 0).toFixed(2)} €</td>
-                        <td />
+                        <td /><td />
                       </tr>
                     </tfoot>
                   )}
@@ -331,7 +493,6 @@ export default function RaportointiOma() {
             <p style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ladataan...</p>
           ) : (
             <>
-              {/* Summary stats */}
               <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
                 <div className="stat-card">
                   <div className="stat-label">Pelaajia</div>
@@ -355,7 +516,6 @@ export default function RaportointiOma() {
                 </div>
               </div>
 
-              {/* Player table */}
               <div className="table-wrap">
                 <table>
                   <thead>
@@ -403,7 +563,6 @@ export default function RaportointiOma() {
                 </table>
               </div>
 
-              {/* Breakdown by billing method */}
               {sportRows.length > 0 && (() => {
                 const byMethod = {}
                 sportRows.forEach(r => {
@@ -428,67 +587,45 @@ export default function RaportointiOma() {
         </div>
       )}
 
-      {loading ? (
-        <div style={{ color: 'var(--text3)', textAlign: 'center', padding: '3rem' }}>Ladataan...</div>
-      ) : allRows.length === 0 ? (
-        <div style={{ color: 'var(--text3)', textAlign: 'center', padding: '3rem' }}>Ei myyntiä valitulla aikavälillä.</div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
-          <div>
-            {/* Daily sales bar chart */}
-            {dailyData.length > 0 && (
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1.25rem' }}>Myynti päivittäin</h3>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={dailyData} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="pvm" tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} tickFormatter={v => v + ' €'} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: '.78rem' }} />
-                    <Bar dataKey="terapia" name="Terapia" fill="var(--violet)" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="valmennus" name="Valmennus" fill="#3B82F6" radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {/* Cumulative line chart */}
-            {dailyData.length > 1 && (
-              <div className="card">
-                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1.25rem' }}>Kumulatiivinen myynti</h3>
-                <ResponsiveContainer width="100%" height={180}>
-                  <LineChart
-                    data={dailyData.reduce((acc, d, i) => {
-                      const prev = acc[i - 1] || { kumulatiivinen: 0 }
-                      acc.push({ ...d, kumulatiivinen: +(prev.kumulatiivinen + d.terapia + d.valmennus).toFixed(2) })
-                      return acc
-                    }, [])}
-                    margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="pvm" tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} tickFormatter={v => v + ' €'} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Line type="monotone" dataKey="kumulatiivinen" name="Kumulatiivinen" stroke="var(--violet)" strokeWidth={2.5} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+      {receiptModal && (
+        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setReceiptModal(null) }}>
+          <div className="modal" style={{ maxWidth: 720 }}>
+            <div className="modal-header">
+              <span className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <Receipt size={16} /> Kuitti
+              </span>
+              <a href={receiptModal} target="_blank" rel="noopener noreferrer"
+                style={{ color: 'var(--violet)', fontSize: '.82rem', display: 'flex', alignItems: 'center', gap: '.25rem', textDecoration: 'none' }}>
+                Avaa <ExternalLink size={13} />
+              </a>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center', padding: '1rem' }}>
+              <img src={receiptModal} alt="Kuitti"
+                style={{ maxWidth: '100%', maxHeight: '72vh', objectFit: 'contain', borderRadius: 6, boxShadow: '0 2px 16px rgba(0,0,0,.12)' }} />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setReceiptModal(null)}>Sulje</button>
+            </div>
           </div>
+        </div>
+      )}
 
-          {/* Service breakdown */}
-          <div className="card">
-            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>Palveluittain</h3>
-            {serviceData.map(s => (
-              <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.4rem 0', borderBottom: '1px solid var(--border)', fontSize: '.83rem' }}>
-                <span style={{ color: 'var(--text2)', flex: 1, marginRight: '.5rem' }}>{s.name}</span>
-                <strong style={{ color: 'var(--violet)', flexShrink: 0 }}>{fmtEur(s.value)}</strong>
-              </div>
-            ))}
-            {serviceData.length === 0 && <p style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ei dataa.</p>}
-
-            <div style={{ marginTop: '1.5rem', borderTop: '2px solid var(--border)', paddingTop: '1rem' }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '.85rem' }}>Maksutavoittain</h3>
+      {/* Palveluittain + maksutavoittain */}
+      {!loading && allRows.length > 0 && (
+        <div className="card">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>Palveluittain</h3>
+              {serviceData.map(s => (
+                <div key={s.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.4rem 0', borderBottom: '1px solid var(--border)', fontSize: '.83rem' }}>
+                  <span style={{ color: 'var(--text2)', flex: 1, marginRight: '.5rem' }}>{s.name}</span>
+                  <strong style={{ color: 'var(--violet)', flexShrink: 0 }}>{fmtEur(s.value)}</strong>
+                </div>
+              ))}
+              {serviceData.length === 0 && <p style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ei dataa.</p>}
+            </div>
+            <div>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>Maksutavoittain</h3>
               {(() => {
                 const pm = {}
                 allRows.forEach(r => { pm[r.payment_method || '—'] = (pm[r.payment_method || '—'] || 0) + (r.price || 0) })

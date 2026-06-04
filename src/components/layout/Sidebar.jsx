@@ -107,6 +107,11 @@ export default function Sidebar({ mobOpen, onClose }) {
         })}
       </div>
 
+      <div style={{ padding: '0 .75rem .3rem', fontSize: '.65rem', color: 'var(--text3)', opacity: .6, letterSpacing: '.03em' }}
+        title={`Build: ${__BUILD_AT__}`}>
+        v{__APP_VERSION__} · {new Date(__BUILD_AT__).toLocaleString('fi-FI', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+      </div>
+
       <div className="sidebar-user">
         <NavLink to="/settings" onClick={onClose} title="Omat tiedot" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flex: 1, minWidth: 0, textDecoration: 'none', color: 'inherit', borderRadius: 'var(--radius)', transition: 'background .15s', padding: '.15rem .3rem', margin: '-.15rem -.3rem' }}
           onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}

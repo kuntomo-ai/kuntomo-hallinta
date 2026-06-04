@@ -1275,6 +1275,13 @@ const emptyMark = {
   description: '', category_type: 'Kampanja', event_date: '',
 }
 
+function getSeasonForMonth(m) {
+  if ([11, 0, 1].includes(m)) return 'talvi'
+  if ([2, 3, 4].includes(m)) return 'kevät'
+  if ([5, 6, 7].includes(m)) return 'kesä'
+  return 'syksy'
+}
+
 function MarkkinointiTab() {
   const { user } = useAuth()
   const [subTab, setSubTab] = useState('kalenteri')
@@ -1456,6 +1463,47 @@ function MarkkinointiTab() {
                       </div>
                     )
                   })}
+
+                  {/* ── Kuukausikirjeet & Teemat ── */}
+                  {(() => {
+                    const season = getSeasonForMonth(i)
+                    const seasonObj = SEASON_THEMES[season]
+                    const alueetToShow = filterAlue ? [ALUEET.find(a => a.key === filterAlue)] : ALUEET
+                    return (
+                      <div style={{ borderTop: monthEvts.length > 0 ? '1px solid var(--border)' : 'none', marginTop: monthEvts.length > 0 ? '.3rem' : 0, paddingTop: monthEvts.length > 0 ? '.35rem' : 0, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                        {alueetToShow.map(a => {
+                          if (!a) return null
+                          const teema = seasonObj?.[a.key]?.teema
+                          const nl = NEWSLETTERS[a.key]?.[i]
+                          return (
+                            <div key={a.key} style={{ display: 'flex', flexDirection: 'column', gap: '.18rem' }}>
+                              {!filterAlue && (
+                                <span style={{ fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: a.color, opacity: .85 }}>
+                                  {a.label}
+                                </span>
+                              )}
+                              {teema && (
+                                <div style={{ display: 'flex', gap: '.3rem', alignItems: 'flex-start' }}>
+                                  <span style={{ fontSize: '.6rem', fontWeight: 700, color: seasonObj?.dark || 'var(--text3)', background: seasonObj?.color, borderRadius: 3, padding: '1px 5px', flexShrink: 0, lineHeight: 1.7 }}>
+                                    Teema
+                                  </span>
+                                  <span style={{ fontSize: '.68rem', color: 'var(--text2)', lineHeight: 1.4 }}>{teema}</span>
+                                </div>
+                              )}
+                              {nl?.otsikko && (
+                                <div style={{ display: 'flex', gap: '.3rem', alignItems: 'flex-start' }}>
+                                  <span style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: a.color, borderRadius: 3, padding: '1px 5px', flexShrink: 0, lineHeight: 1.7 }}>
+                                    Kirje
+                                  </span>
+                                  <span style={{ fontSize: '.68rem', color: 'var(--text2)', lineHeight: 1.4 }}>{nl.otsikko}</span>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             )

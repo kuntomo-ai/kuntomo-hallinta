@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { Receipt, ExternalLink } from 'lucide-react'
 import { supabase, supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
@@ -57,7 +58,7 @@ function getRange(period, customFrom, customTo) {
 }
 
 export default function RaportointiTerapia() {
-  const { isAdmin, isHallitus } = useAuth()
+  const { user, isAdmin, isHallitus } = useAuth()
   const canFilter = isAdmin || isHallitus
 
   const [period, setPeriod] = useState('year')
@@ -67,6 +68,7 @@ export default function RaportointiTerapia() {
   const [employees, setEmployees] = useState([])
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [receiptModal, setReceiptModal] = useState(null)
 
   useEffect(() => {
     if (canFilter) {
@@ -159,23 +161,39 @@ export default function RaportointiTerapia() {
                 <th>Hinta</th>
                 <th>Maksutapa</th>
                 {canFilter && <th>Myyjä</th>}
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canFilter ? 6 : 5} className="table-empty">Ladataan...</td></tr>
+                <tr><td colSpan={canFilter ? 7 : 6} className="table-empty">Ladataan...</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={canFilter ? 6 : 5} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
-              ) : rows.map(r => (
-                <tr key={r.id}>
-                  <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{new Date(r.entry_date || r.visit_date || r.created_at).toLocaleDateString('fi-FI')}</td>
-                  <td style={{ fontWeight: 600 }}>{r.customer_name}</td>
-                  <td>{r.service}</td>
-                  <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
-                  <td>{r.payment_method}</td>
-                  {canFilter && <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.employee_name || '—'}</td>}
-                </tr>
-              ))}
+                <tr><td colSpan={canFilter ? 7 : 6} className="table-empty">Ei kirjauksia valitulla aikavälillä.</td></tr>
+              ) : rows.map(r => {
+                const canViewReceipt = r.receipt_url && (isAdmin || isHallitus || r.seller_id === user?.id)
+                return (
+                  <tr key={r.id}>
+                    <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{new Date(r.entry_date || r.visit_date || r.created_at).toLocaleDateString('fi-FI')}</td>
+                    <td style={{ fontWeight: 600 }}>{r.customer_name}</td>
+                    <td>{r.service}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
+                    <td>{r.payment_method}</td>
+                    {canFilter && <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.employee_name || '—'}</td>}
+                    <td>
+                      {canViewReceipt && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          title="Näytä kuitti"
+                          onClick={() => setReceiptModal(r.receipt_url)}
+                          style={{ color: 'var(--violet)' }}
+                        >
+                          <Receipt size={14} />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -191,6 +209,29 @@ export default function RaportointiTerapia() {
           {Object.keys(byService).length === 0 && <p style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ei dataa.</p>}
         </div>
       </div>
+
+      {receiptModal && (
+        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setReceiptModal(null) }}>
+          <div className="modal" style={{ maxWidth: 720 }}>
+            <div className="modal-header">
+              <span className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <Receipt size={16} /> Kuitti
+              </span>
+              <a href={receiptModal} target="_blank" rel="noopener noreferrer"
+                style={{ color: 'var(--violet)', fontSize: '.82rem', display: 'flex', alignItems: 'center', gap: '.25rem', textDecoration: 'none' }}>
+                Avaa <ExternalLink size={13} />
+              </a>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center', padding: '1rem' }}>
+              <img src={receiptModal} alt="Kuitti"
+                style={{ maxWidth: '100%', maxHeight: '72vh', objectFit: 'contain', borderRadius: 6, boxShadow: '0 2px 16px rgba(0,0,0,.12)' }} />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setReceiptModal(null)}>Sulje</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

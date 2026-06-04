@@ -103,7 +103,19 @@ export default function Tasks() {
   const myEmail = profile?.email || ''
   const myName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim()
   const myRole = profile?.role || ''
-  const filtered = withStatus.filter(r => {
+
+  // Non-admins see only tasks that have no specific assignee, are assigned to them,
+  // or are assigned to their role. Admins see everything.
+  const visibleRows = isAdmin
+    ? withStatus
+    : withStatus.filter(r => {
+        const at = (r.assigned_to || '').trim()
+        if (!at) return true
+        const assignedParts = at.split(',').map(s => s.trim())
+        return at === myEmail || at === myName || assignedParts.some(p => p === myRole)
+      })
+
+  const filtered = visibleRows.filter(r => {
     if (tab === 'avoimet') return r.computedStatus === 'avoin'
     if (tab === 'kiireelliset') return r.priority === 'high' && r.computedStatus !== 'valmis'
     if (tab === 'minun') {
@@ -114,8 +126,8 @@ export default function Tasks() {
     return true
   })
 
-  const openCount = withStatus.filter(r => r.computedStatus === 'avoin').length
-  const urgentCount = withStatus.filter(r => r.priority === 'high' && r.computedStatus !== 'valmis').length
+  const openCount = visibleRows.filter(r => r.computedStatus === 'avoin').length
+  const urgentCount = visibleRows.filter(r => r.priority === 'high' && r.computedStatus !== 'valmis').length
 
   return (
     <div>

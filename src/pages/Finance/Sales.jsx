@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Trash2, Camera, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react'
+import { Search, Trash2, Camera, ChevronLeft, ChevronRight, Edit2, CheckCircle } from 'lucide-react'
 import { supabase, supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
@@ -15,7 +15,7 @@ const TABS = [
 
 const MAKSUTAVAT_TERAPIA = [
   'Maksupääte', 'Käteinen', 'Hyvinvointietu',
-  'Yrityslaskutus', 'Yrityskäynti', 'Lahjakortti', 'Muu',
+  'Yrityslaskutus', 'Yrityskäynti', 'Laskutus', 'Lahjakortti', 'Muu',
 ]
 const COMPANY_METHODS = ['Yrityslaskutus', 'Yrityskäynti']
 
@@ -74,6 +74,8 @@ function TerapiaForm({ onSaved }) {
     hve_provider: '',
     muu_details: '',
     notify_admin: 'ei',
+    laskutus_laskutettu: 'ei',
+    customer_name_free: '',
     company_id: '',
     company_person_id: '',
     company_person_name: '',
@@ -103,6 +105,7 @@ function TerapiaForm({ onSaved }) {
         hve_provider: methods.includes('Hyvinvointietu') ? f.hve_provider : '',
         muu_details: methods.includes('Muu') ? f.muu_details : '',
         notify_admin: methods.includes('Muu') ? f.notify_admin : 'ei',
+        laskutus_laskutettu: methods.includes('Laskutus') ? f.laskutus_laskutettu : 'ei',
         company_id: methods.includes('Yrityslaskutus') ? f.company_id : '',
         company_person_id: methods.includes('Yrityslaskutus') ? f.company_person_id : '',
         company_person_name: methods.includes('Yrityslaskutus') ? f.company_person_name : '',
@@ -192,7 +195,7 @@ function TerapiaForm({ onSaved }) {
       if (m === 'Muu' && form.muu_details) return `Muu: ${form.muu_details}`
       return m
     }).join(', ')
-    const customerName = needsYrityskäynti ? form.yritys_name.trim() : (form.company_person_name || '—')
+    const customerName = needsYrityskäynti ? form.yritys_name.trim() : (form.company_person_name || form.customer_name_free?.trim() || '—')
 
     const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
     const { error: insertError } = await supabaseAdmin.from('terapiamyynti').insert({
@@ -206,6 +209,8 @@ function TerapiaForm({ onSaved }) {
       employee_name: empName || null,
       seller_id: user?.id ?? null,
       visit_date: form.visit_date || null,
+      entry_date: form.visit_date || null,
+      laskutettu: form.payment_methods.includes('Laskutus') ? (form.laskutus_laskutettu === 'kylla') : null,
     })
     if (insertError) {
       setSaveError(insertError.message)
@@ -250,6 +255,16 @@ function TerapiaForm({ onSaved }) {
       })
     }
 
+    if (form.payment_methods.includes('Laskutus') && form.laskutus_laskutettu === 'ei') {
+      await supabaseAdmin.from('channel_messages').insert({
+        content: `🧾 Laskuttamaton hoitomyynti: ${empName || '—'} — ${form.service} — ${parseFloat(form.price).toFixed(2)} € — ${form.visit_date || TODAY}${form.notes ? '. ' + form.notes : ''}`,
+        sender_name: profile?.full_name || profile?.email || 'Järjestelmä',
+        sender_id: user?.id || null,
+        recipient_type: 'role',
+        recipient_role: 'admin',
+      })
+    }
+
     // ── Lahjakortti-käsittely (try/catch jotta onSaved() aina kutsutaan) ────────
     try {
       if (form.payment_methods.includes('Lahjakortti') && giftCode.trim()) {
@@ -287,7 +302,7 @@ function TerapiaForm({ onSaved }) {
     setGiftCode('')
     setGiftCard(null)
     setGiftNotFound(false)
-    setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, hve_provider: '', muu_details: '', notify_admin: 'ei', company_id: '', company_person_id: '', company_person_name: '', yritys_name: '', kuntomo_laskuttaa: 'ei', notes: '' })
+    setForm({ visit_date: TODAY, service: '', price: '', payment_methods: [], splits: {}, hve_provider: '', muu_details: '', notify_admin: 'ei', laskutus_laskutettu: 'ei', customer_name_free: '', company_id: '', company_person_id: '', company_person_name: '', yritys_name: '', kuntomo_laskuttaa: 'ei', notes: '' })
     onSaved()
   }
 
@@ -295,8 +310,8 @@ function TerapiaForm({ onSaved }) {
   const ok = splitsValid()
 
   return (
-    <div className="card" style={{ padding: '1.5rem', alignSelf: 'start' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+    <div className="card" style={{ padding: '1rem', alignSelf: 'start' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem' }}>
         <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', margin: 0 }}>
           Uusi hoitomyynti
         </h3>
@@ -310,13 +325,24 @@ function TerapiaForm({ onSaved }) {
         }} />
       </div>
 
-      <div className="form-grid">
+      <div className="form-grid" style={{ gap: '.6rem' }}>
 
-        {/* Päivämäärä */}
-        <div className="input-group">
-          <label className="input-label">Päivämäärä</label>
-          <input className="input-field" type="date" value={form.visit_date}
-            onChange={e => setForm(f => ({ ...f, visit_date: e.target.value }))} />
+        {/* Päivämäärä + Hinta vierekkäin */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem' }}>
+          <div className="input-group" style={{ margin: 0 }}>
+            <label className="input-label">Päivämäärä</label>
+            <input className="input-field" type="date" value={form.visit_date}
+              onChange={e => setForm(f => ({ ...f, visit_date: e.target.value }))} />
+          </div>
+          <div className="input-group" style={{ margin: 0 }}>
+            <label className="input-label">Hinta (€) *</label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', fontSize: '.9rem' }}>€</span>
+              <input className="input-field" type="number" step="0.01" min="0" placeholder="0"
+                style={{ paddingLeft: '2rem' }}
+                value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+            </div>
+          </div>
         </div>
 
         {/* Hoitotuote */}
@@ -344,28 +370,18 @@ function TerapiaForm({ onSaved }) {
           )}
         </div>
 
-        {/* Hinta */}
-        <div className="input-group">
-          <label className="input-label">Hinta (€) *</label>
-          <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: '.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)', fontSize: '.9rem' }}>€</span>
-            <input className="input-field" type="number" step="0.01" min="0" placeholder="0"
-              style={{ paddingLeft: '2rem' }}
-              value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
-          </div>
-          {products.find(p => p.name === form.service)?.price > 0 && (
-            <span style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.2rem', display: 'block' }}>
-              Hinta täyttyy automaattisesti, mutta voit muokata sitä.
-            </span>
-          )}
-        </div>
-
         {/* Maksutapa */}
         <div className="input-group">
           <label className="input-label">Maksutapa (voit valita useamman)</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem', marginTop: '.3rem' }}>
-            {MAKSUTAVAT_TERAPIA.map(m => (
-              <div key={m}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '.3rem', marginTop: '.3rem' }}>
+            {MAKSUTAVAT_TERAPIA.map(m => {
+              const hasOpenPanel =
+                (m === 'Hyvinvointietu' && form.payment_methods.includes('Hyvinvointietu')) ||
+                (m === 'Lahjakortti'    && form.payment_methods.includes('Lahjakortti'))    ||
+                (m === 'Laskutus'       && form.payment_methods.includes('Laskutus'))       ||
+                (m === 'Muu'            && form.payment_methods.includes('Muu'))
+              return (
+              <div key={m} style={hasOpenPanel ? { gridColumn: '1 / -1' } : undefined}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '.65rem', cursor: 'pointer', fontSize: '.87rem', userSelect: 'none' }}>
                   <input type="checkbox" checked={form.payment_methods.includes(m)} onChange={() => togglePayment(m)}
                     style={{ accentColor: 'var(--violet)', width: 16, height: 16, cursor: 'pointer' }} />
@@ -434,6 +450,24 @@ function TerapiaForm({ onSaved }) {
                     })()}
                   </div>
                 )}
+                {m === 'Laskutus' && form.payment_methods.includes('Laskutus') && (
+                  <div style={{ marginLeft: '1.65rem', marginTop: '.5rem', padding: '.8rem', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                    <div>
+                      <div className="input-label" style={{ marginBottom: '.2rem' }}>Laskutettu</div>
+                      <div style={{ display: 'flex', gap: '1.5rem', marginTop: '.3rem' }}>
+                        {[['kylla', 'Kyllä'], ['ei', 'Ei']].map(([v, l]) => (
+                          <label key={v} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer', fontSize: '.85rem', userSelect: 'none' }}>
+                            <input type="radio" name="laskutus_laskutettu" value={v}
+                              checked={form.laskutus_laskutettu === v}
+                              onChange={() => setForm(f => ({ ...f, laskutus_laskutettu: v }))}
+                              style={{ accentColor: 'var(--violet)', cursor: 'pointer' }} />
+                            {l}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {m === 'Muu' && form.payment_methods.includes('Muu') && (
                   <div style={{ marginLeft: '1.65rem', marginTop: '.5rem', padding: '.8rem', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
                     <div className="input-group" style={{ margin: 0 }}>
@@ -460,7 +494,8 @@ function TerapiaForm({ onSaved }) {
                   </div>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
@@ -566,6 +601,13 @@ function TerapiaForm({ onSaved }) {
           <label className="input-label">Kuitin tai maksun tiedot</label>
           <input className="input-field" placeholder="Lisätiedot..."
             value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+        </div>
+
+        {/* Asiakkaan nimi */}
+        <div className="input-group">
+          <label className="input-label">Asiakkaan nimi (valinnainen)</label>
+          <input className="input-field" placeholder="Esim. Matti Meikäläinen"
+            value={form.customer_name_free || ''} onChange={e => setForm(f => ({ ...f, customer_name_free: e.target.value }))} />
         </div>
 
         {/* Kuitti */}
@@ -923,6 +965,11 @@ export default function Sales() {
     tab === 'terapia' ? fetchTerapia() : fetchOther(tab)
   }
 
+  async function markLaskutettu(id) {
+    await supabaseAdmin.from('terapiamyynti').update({ laskutettu: true }).eq('id', id)
+    fetchTerapia()
+  }
+
   const [editRow, setEditRow] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [editSaving, setEditSaving] = useState(false)
@@ -937,6 +984,7 @@ export default function Sales() {
         price: r.price != null ? String(r.price) : '',
         payment_method: r.payment_method || '',
         notes: r.notes || '',
+        laskutettu: r.laskutettu ?? null,
       })
     } else if (tab === 'valmennus') {
       setEditForm({
@@ -974,6 +1022,7 @@ export default function Sales() {
         price: parseFloat(editForm.price) || 0,
         payment_method: editForm.payment_method || null,
         notes: editForm.notes.trim() || null,
+        ...((editForm.payment_method || '').includes('Laskutus') ? { laskutettu: editForm.laskutettu ?? false } : {}),
       }
     } else if (tab === 'valmennus') {
       table = 'valmennusmyynti'
@@ -1122,25 +1171,38 @@ export default function Sales() {
                   ? <tr><td colSpan={tab === 'jasen' ? 8 : 7} className="table-empty">Ladataan...</td></tr>
                   : filtered.length === 0
                     ? <tr><td colSpan={tab === 'jasen' ? 8 : 7} className="table-empty">Ei kirjauksia.</td></tr>
-                    : filtered.map(r => (
-                      <tr key={r.id}>
-                        <td style={{ whiteSpace: 'nowrap', color: 'var(--text3)', fontSize: '.78rem' }}>
+                    : filtered.map(r => {
+                      const isUnbilled = tab === 'terapia' && (r.payment_method || '').includes('Laskutus') && r.laskutettu === false
+                      return (
+                      <tr key={r.id} style={isUnbilled ? { background: '#FEF2F2' } : undefined}>
+                        <td style={{ whiteSpace: 'nowrap', color: isUnbilled ? '#DC2626' : 'var(--text3)', fontSize: '.78rem' }}>
                           {new Date(rowDate(r)).toLocaleDateString('fi-FI')}
                         </td>
-                        <td style={{ fontWeight: 600 }}>{r.customer_name}</td>
-                        <td>{tab === 'jasen' ? r.membership_type : r.service}</td>
-                        <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
+                        <td style={{ fontWeight: 600, color: isUnbilled ? '#DC2626' : undefined }}>{r.customer_name}</td>
+                        <td style={{ color: isUnbilled ? '#DC2626' : undefined }}>{tab === 'jasen' ? r.membership_type : r.service}</td>
+                        <td style={{ fontWeight: 700, color: isUnbilled ? '#DC2626' : 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
                         {tab === 'jasen' && <td style={{ color: 'var(--text3)' }}>{r.start_date ? new Date(r.start_date).toLocaleDateString('fi-FI') : '—'}</td>}
-                        <td style={{ fontSize: '.78rem' }}>{r.payment_method}</td>
+                        <td style={{ fontSize: '.78rem', color: isUnbilled ? '#DC2626' : undefined }}>
+                          {r.payment_method}
+                          {isUnbilled && <span style={{ marginLeft: '.4rem', fontWeight: 700 }}>· Laskuttamatta</span>}
+                        </td>
                         <td style={{ color: 'var(--text3)', fontSize: '.78rem', maxWidth: 160 }}>{r.notes || '—'}</td>
                         <td>
                           <div style={{ display: 'flex', gap: '.3rem' }}>
+                            {isUnbilled && (
+                              <button className="btn btn-ghost btn-sm" title="Merkitse laskutetuksi"
+                                style={{ color: '#16A34A' }}
+                                onClick={() => markLaskutettu(r.id)}>
+                                <CheckCircle size={13} />
+                              </button>
+                            )}
                             <button className="btn btn-ghost btn-sm" onClick={() => openEdit(r)}><Edit2 size={13} /></button>
                             <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}><Trash2 size={13} /></button>
                           </div>
                         </td>
                       </tr>
-                    ))
+                      )
+                    })
                 }
               </tbody>
             </table>

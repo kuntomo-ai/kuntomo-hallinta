@@ -63,6 +63,12 @@ const DATA = [
     tase:          500_627, oma:            54_410,
     pdf: 'https://sign.visma.net/fi/document-check/c919f022-bc46-407d-952a-41392fc04013',
   },
+  {
+    label: '2026', period: '1.5.2025–30.4.2026',
+    liikevaihto: 1_919_009, liikevoitto: 248_301, voitto: 188_594,
+    tase:          642_003, oma:          243_003,
+    pdf: null,
+  },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -195,18 +201,18 @@ export default function Tilinpaatos() {
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Tilinpäätökset</h1>
-          <p className="page-subtitle">Historialliset tilinpäätöstiedot 2017–2025</p>
+          <p className="page-subtitle">Historialliset tilinpäätöstiedot 2017–2026</p>
         </div>
       </div>
 
-      {/* KPI tiles – viimeisin tilikausi (2024) */}
+      {/* KPI tiles – viimeisin tilikausi */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: '.75rem', marginBottom: '1.5rem' }}>
         {[
-          { label: 'Liikevaihto 2025',   value: eur(DATA[8].liikevaihto) },
-          { label: 'Liikevoitto 2025',   value: eur(DATA[8].liikevoitto), color: DATA[8].liikevoitto >= 0 ? 'var(--green)' : 'var(--red)' },
-          { label: 'Tilikauden tulos',   value: eur(DATA[8].voitto),      color: DATA[8].voitto >= 0 ? 'var(--green)' : 'var(--red)' },
-          { label: 'Tase 30.4.2025',     value: eur(DATA[8].tase) },
-          { label: 'Oma pääoma 2025',    value: eur(DATA[8].oma),         color: DATA[8].oma >= 0 ? 'var(--green)' : 'var(--red)' },
+          { label: 'Liikevaihto 2026',   value: eur(DATA[9].liikevaihto) },
+          { label: 'Liikevoitto 2026',   value: eur(DATA[9].liikevoitto), color: DATA[9].liikevoitto >= 0 ? 'var(--green)' : 'var(--red)' },
+          { label: 'Tilikauden tulos',   value: eur(DATA[9].voitto),      color: DATA[9].voitto >= 0 ? 'var(--green)' : 'var(--red)' },
+          { label: 'Tase 30.4.2026',     value: eur(DATA[9].tase) },
+          { label: 'Oma pääoma 2026',    value: eur(DATA[9].oma),         color: DATA[9].oma >= 0 ? 'var(--green)' : 'var(--red)' },
         ].map(k => (
           <div key={k.label} className="card" style={{ padding: '1rem' }}>
             <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginBottom: '.3rem' }}>{k.label}</div>
