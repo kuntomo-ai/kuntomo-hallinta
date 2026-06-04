@@ -517,12 +517,13 @@ export default function Surveys() {
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
               {[
-                'Rehellisyys, kunnioitus ja suvaitsevaisuus',
-                'Asiakaslähtöinen ja arvojemme mukainen kohtelu',
-                'Kuntomolaiseen henkeen yhdessä liikkuminen ja toisten auttaminen',
+                { nimi: 'REINO', teksti: 'Rehellisyys, kunnioitus ja suvaitsevaisuus' },
+                { nimi: 'AINO', teksti: 'Asiakaslähtöinen ja arvojemme mukainen kohtelu' },
+                { nimi: 'KUNTO', teksti: 'Kuntomolaiseen henkeen yhdessä liikkuminen ja toisten auttaminen' },
               ].map(arvo => (
-                <div key={arvo} style={{ padding: '.75rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontWeight: 700, fontSize: '.88rem', lineHeight: 1.5, color: 'var(--text)' }}>
-                  {arvo}
+                <div key={arvo.nimi} style={{ padding: '.75rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', lineHeight: 1.5 }}>
+                  <div style={{ fontWeight: 900, fontSize: '.8rem', letterSpacing: '.08em', color: 'var(--text3)', marginBottom: '.3rem' }}>{arvo.nimi}</div>
+                  <div style={{ fontWeight: 700, fontSize: '.88rem', color: 'var(--text)' }}>{arvo.teksti}</div>
                 </div>
               ))}
             </div>
