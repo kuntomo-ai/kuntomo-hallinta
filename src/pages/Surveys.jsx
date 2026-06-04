@@ -252,14 +252,15 @@ export default function Surveys() {
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">Kyselyt</h1>
-          <p className="page-subtitle">Henkilöstökyselyt ja tilaukset</p>
+          <h1 className="page-title">Kyselyt ja ohjeet</h1>
+          <p className="page-subtitle">Henkilöstökyselyt, tilaukset ja henkilökunnan ohjeistus</p>
         </div>
       </div>
 
       <div className="sub-tabs" style={{ marginBottom: '1.5rem' }}>
         <button className={`sub-tab${tab === 'henkilosto' ? ' active' : ''}`} onClick={() => setTab('henkilosto')}>Henkilöstökysely</button>
         <button className={`sub-tab${tab === 'vaatetus' ? ' active' : ''}`} onClick={() => setTab('vaatetus')}>Vaatetilaus</button>
+        <button className={`sub-tab${tab === 'ohjeet' ? ' active' : ''}`} onClick={() => setTab('ohjeet')}>Ohjeet</button>
       </div>
 
       {/* ── Henkilöstökysely ───────────────────────────────────────────────── */}
@@ -497,6 +498,221 @@ export default function Surveys() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Ohjeet ─────────────────────────────────────────────────────── */}
+      {tab === 'ohjeet' && (
+        <div style={{ maxWidth: 760 }}>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.5rem', marginBottom: '.25rem' }}>Henkilökunnan ohjeistus</h2>
+            <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Kuntomo Oy — Sisäinen ohjeistus henkilökunnalle</p>
+          </div>
+
+          {/* 1. Päätöksenteko */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Päätöksenteko — Kuntomon kolmio
+            </h3>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem', marginBottom: '.75rem' }}>
+              Voit tehdä aina päätöksen itsenäisesti, kunhan Kuntomon kolmio on tasapainossa — eli jokainen hyötyy saman verran.
+            </p>
+            <ul style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+              {['Työntekijä', 'Asiakas', 'Kuntomo'].map(item => (
+                <li key={item} style={{ color: 'var(--text2)', fontSize: '.9rem', lineHeight: 1.55 }}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          {/* 2. Arvot */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Kuntomon arvot
+            </h3>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem' }}>
+              Yli kaksi vuosikymmentä sitten Kuntomoon asteli kolme suomalaista kuntoilijaa. Nämä kempeleläiset halusivat muuttaa hyvinvoinnin ja liikunnan käsityksen. Reino, Aino ja Kunto löivät kättä päälle, että heidän elämäntehtävänään on saada ihmiset liikkumaan hymyssä suin, ilolla ja onnella. Tästä alkoi Kuntomon tarina — matka, joka jatkuu edelleen Reinon, Ainon ja Kunnon henkeä noudattaen.
+            </p>
+          </section>
+
+          {/* 3. Hallitus */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Hallitus
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {[
+                {
+                  rooli: 'Hallituksen puheenjohtaja',
+                  nimi: 'Janne Haverinen',
+                  tiedot: 'Kuljetus Haverinen Oy:n omistaja ja toimitusjohtaja. Pitkän linjan yrittäjä. Kuntomon pääomistaja Jussin kanssa. Osaaminen: myynti, liiketoiminnan kehittäminen. Jussin esimies.',
+                },
+                {
+                  rooli: 'Hallituksen jäsen',
+                  nimi: 'Jere Reinikainen',
+                  tiedot: 'Suomen Juristit Oy:n omistaja ja toimitusjohtaja. Osaaminen: hallinto, juridiikka, liiketoiminnan kehittäminen.',
+                },
+                {
+                  rooli: 'Hallituksen jäsen',
+                  nimi: 'Marika Tuohino',
+                  tiedot: 'Alltime Oy:n omistaja. Osaaminen: hallinto, markkinointi, liiketoiminnan kehittäminen.',
+                },
+                {
+                  rooli: 'Hallituksen sihteeri',
+                  nimi: 'Jussi Lotvonen',
+                  tiedot: 'Jos et halua tai voi puhua Jussille, ota yhteys Janneen.',
+                },
+              ].map(h => (
+                <div key={h.nimi} style={{ padding: '.75rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text3)', marginBottom: '.2rem' }}>{h.rooli}</div>
+                  <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: '.3rem' }}>{h.nimi}</div>
+                  <div style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.5 }}>{h.tiedot}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* 4. Tietojärjestelmät */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Tietojärjestelmät
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.85rem' }}>
+              {[
+                {
+                  nimi: 'Sähköposti (Gmail)',
+                  kuvaus: 'Käyttäjätunnus: etunimi.sukunimi@kuntomo.fi. Salasana toimitetaan erikseen.',
+                },
+                {
+                  nimi: 'AJAS — ajanvarausjärjestelmä',
+                  kuvaus: 'Ajanvarausjärjestelmän ohjesivut: ohje.ajas.fi. Ajantasaiset tunnukset saat henkilökunnalta.',
+                },
+                {
+                  nimi: 'WISE CRM & Intra',
+                  kuvaus: 'kuntomo.fi/intra — Kuntomon intra. Kirjaudu ensin sisään www.kuntomo.fi, jotta pääset intraan. Sisältää ajantasaiset tiedotteet.',
+                },
+                {
+                  nimi: 'WISE ADMIN',
+                  kuvaus: 'admin.kuntomo.fi — laskutus ja CRM omilla tunnuksilla.',
+                },
+              ].map(j => (
+                <div key={j.nimi} style={{ padding: '.65rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: '.2rem' }}>{j.nimi}</div>
+                  <div style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.5 }}>{j.kuvaus}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* 5. Tiedottaminen */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Tiedottaminen ja ryhmät
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: '.5rem' }}>WhatsApp-ryhmät</div>
+                <ul style={{ paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                  {[
+                    ['Kuntomoterapia', 'Koko terapiapuolen ryhmä'],
+                    ['Kuntomofysioterapia', 'Fysioterapeuttien oma ryhmä'],
+                    ['Kuntomovalmennus', 'Valmentajien oma ryhmä'],
+                    ['Kuntomoryhmäliikunta', 'Ohjaajien ryhmä'],
+                    ['Kuntomokimppakivaa', 'Koko henkilökunnan ryhmä'],
+                  ].map(([nimi, kuvaus]) => (
+                    <li key={nimi} style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.5 }}>
+                      <span style={{ fontWeight: 600 }}>{nimi}</span> — {kuvaus}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: '.5rem' }}>Facebook</div>
+                <ul style={{ paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                  {[
+                    ['Kuntomohenkilökunta', 'Koko henkilökunnan tiedotuskanava. Sisältää ajantasaiset tiedostot ja tapahtumat.'],
+                    ['Kuntomoasiakkaat', 'Asiakkaiden ryhmä — hyvä tiedottaa omista palveluista ja muutoksista.'],
+                  ].map(([nimi, kuvaus]) => (
+                    <li key={nimi} style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.5 }}>
+                      <span style={{ fontWeight: 600 }}>{nimi}</span> — {kuvaus}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          {/* 6. Asiakkaan polku */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Asiakkaan polku Kuntomossa
+            </h3>
+            <ol style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+              {[
+                'Kun asiakas tulee hierontaan ja hänellä on vaiva, johon hieronta ei tehoa tai oireet ovat pitkittyneet — ohjaa hänet fysioterapeutille.',
+                'Fysioterapeutin vastaanotolla ft tutkii asiakkaan. Jos asiakas hyötyisi kuntosaliharjoittelusta, ohjataan hänet valmennukseen pt:n tai ft:n kanssa.',
+                'Jos asiakas kokee kuntosaliharjoittelun tarpeelliseksi, suosittele pt-pakettia tai yksilövalmennusta. Kohderyhmään soveltuvalle voi suositella myös ft:n vetämää pienryhmää.',
+                'Kun asiakkaan tilanne on kartoitettu ja hän on valmis itsenäiseen harjoitteluun, ohjaa hänet kuntosalille tai ryhmäliikuntaan.',
+                'Asiakkaalle voi suositella harjoittelun tueksi mentaali- tai hyvinvointivalmennusta.',
+                'Asiakas jatkaa hieronnassa käyntiä.',
+              ].map((askel, i) => (
+                <li key={i} style={{ fontSize: '.88rem', color: 'var(--text2)', lineHeight: 1.6 }}>{askel}</li>
+              ))}
+            </ol>
+          </section>
+
+          {/* 7. Komissio */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Komissio — Suosittele Kuntomoa, tienaa
+            </h3>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem', marginBottom: '1rem' }}>
+              Kuntomon henkilökunnalla on mahdollisuus ansaita komissiota kuntosalijäsenyyksien hankinnasta. Komissio tilitetään seuraavana palkkapäivänä tai yrittäjille seuraavan laskutuksen yhteydessä.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem', marginBottom: '1rem' }}>
+              <div style={{ padding: '.65rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: '.2rem' }}>Toistaiseksi voimassaoleva sopimus (yli 6 kk)</div>
+                <div style={{ fontSize: '.83rem', color: 'var(--text2)' }}>Komissio = yhden kuukauden maksun suuruinen.</div>
+              </div>
+              <div style={{ padding: '.65rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: '.2rem' }}>Kymppikombo</div>
+                <div style={{ fontSize: '.83rem', color: 'var(--text2)' }}>Korvaus on 10 % myynnistä (sis. alv).</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text3)', marginBottom: '.2rem' }}>Esimerkit</div>
+              <div style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.6, paddingLeft: '1rem', borderLeft: '3px solid var(--border)' }}>
+                Ryhmäliikunnanohjaaja puhuu ystävän Kuntomoon, ystävä tekee 12 kk Combo-sopimuksen 42,90 €/kk → asiakashankkija saa 42,90 €.
+              </div>
+              <div style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.6, paddingLeft: '1rem', borderLeft: '3px solid var(--border)' }}>
+                Ryhmäliikunnanohjaaja ostaa kymppikomboon (74,90 €) lahjaksi → asiakashankkija saa 10 % eli 7,49 €.
+              </div>
+            </div>
+          </section>
+
+          {/* 8. Asiakaskeskustelut */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Keskustelut asiakkaan kanssa
+            </h3>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem', marginBottom: '1rem' }}>
+              Pyritään siihen, että asiakkaalta kysytään heti hoitokerran loputtua, haluaako hän varata uuden ajan. Jos haluaa, työntekijä varaa ajan — tätä ei jätetä asiakkaan tehtäväksi.
+            </p>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem', marginBottom: '.75rem' }}>
+              Jos jokainen tekisi hieman myynti- ja markkinointityötä oman tekemisensä ohessa, voisimme yhdessä lisätä myyntiä ja kehittää Kuntomoa. Asiakkaan kanssa voi keskustella esimerkiksi:
+            </p>
+            <ul style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+              {[
+                'Mistä hän sai tietää Kuntomosta',
+                'Kuntomon eri toimipisteistä',
+                'Kuntomon palvelutarjonnasta',
+                'Jos asiakas ei asu Kempeleen alueella — Kuntomon virtuaalitunnit mahdollistavat harjoittelun kotona',
+              ].map(item => (
+                <li key={item} style={{ fontSize: '.88rem', color: 'var(--text2)', lineHeight: 1.55 }}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
         </div>
       )}
 

@@ -44,7 +44,7 @@ const NAV = [
   { section: 'Hallinto' },
   { label: 'Henkilöstö',         href: '/employees',                        icon: Users2,        roles: HENK },
   { label: 'Kausityöntekijät',  href: '/employees/kausityontekijat',       icon: Users2,        roles: HENK },
-  { label: 'Kyselyt',        href: '/surveys',                  icon: ClipboardList },
+  { label: 'Kyselyt ja ohjeet', href: '/surveys',               icon: ClipboardList },
   { label: 'Inventaario',    href: '/inventory',                icon: Package,       roles: VARASTO },
   { label: 'Laiteluettelo',  href: '/laiteluettelo',            icon: Wrench,        roles: LAITE },
   { label: 'Dokumentit',     href: '/documents',                icon: FileText },
