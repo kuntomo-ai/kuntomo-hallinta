@@ -510,7 +510,17 @@ export default function Surveys() {
             <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Kuntomo Oy — Sisäinen ohjeistus henkilökunnalle</p>
           </div>
 
-          {/* 1. Päätöksenteko */}
+          {/* 1. Arvot */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Kuntomon arvot
+            </h3>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem' }}>
+              Yli kaksi vuosikymmentä sitten Kuntomoon asteli kolme suomalaista kuntoilijaa. Nämä kempeleläiset halusivat muuttaa hyvinvoinnin ja liikunnan käsityksen. Reino, Aino ja Kunto löivät kättä päälle, että heidän elämäntehtävänään on saada ihmiset liikkumaan hymyssä suin, ilolla ja onnella. Tästä alkoi Kuntomon tarina — matka, joka jatkuu edelleen Reinon, Ainon ja Kunnon henkeä noudattaen.
+            </p>
+          </section>
+
+          {/* 2. Päätöksenteko */}
           <section style={{ marginBottom: '2rem' }}>
             <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
               Päätöksenteko — Kuntomon kolmio
@@ -525,16 +535,6 @@ export default function Surveys() {
             </ul>
           </section>
 
-          {/* 2. Arvot */}
-          <section style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
-              Kuntomon arvot
-            </h3>
-            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem' }}>
-              Yli kaksi vuosikymmentä sitten Kuntomoon asteli kolme suomalaista kuntoilijaa. Nämä kempeleläiset halusivat muuttaa hyvinvoinnin ja liikunnan käsityksen. Reino, Aino ja Kunto löivät kättä päälle, että heidän elämäntehtävänään on saada ihmiset liikkumaan hymyssä suin, ilolla ja onnella. Tästä alkoi Kuntomon tarina — matka, joka jatkuu edelleen Reinon, Ainon ja Kunnon henkeä noudattaen.
-            </p>
-          </section>
-
           {/* 3. Hallitus */}
           <section style={{ marginBottom: '2rem' }}>
             <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
@@ -545,17 +545,12 @@ export default function Surveys() {
                 {
                   rooli: 'Hallituksen puheenjohtaja',
                   nimi: 'Janne Haverinen',
-                  tiedot: 'Kuljetus Haverinen Oy:n omistaja ja toimitusjohtaja. Pitkän linjan yrittäjä. Kuntomon pääomistaja Jussin kanssa. Osaaminen: myynti, liiketoiminnan kehittäminen. Jussin esimies.',
+                  tiedot: 'Kuljetus Haverinen Oy:n omistaja. Kuntomon pääomistaja Jussin kanssa. Osaaminen: myynti, liiketoiminnan kehittäminen. Jussin esimies.',
                 },
                 {
                   rooli: 'Hallituksen jäsen',
                   nimi: 'Jere Reinikainen',
-                  tiedot: 'Suomen Juristit Oy:n omistaja ja toimitusjohtaja. Osaaminen: hallinto, juridiikka, liiketoiminnan kehittäminen.',
-                },
-                {
-                  rooli: 'Hallituksen jäsen',
-                  nimi: 'Marika Tuohino',
-                  tiedot: 'Alltime Oy:n omistaja. Osaaminen: hallinto, markkinointi, liiketoiminnan kehittäminen.',
+                  tiedot: 'JR Law omistaja ja lakimies.',
                 },
                 {
                   rooli: 'Hallituksen sihteeri',
@@ -588,10 +583,6 @@ export default function Surveys() {
                   kuvaus: 'Ajanvarausjärjestelmän ohjesivut: ohje.ajas.fi. Ajantasaiset tunnukset saat henkilökunnalta.',
                 },
                 {
-                  nimi: 'WISE CRM & Intra',
-                  kuvaus: 'kuntomo.fi/intra — Kuntomon intra. Kirjaudu ensin sisään www.kuntomo.fi, jotta pääset intraan. Sisältää ajantasaiset tiedotteet.',
-                },
-                {
                   nimi: 'WISE ADMIN',
                   kuvaus: 'admin.kuntomo.fi — laskutus ja CRM omilla tunnuksilla.',
                 },
@@ -617,7 +608,6 @@ export default function Surveys() {
                     ['Kuntomoterapia', 'Koko terapiapuolen ryhmä'],
                     ['Kuntomofysioterapia', 'Fysioterapeuttien oma ryhmä'],
                     ['Kuntomovalmennus', 'Valmentajien oma ryhmä'],
-                    ['Kuntomoryhmäliikunta', 'Ohjaajien ryhmä'],
                     ['Kuntomokimppakivaa', 'Koko henkilökunnan ryhmä'],
                   ].map(([nimi, kuvaus]) => (
                     <li key={nimi} style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.5 }}>
@@ -674,18 +664,11 @@ export default function Surveys() {
                 <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: '.2rem' }}>Toistaiseksi voimassaoleva sopimus (yli 6 kk)</div>
                 <div style={{ fontSize: '.83rem', color: 'var(--text2)' }}>Komissio = yhden kuukauden maksun suuruinen.</div>
               </div>
-              <div style={{ padding: '.65rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
-                <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: '.2rem' }}>Kymppikombo</div>
-                <div style={{ fontSize: '.83rem', color: 'var(--text2)' }}>Korvaus on 10 % myynnistä (sis. alv).</div>
-              </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
-              <div style={{ fontSize: '.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text3)', marginBottom: '.2rem' }}>Esimerkit</div>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text3)', marginBottom: '.2rem' }}>Esimerkki</div>
               <div style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.6, paddingLeft: '1rem', borderLeft: '3px solid var(--border)' }}>
-                Ryhmäliikunnanohjaaja puhuu ystävän Kuntomoon, ystävä tekee 12 kk Combo-sopimuksen 42,90 €/kk → asiakashankkija saa 42,90 €.
-              </div>
-              <div style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.6, paddingLeft: '1rem', borderLeft: '3px solid var(--border)' }}>
-                Ryhmäliikunnanohjaaja ostaa kymppikomboon (74,90 €) lahjaksi → asiakashankkija saa 10 % eli 7,49 €.
+                Valmentaja tai hieroja puhuu ystävän Kuntomoon, ystävä tekee kuntosalijäsenyyden, asiakashankkija saa yhden kuukauden jäsenyyttä vastaavan summan.
               </div>
             </div>
           </section>
