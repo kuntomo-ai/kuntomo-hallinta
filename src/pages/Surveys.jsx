@@ -515,6 +515,17 @@ export default function Surveys() {
             <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
               Kuntomon arvot
             </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+              {[
+                'Rehellisyys, kunnioitus ja suvaitsevaisuus',
+                'Asiakaslähtöinen ja arvojemme mukainen kohtelu',
+                'Kuntomolaiseen henkeen yhdessä liikkuminen ja toisten auttaminen',
+              ].map(arvo => (
+                <div key={arvo} style={{ padding: '.75rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontWeight: 700, fontSize: '.88rem', lineHeight: 1.5, color: 'var(--text)' }}>
+                  {arvo}
+                </div>
+              ))}
+            </div>
             <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem' }}>
               Yli kaksi vuosikymmentä sitten Kuntomoon asteli kolme suomalaista kuntoilijaa. Nämä kempeleläiset halusivat muuttaa hyvinvoinnin ja liikunnan käsityksen. Reino, Aino ja Kunto löivät kättä päälle, että heidän elämäntehtävänään on saada ihmiset liikkumaan hymyssä suin, ilolla ja onnella. Tästä alkoi Kuntomon tarina — matka, joka jatkuu edelleen Reinon, Ainon ja Kunnon henkeä noudattaen.
             </p>
@@ -545,12 +556,12 @@ export default function Surveys() {
                 {
                   rooli: 'Hallituksen puheenjohtaja',
                   nimi: 'Janne Haverinen',
-                  tiedot: 'Kuljetus Haverinen Oy:n omistaja. Kuntomon pääomistaja Jussin kanssa. Osaaminen: myynti, liiketoiminnan kehittäminen. Jussin esimies.',
+                  tiedot: 'Kuljetus Haverinen Oy:n omistaja. Yksi Kuntomon omistajista. Osaaminen: myynti, liiketoiminnan kehittäminen. Jussin esimies.',
                 },
                 {
                   rooli: 'Hallituksen jäsen',
                   nimi: 'Jere Reinikainen',
-                  tiedot: 'JR Law omistaja ja lakimies.',
+                  tiedot: 'JR Law omistaja ja lakimies. Yksi Kuntomon omistajista.',
                 },
                 {
                   rooli: 'Hallituksen sihteeri',
