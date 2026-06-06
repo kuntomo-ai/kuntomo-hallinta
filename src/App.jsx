@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/layout/Layout'
 import Login from './pages/Login'
@@ -34,6 +35,26 @@ import SportHockey from './pages/Customers/SportHockey'
 import UserSettings from './pages/UserSettings'
 import ResetPassword from './pages/ResetPassword'
 
+// Reload the page if the PWA has been in the background for >3 minutes
+// so all data fetches re-run with fresh data.
+function useReloadOnResume(thresholdMs = 3 * 60 * 1000) {
+  useEffect(() => {
+    let hiddenAt = null
+    function onVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now()
+      } else if (document.visibilityState === 'visible' && hiddenAt !== null) {
+        if (Date.now() - hiddenAt >= thresholdMs) {
+          window.location.reload()
+        }
+        hiddenAt = null
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
+}
+
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--text3)' }}>Ladataan...</div>
@@ -52,6 +73,7 @@ function RoleRoute({ children }) {
 
 function AppRoutes() {
   const { user } = useAuth()
+  useReloadOnResume()
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
