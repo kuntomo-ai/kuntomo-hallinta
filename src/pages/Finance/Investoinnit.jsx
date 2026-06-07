@@ -20,14 +20,31 @@ const CLR_GREEN = 'var(--green)'
 const CLR_RED   = 'var(--red)'
 const CLR_BLUE  = '#6366f1'
 
-// 4-week billing → monthly: price × 13/12 (52 weeks / 4 / 12 months)
-// kertakäynti (periodWeeks === null): count = käynnit per kk
+// ── Billing type calculation ──────────────────────────────────────────────────
+// type 'kk':    amount per month, grows annually
+// type 'v':     amount per year, paid as lump sum in month 1 of each year, grows annually
+// type 'kerta': one-time amount at startMonth (1-indexed), no growth
+function itemAmount(item, monthIdx) {
+  const type = item.type ?? 'kk'
+  const year = Math.floor(monthIdx / 12)
+  const monthInYear = monthIdx % 12
+  if (type === 'kk')
+    return item.amount * Math.pow(1 + (item.growthPct ?? 0) / 100, year)
+  if (type === 'v')
+    return monthInYear === 0
+      ? item.amount * Math.pow(1 + (item.growthPct ?? 0) / 100, year)
+      : 0
+  if (type === 'kerta')
+    return monthIdx === (item.startMonth ?? 1) - 1 ? item.amount : 0
+  return 0
+}
+
+// 4-week billing → monthly: price × 13/12
 function memberMonthly(m) {
   if (m.periodWeeks) return m.count * m.price * (52 / m.periodWeeks / 12)
   return m.count * m.price
 }
 
-// Apply annual growth at year boundaries
 function withGrowth(base, pct, monthIdx) {
   return base * Math.pow(1 + pct / 100, Math.floor(monthIdx / 12))
 }
@@ -35,9 +52,9 @@ function withGrowth(base, pct, monthIdx) {
 function calcMonths(expenses, memberships, otherRevs, horisontti) {
   let cum = 0
   return Array.from({ length: horisontti }, (_, i) => {
-    const menot      = expenses.reduce((s, e) => s + withGrowth(e.amount, e.growthPct, i), 0)
+    const menot      = expenses.reduce((s, e) => s + itemAmount(e, i), 0)
     const jasenTulot = memberships.reduce((s, m) => s + withGrowth(memberMonthly(m), m.growthPct, i), 0)
-    const muutTulot  = otherRevs.reduce((s, r) => s + withGrowth(r.amount, r.growthPct, i), 0)
+    const muutTulot  = otherRevs.reduce((s, r) => s + itemAmount(r, i), 0)
     const tulot      = jasenTulot + muutTulot
     const netto      = tulot - menot
     cum += netto
@@ -54,12 +71,12 @@ function calcMonths(expenses, memberships, otherRevs, horisontti) {
 
 // ── Default data ──────────────────────────────────────────────────────────────
 const DEF_EXPENSES = [
-  { label: 'Vuokra',            amount: 3000, growthPct: 2 },
-  { label: 'Laina',             amount: 1500, growthPct: 0 },
-  { label: 'Sähkö',             amount:  400, growthPct: 3 },
-  { label: 'Leasingkulut',      amount:  500, growthPct: 0 },
-  { label: 'Markkinointikulut', amount:  600, growthPct: 0 },
-  { label: 'Laitehankinnat',    amount:  200, growthPct: 0 },
+  { label: 'Vuokra',            amount: 3000, growthPct: 2, type: 'kk',    startMonth: 1 },
+  { label: 'Laina',             amount: 1500, growthPct: 0, type: 'kk',    startMonth: 1 },
+  { label: 'Sähkö',             amount:  400, growthPct: 3, type: 'kk',    startMonth: 1 },
+  { label: 'Leasingkulut',      amount:  500, growthPct: 0, type: 'kk',    startMonth: 1 },
+  { label: 'Markkinointikulut', amount:  600, growthPct: 0, type: 'kk',    startMonth: 1 },
+  { label: 'Laitehankinnat',    amount: 5000, growthPct: 0, type: 'kerta', startMonth: 1 },
 ]
 
 const DEF_MEMBERSHIPS = [
@@ -69,8 +86,8 @@ const DEF_MEMBERSHIPS = [
 ]
 
 const DEF_OTHER_REVS = [
-  { label: 'Hoitohuonevuokrat', amount: 1200, growthPct: 2 },
-  { label: 'Lisäravinnemyynti', amount:  800, growthPct: 5 },
+  { label: 'Hoitohuonevuokrat', amount: 1200, growthPct: 2, type: 'kk', startMonth: 1 },
+  { label: 'Lisäravinnemyynti', amount:  800, growthPct: 5, type: 'kk', startMonth: 1 },
 ]
 
 function makeInvestment(n) {
@@ -85,15 +102,30 @@ function makeInvestment(n) {
 }
 
 // ── Small components ──────────────────────────────────────────────────────────
-function NumInput({ value, onChange, step = 1, min, style }) {
+function NumInput({ value, onChange, step = 1, min, max, style }) {
   return (
     <input
       className="input-field"
       type="number" step={step} value={value}
-      min={min ?? undefined}
+      min={min ?? undefined} max={max ?? undefined}
       onChange={e => onChange(Number(e.target.value))}
-      style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto', textAlign: 'right', ...style }}
+      style={{ fontSize: '.8rem', padding: '.28rem .45rem', height: 'auto', textAlign: 'right', ...style }}
     />
+  )
+}
+
+function TypeSelect({ value, onChange }) {
+  return (
+    <select
+      className="input-field"
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      style={{ fontSize: '.75rem', padding: '.28rem .25rem', height: 'auto', cursor: 'pointer' }}
+    >
+      <option value="kk">kk</option>
+      <option value="v">vuosi</option>
+      <option value="kerta">kerta</option>
+    </select>
   )
 }
 
@@ -137,6 +169,21 @@ function DeleteBtn({ onClick }) {
     }}>
       <Trash2 size={13} />
     </button>
+  )
+}
+
+// Type badge shown next to amount for non-monthly items in the totals row
+function TypeBadge({ type }) {
+  if (type === 'kk') return null
+  const label = type === 'v' ? '€/v' : '€ kerta'
+  return (
+    <span style={{
+      fontSize: '.63rem', background: type === 'v' ? 'rgba(99,102,241,.12)' : 'rgba(245,158,11,.12)',
+      color: type === 'v' ? '#6366f1' : '#d97706',
+      borderRadius: 4, padding: '.05rem .3rem', whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
   )
 }
 
@@ -195,43 +242,30 @@ function InvestmentTabs({ investments, activeId, onSelect, onAdd, onDelete, onRe
   }
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '.35rem',
-      flexWrap: 'wrap', marginBottom: '1.25rem',
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
       {investments.map(inv => {
-        const isActive = inv.id === activeId
+        const isActive  = inv.id === activeId
         const isEditing = inv.id === editId
         return (
-          <div
-            key={inv.id}
+          <div key={inv.id}
             onClick={() => !isEditing && onSelect(inv.id)}
             style={{
               display: 'flex', alignItems: 'center', gap: '.3rem',
-              padding: '.38rem .65rem .38rem .75rem',
-              borderRadius: 8,
+              padding: '.38rem .65rem .38rem .75rem', borderRadius: 8,
               border: isActive ? '1px solid var(--violet, #7c5cbf)' : '1px solid var(--border)',
               background: isActive ? 'var(--violet-subtle, rgba(124,92,191,.08))' : 'var(--bg2)',
-              cursor: isEditing ? 'default' : 'pointer',
-              transition: 'all .15s',
+              cursor: isEditing ? 'default' : 'pointer', transition: 'all .15s',
             }}
           >
             {isEditing ? (
               <>
-                <input
-                  ref={inputRef}
-                  value={editName}
+                <input ref={inputRef} value={editName}
                   onChange={e => setEditName(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onBlur={commitEdit}
-                  style={{
-                    border: 'none', background: 'transparent', outline: 'none',
+                  onKeyDown={handleKeyDown} onBlur={commitEdit}
+                  style={{ border: 'none', background: 'transparent', outline: 'none',
                     fontSize: '.82rem', fontWeight: 600, color: 'var(--text)',
-                    width: Math.max(80, editName.length * 9),
-                  }}
-                />
-                <button
-                  onMouseDown={e => { e.preventDefault(); commitEdit() }}
+                    width: Math.max(80, editName.length * 9) }} />
+                <button onMouseDown={e => { e.preventDefault(); commitEdit() }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: CLR_GREEN,
                     display: 'flex', alignItems: 'center', padding: '.1rem' }}>
                   <Check size={13} />
@@ -239,26 +273,19 @@ function InvestmentTabs({ investments, activeId, onSelect, onAdd, onDelete, onRe
               </>
             ) : (
               <>
-                <span style={{
-                  fontSize: '.82rem', fontWeight: isActive ? 700 : 500,
-                  color: isActive ? 'var(--violet, #7c5cbf)' : 'var(--text2)',
-                  whiteSpace: 'nowrap',
-                }}>
+                <span style={{ fontSize: '.82rem', fontWeight: isActive ? 700 : 500,
+                  color: isActive ? 'var(--violet, #7c5cbf)' : 'var(--text2)', whiteSpace: 'nowrap' }}>
                   {inv.name}
                 </span>
                 {isActive && (
-                  <button
-                    onClick={e => startEdit(inv, e)}
-                    title="Nimeä uudelleen"
+                  <button onClick={e => startEdit(inv, e)} title="Nimeä uudelleen"
                     style={{ background: 'none', border: 'none', cursor: 'pointer',
                       color: 'var(--text3)', display: 'flex', alignItems: 'center', padding: '.1rem' }}>
                     <Pencil size={11} />
                   </button>
                 )}
                 {investments.length > 1 && isActive && (
-                  <button
-                    onClick={e => { e.stopPropagation(); onDelete(inv.id) }}
-                    title="Poista investointi"
+                  <button onClick={e => { e.stopPropagation(); onDelete(inv.id) }} title="Poista investointi"
                     style={{ background: 'none', border: 'none', cursor: 'pointer',
                       color: 'var(--text3)', display: 'flex', alignItems: 'center', padding: '.1rem' }}>
                     <Trash2 size={11} />
@@ -269,21 +296,59 @@ function InvestmentTabs({ investments, activeId, onSelect, onAdd, onDelete, onRe
           </div>
         )
       })}
-      <button
-        onClick={onAdd}
-        title="Lisää uusi investointi"
-        style={{
-          display: 'flex', alignItems: 'center', gap: '.3rem',
+      <button onClick={onAdd} title="Lisää uusi investointi"
+        style={{ display: 'flex', alignItems: 'center', gap: '.3rem',
           padding: '.38rem .65rem', borderRadius: 8,
           border: '1px dashed var(--border2)', background: 'none',
-          cursor: 'pointer', color: 'var(--text3)', fontSize: '.82rem',
-          transition: 'all .15s',
-        }}
+          cursor: 'pointer', color: 'var(--text3)', fontSize: '.82rem', transition: 'all .15s' }}
         onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text4)'; e.currentTarget.style.color = 'var(--text2)' }}
         onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--text3)' }}
       >
         <Plus size={13} /> Uusi investointi
       </button>
+    </div>
+  )
+}
+
+// ── LineItem row (shared by Menot and Muut tulot) ─────────────────────────────
+// Grid: label(1fr) | amount(68px) | type(46px) | last-col(44px) | suffix(18px) | delete(22px)
+const ITEM_GRID = '1fr 68px 46px 44px 18px 22px'
+
+function ItemRowHeader() {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: ITEM_GRID, gap: '.28rem', marginBottom: '.3rem' }}>
+      <ColHeader>Nimi</ColHeader>
+      <ColHeader right>Summa</ColHeader>
+      <ColHeader right>Tyyppi</ColHeader>
+      <ColHeader right>Kasvu/Kk</ColHeader>
+      <span />
+      <span />
+    </div>
+  )
+}
+
+function ItemRow({ item, onUpdate, onDelete, maxMonth }) {
+  const type = item.type ?? 'kk'
+  const isKerta = type === 'kerta'
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: ITEM_GRID, gap: '.28rem', alignItems: 'center' }}>
+      <input className="input-field" value={item.label}
+        onChange={e => onUpdate('label', e.target.value)}
+        style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto' }} />
+      <NumInput value={item.amount} step={isKerta ? 500 : 50} min={0}
+        onChange={v => onUpdate('amount', v)} />
+      <TypeSelect value={type} onChange={v => onUpdate('type', v)} />
+      {isKerta ? (
+        <NumInput value={item.startMonth ?? 1} step={1} min={1} max={maxMonth}
+          onChange={v => onUpdate('startMonth', v)} />
+      ) : (
+        <NumInput value={item.growthPct ?? 0} step={0.5}
+          onChange={v => onUpdate('growthPct', v)} />
+      )}
+      <span style={{ fontSize: '.65rem', color: 'var(--text3)', textAlign: 'center' }}>
+        {isKerta ? 'kk#' : '%'}
+      </span>
+      <DeleteBtn onClick={onDelete} />
     </div>
   )
 }
@@ -302,7 +367,6 @@ export default function Investoinnit() {
     setInvestments(p => [...p, next])
     setActiveId(next.id)
   }
-
   function deleteInvestment(id) {
     setInvestments(p => {
       const remaining = p.filter(i => i.id !== id)
@@ -310,33 +374,28 @@ export default function Investoinnit() {
       return remaining
     })
   }
-
   function renameInvestment(id, name) {
     setInvestments(p => p.map(i => i.id === id ? { ...i, name } : i))
   }
-
-  // Patch a field inside the active investment
   function patch(changes) {
     setInvestments(p => p.map(i => i.id === currentId ? { ...i, ...changes } : i))
   }
 
-  // ── Expense handlers ─────────────────────────────────────────────────────
+  // ── Row handlers ─────────────────────────────────────────────────────────
   const updateExpense = (id, field, val) =>
     patch({ expenses: inv.expenses.map(e => e.id === id ? { ...e, [field]: val } : e) })
   const addExpense = () =>
-    patch({ expenses: [...inv.expenses, { id: nid(), label: 'Uusi kulu', amount: 0, growthPct: 0 }] })
+    patch({ expenses: [...inv.expenses, { id: nid(), label: 'Uusi kulu', amount: 0, growthPct: 0, type: 'kk', startMonth: 1 }] })
   const removeExpense = id =>
     patch({ expenses: inv.expenses.filter(e => e.id !== id) })
 
-  // ── Membership handlers ──────────────────────────────────────────────────
   const updateMembership = (id, field, val) =>
     patch({ memberships: inv.memberships.map(m => m.id === id ? { ...m, [field]: val } : m) })
 
-  // ── Other revenue handlers ───────────────────────────────────────────────
   const updateOtherRev = (id, field, val) =>
     patch({ otherRevs: inv.otherRevs.map(r => r.id === id ? { ...r, [field]: val } : r) })
   const addOtherRev = () =>
-    patch({ otherRevs: [...inv.otherRevs, { id: nid(), label: 'Uusi tulo', amount: 0, growthPct: 0 }] })
+    patch({ otherRevs: [...inv.otherRevs, { id: nid(), label: 'Uusi tulo', amount: 0, growthPct: 0, type: 'kk', startMonth: 1 }] })
   const removeOtherRev = id =>
     patch({ otherRevs: inv.otherRevs.filter(r => r.id !== id) })
 
@@ -346,8 +405,8 @@ export default function Investoinnit() {
     [inv],
   )
 
-  const yearSummaries = useMemo(() => {
-    return Array.from({ length: Math.ceil(inv.horisontti / 12) }, (_, y) => {
+  const yearSummaries = useMemo(() => (
+    Array.from({ length: Math.ceil(inv.horisontti / 12) }, (_, y) => {
       const slice = months.slice(y * 12, (y + 1) * 12)
       return {
         year:  y + 1,
@@ -357,7 +416,7 @@ export default function Investoinnit() {
         Netto: slice.reduce((s, m) => s + m.netto, 0),
       }
     })
-  }, [months, inv.horisontti])
+  ), [months, inv.horisontti])
 
   const breakEvenMonth    = useMemo(() => { const i = months.findIndex(m => m.netto >= 0);          return i === -1 ? null : i + 1 }, [months])
   const cumBreakEvenMonth = useMemo(() => { const i = months.findIndex(m => m.kumulatiivinen >= 0); return i === -1 ? null : i + 1 }, [months])
@@ -366,12 +425,12 @@ export default function Investoinnit() {
     ? months.map((m, i) => ({ ...m, label: i % 3 === 2 ? `Kk ${m.kk}` : '' }))
     : months
 
-  // ── Totals ───────────────────────────────────────────────────────────────
-  const totalExpenseM1 = inv.expenses.reduce((s, e) => s + e.amount, 0)
-  const totalMemberM1  = inv.memberships.reduce((s, m) => s + memberMonthly(m), 0)
-  const totalOtherM1   = inv.otherRevs.reduce((s, r) => s + r.amount, 0)
-  const totalRevenueM1 = totalMemberM1 + totalOtherM1
-  const nettoM1        = totalRevenueM1 - totalExpenseM1
+  // Month-1 totals from actual calculation (correct for all types)
+  const m1 = months[0] ?? { tulot: 0, menot: 0, netto: 0 }
+  // Left-panel subtotals for month 1 (for RowTotal displays)
+  const expenseM1   = inv.expenses.reduce((s, e) => s + itemAmount(e, 0), 0)
+  const memberM1    = inv.memberships.reduce((s, m) => s + memberMonthly(m), 0)
+  const otherRevM1  = inv.otherRevs.reduce((s, r) => s + itemAmount(r, 0), 0)
 
   return (
     <div className="page-wrapper">
@@ -394,14 +453,11 @@ export default function Investoinnit() {
         </div>
       </div>
 
-      {/* Investment tab navigation */}
+      {/* Investment tabs */}
       <InvestmentTabs
-        investments={investments}
-        activeId={currentId}
-        onSelect={setActiveId}
-        onAdd={addInvestment}
-        onDelete={deleteInvestment}
-        onRename={renameInvestment}
+        investments={investments} activeId={currentId}
+        onSelect={setActiveId} onAdd={addInvestment}
+        onDelete={deleteInvestment} onRename={renameInvestment}
       />
 
       {/* KPI cards */}
@@ -410,17 +466,13 @@ export default function Investoinnit() {
           <div className="stat-card" key={y.year}>
             <div className="stat-label">Vuosi {y.year} netto</div>
             <div className="stat-value" style={{ color: y.Netto >= 0 ? CLR_GREEN : CLR_RED }}>{fmt(y.Netto)}</div>
-            <div style={{ fontSize: '.7rem', color: 'var(--text3)' }}>
-              Tulot {fmt(y.Tulot)} · Menot {fmt(y.Menot)}
-            </div>
+            <div style={{ fontSize: '.7rem', color: 'var(--text3)' }}>Tulot {fmt(y.Tulot)} · Menot {fmt(y.Menot)}</div>
           </div>
         ))}
         <div className="stat-card">
           <div className="stat-label">Kk 1 netto</div>
-          <div className="stat-value" style={{ color: nettoM1 >= 0 ? CLR_GREEN : CLR_RED }}>{fmt(nettoM1)}</div>
-          <div style={{ fontSize: '.7rem', color: 'var(--text3)' }}>
-            Tulot {fmt(totalRevenueM1)} · Menot {fmt(totalExpenseM1)}
-          </div>
+          <div className="stat-value" style={{ color: m1.netto >= 0 ? CLR_GREEN : CLR_RED }}>{fmt(m1.netto)}</div>
+          <div style={{ fontSize: '.7rem', color: 'var(--text3)' }}>Tulot {fmt(m1.tulot)} · Menot {fmt(m1.menot)}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Kuukausitasapaino</div>
@@ -435,37 +487,34 @@ export default function Investoinnit() {
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) 1fr', gap: '1.25rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 340px) 1fr', gap: '1.25rem', alignItems: 'start' }}>
 
         {/* ── Left panel ──────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
           {/* Menot */}
           <div className="card" style={{ padding: '1rem' }}>
-            <SectionLabel>Menot / kk</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 76px 54px 22px', gap: '.3rem', marginBottom: '.3rem' }}>
-              <ColHeader>Kulu</ColHeader>
-              <ColHeader right>€/kk</ColHeader>
-              <ColHeader right>Kasvu/v%</ColHeader>
-              <span />
-            </div>
+            <SectionLabel>Menot</SectionLabel>
+            <ItemRowHeader />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
               {inv.expenses.map(e => (
-                <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '1fr 76px 54px 22px', gap: '.3rem', alignItems: 'center' }}>
-                  <input className="input-field" value={e.label}
-                    onChange={ev => updateExpense(e.id, 'label', ev.target.value)}
-                    style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto' }} />
-                  <NumInput value={e.amount} step={50} min={0} onChange={v => updateExpense(e.id, 'amount', v)} />
-                  <NumInput value={e.growthPct} step={0.5} onChange={v => updateExpense(e.id, 'growthPct', v)} />
-                  <DeleteBtn onClick={() => removeExpense(e.id)} />
-                </div>
+                <ItemRow key={e.id} item={e} maxMonth={inv.horisontti}
+                  onUpdate={(f, v) => updateExpense(e.id, f, v)}
+                  onDelete={() => removeExpense(e.id)} />
               ))}
             </div>
             <button className="btn btn-ghost btn-sm" onClick={addExpense}
               style={{ marginTop: '.6rem', width: '100%', justifyContent: 'center', gap: '.3rem' }}>
               <Plus size={13} /> Lisää kulu
             </button>
-            <RowTotal label="Yhteensä kk 1" value={fmt(totalExpenseM1)} />
+            {/* Legend */}
+            <div style={{ marginTop: '.65rem', paddingTop: '.55rem', borderTop: '1px solid var(--border)',
+              display: 'flex', gap: '.5rem', fontSize: '.68rem', color: 'var(--text3)', flexWrap: 'wrap' }}>
+              <span><b>kk</b> = joka kuukausi</span>
+              <span><b>vuosi</b> = kerran vuodessa</span>
+              <span><b>kerta</b> = kertaluonteinen, Kk# = milloin</span>
+            </div>
+            <RowTotal label="Menot kk 1 yhteensä" value={fmt(expenseM1)} />
           </div>
 
           {/* Jäsenyysmyynti */}
@@ -496,35 +545,25 @@ export default function Investoinnit() {
                 </div>
               ))}
             </div>
-            <RowTotal label="Yhteensä kk 1" value={fmt(totalMemberM1)} />
+            <RowTotal label="Yhteensä kk 1" value={fmt(memberM1)} />
           </div>
 
           {/* Muut tulot */}
           <div className="card" style={{ padding: '1rem' }}>
-            <SectionLabel>Muut tulot / kk</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 76px 54px 22px', gap: '.3rem', marginBottom: '.3rem' }}>
-              <ColHeader>Tulo</ColHeader>
-              <ColHeader right>€/kk</ColHeader>
-              <ColHeader right>Kasvu/v%</ColHeader>
-              <span />
-            </div>
+            <SectionLabel>Muut tulot</SectionLabel>
+            <ItemRowHeader />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
               {inv.otherRevs.map(r => (
-                <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 76px 54px 22px', gap: '.3rem', alignItems: 'center' }}>
-                  <input className="input-field" value={r.label}
-                    onChange={ev => updateOtherRev(r.id, 'label', ev.target.value)}
-                    style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto' }} />
-                  <NumInput value={r.amount} step={50} min={0} onChange={v => updateOtherRev(r.id, 'amount', v)} />
-                  <NumInput value={r.growthPct} step={0.5} onChange={v => updateOtherRev(r.id, 'growthPct', v)} />
-                  <DeleteBtn onClick={() => removeOtherRev(r.id)} />
-                </div>
+                <ItemRow key={r.id} item={r} maxMonth={inv.horisontti}
+                  onUpdate={(f, v) => updateOtherRev(r.id, f, v)}
+                  onDelete={() => removeOtherRev(r.id)} />
               ))}
             </div>
             <button className="btn btn-ghost btn-sm" onClick={addOtherRev}
               style={{ marginTop: '.6rem', width: '100%', justifyContent: 'center', gap: '.3rem' }}>
               <Plus size={13} /> Lisää tulo
             </button>
-            <RowTotal label="Yhteensä kk 1" value={fmt(totalOtherM1)} />
+            <RowTotal label="Muut tulot kk 1 yhteensä" value={fmt(otherRevM1)} />
           </div>
 
         </div>
@@ -540,8 +579,8 @@ export default function Investoinnit() {
                 <YAxis tickFormatter={v => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} width={38} />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '.75rem' }} />
-                <Area type="monotone" dataKey="tulot" name="Tulot"  fill="#00b89422" stroke="#00b894" strokeWidth={2} />
-                <Area type="monotone" dataKey="menot" name="Menot"  fill="#d6303122" stroke="#d63031" strokeWidth={2} />
+                <Area type="monotone" dataKey="tulot" name="Tulot" fill="#00b89422" stroke="#00b894" strokeWidth={2} />
+                <Area type="monotone" dataKey="menot" name="Menot" fill="#d6303122" stroke="#d63031" strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
           </ChartCard>
