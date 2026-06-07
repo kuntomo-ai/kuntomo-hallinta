@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   ComposedChart, BarChart, Bar, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, Cell, ReferenceLine,
 } from 'recharts'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 let _id = 100
@@ -16,28 +16,26 @@ function fmt(n, dec = 0) {
   return n < 0 ? `−${s}` : s
 }
 
-const CLR_GREEN  = 'var(--green)'
-const CLR_RED    = 'var(--red)'
-const CLR_BLUE   = '#6366f1'
-const CLR_ORANGE = '#f59e0b'
+const CLR_GREEN = 'var(--green)'
+const CLR_RED   = 'var(--red)'
+const CLR_BLUE  = '#6366f1'
 
-// 4-week billing → monthly: price × 13/12 (= 52 weeks / 4 / 12 months)
-// kertakäynti (periodWeeks === null): count = käynnit per kk, monthly = count × price
+// 4-week billing → monthly: price × 13/12 (52 weeks / 4 / 12 months)
+// kertakäynti (periodWeeks === null): count = käynnit per kk
 function memberMonthly(m) {
   if (m.periodWeeks) return m.count * m.price * (52 / m.periodWeeks / 12)
   return m.count * m.price
 }
 
-// Apply annual growth at year boundaries (growth resets at each 12-month mark)
+// Apply annual growth at year boundaries
 function withGrowth(base, pct, monthIdx) {
-  const year = Math.floor(monthIdx / 12)
-  return base * Math.pow(1 + pct / 100, year)
+  return base * Math.pow(1 + pct / 100, Math.floor(monthIdx / 12))
 }
 
 function calcMonths(expenses, memberships, otherRevs, horisontti) {
   let cum = 0
   return Array.from({ length: horisontti }, (_, i) => {
-    const menot     = expenses.reduce((s, e) => s + withGrowth(e.amount, e.growthPct, i), 0)
+    const menot      = expenses.reduce((s, e) => s + withGrowth(e.amount, e.growthPct, i), 0)
     const jasenTulot = memberships.reduce((s, m) => s + withGrowth(memberMonthly(m), m.growthPct, i), 0)
     const muutTulot  = otherRevs.reduce((s, r) => s + withGrowth(r.amount, r.growthPct, i), 0)
     const tulot      = jasenTulot + muutTulot
@@ -56,24 +54,35 @@ function calcMonths(expenses, memberships, otherRevs, horisontti) {
 
 // ── Default data ──────────────────────────────────────────────────────────────
 const DEF_EXPENSES = [
-  { id: 1, label: 'Vuokra',            amount: 3000, growthPct: 2   },
-  { id: 2, label: 'Laina',             amount: 1500, growthPct: 0   },
-  { id: 3, label: 'Sähkö',             amount: 400,  growthPct: 3   },
-  { id: 4, label: 'Leasingkulut',      amount: 500,  growthPct: 0   },
-  { id: 5, label: 'Markkinointikulut', amount: 600,  growthPct: 0   },
-  { id: 6, label: 'Laitehankinnat',    amount: 200,  growthPct: 0   },
+  { label: 'Vuokra',            amount: 3000, growthPct: 2 },
+  { label: 'Laina',             amount: 1500, growthPct: 0 },
+  { label: 'Sähkö',             amount:  400, growthPct: 3 },
+  { label: 'Leasingkulut',      amount:  500, growthPct: 0 },
+  { label: 'Markkinointikulut', amount:  600, growthPct: 0 },
+  { label: 'Laitehankinnat',    amount:  200, growthPct: 0 },
 ]
 
 const DEF_MEMBERSHIPS = [
-  { id: 1, label: 'Kuntosali',     price: 38.90, periodWeeks: 4,    count: 50, growthPct: 10 },
-  { id: 2, label: 'Päiväjäsenyys', price: 27.90, periodWeeks: 4,    count: 20, growthPct:  5 },
-  { id: 3, label: 'Kertakäynti',   price: 12.00, periodWeeks: null, count: 30, growthPct:  5 },
+  { label: 'Kuntosali',     price: 38.90, periodWeeks: 4,    count: 50, growthPct: 10 },
+  { label: 'Päiväjäsenyys', price: 27.90, periodWeeks: 4,    count: 20, growthPct:  5 },
+  { label: 'Kertakäynti',   price: 12.00, periodWeeks: null, count: 30, growthPct:  5 },
 ]
 
 const DEF_OTHER_REVS = [
-  { id: 1, label: 'Hoitohuonevuokrat', amount: 1200, growthPct: 2 },
-  { id: 2, label: 'Lisäravinnemyynti', amount:  800, growthPct: 5 },
+  { label: 'Hoitohuonevuokrat', amount: 1200, growthPct: 2 },
+  { label: 'Lisäravinnemyynti', amount:  800, growthPct: 5 },
 ]
+
+function makeInvestment(n) {
+  return {
+    id:          nid(),
+    name:        `Toimipiste ${n}`,
+    horisontti:  36,
+    expenses:    DEF_EXPENSES.map(e => ({ ...e, id: nid() })),
+    memberships: DEF_MEMBERSHIPS.map(m => ({ ...m, id: nid() })),
+    otherRevs:   DEF_OTHER_REVS.map(r => ({ ...r, id: nid() })),
+  }
+}
 
 // ── Small components ──────────────────────────────────────────────────────────
 function NumInput({ value, onChange, step = 1, min, style }) {
@@ -140,9 +149,7 @@ function ChartTooltip({ active, payload, label }) {
     }}>
       <div style={{ fontWeight: 700, marginBottom: '.3rem' }}>{label}</div>
       {payload.map(p => (
-        <div key={p.name} style={{
-          color: p.color, display: 'flex', justifyContent: 'space-between', gap: '1rem',
-        }}>
+        <div key={p.name} style={{ color: p.color, display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
           <span>{p.name}</span><span>{fmt(p.value)}</span>
         </div>
       ))}
@@ -161,22 +168,186 @@ function ChartCard({ title, children }) {
   )
 }
 
+// ── Investment tab bar ────────────────────────────────────────────────────────
+function InvestmentTabs({ investments, activeId, onSelect, onAdd, onDelete, onRename }) {
+  const [editId,   setEditId]   = useState(null)
+  const [editName, setEditName] = useState('')
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (editId && inputRef.current) inputRef.current.focus()
+  }, [editId])
+
+  function startEdit(inv, e) {
+    e.stopPropagation()
+    setEditId(inv.id)
+    setEditName(inv.name)
+  }
+
+  function commitEdit() {
+    if (editName.trim()) onRename(editId, editName.trim())
+    setEditId(null)
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') commitEdit()
+    if (e.key === 'Escape') setEditId(null)
+  }
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '.35rem',
+      flexWrap: 'wrap', marginBottom: '1.25rem',
+    }}>
+      {investments.map(inv => {
+        const isActive = inv.id === activeId
+        const isEditing = inv.id === editId
+        return (
+          <div
+            key={inv.id}
+            onClick={() => !isEditing && onSelect(inv.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '.3rem',
+              padding: '.38rem .65rem .38rem .75rem',
+              borderRadius: 8,
+              border: isActive ? '1px solid var(--violet, #7c5cbf)' : '1px solid var(--border)',
+              background: isActive ? 'var(--violet-subtle, rgba(124,92,191,.08))' : 'var(--bg2)',
+              cursor: isEditing ? 'default' : 'pointer',
+              transition: 'all .15s',
+            }}
+          >
+            {isEditing ? (
+              <>
+                <input
+                  ref={inputRef}
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={commitEdit}
+                  style={{
+                    border: 'none', background: 'transparent', outline: 'none',
+                    fontSize: '.82rem', fontWeight: 600, color: 'var(--text)',
+                    width: Math.max(80, editName.length * 9),
+                  }}
+                />
+                <button
+                  onMouseDown={e => { e.preventDefault(); commitEdit() }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: CLR_GREEN,
+                    display: 'flex', alignItems: 'center', padding: '.1rem' }}>
+                  <Check size={13} />
+                </button>
+              </>
+            ) : (
+              <>
+                <span style={{
+                  fontSize: '.82rem', fontWeight: isActive ? 700 : 500,
+                  color: isActive ? 'var(--violet, #7c5cbf)' : 'var(--text2)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {inv.name}
+                </span>
+                {isActive && (
+                  <button
+                    onClick={e => startEdit(inv, e)}
+                    title="Nimeä uudelleen"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text3)', display: 'flex', alignItems: 'center', padding: '.1rem' }}>
+                    <Pencil size={11} />
+                  </button>
+                )}
+                {investments.length > 1 && isActive && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onDelete(inv.id) }}
+                    title="Poista investointi"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text3)', display: 'flex', alignItems: 'center', padding: '.1rem' }}>
+                    <Trash2 size={11} />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })}
+      <button
+        onClick={onAdd}
+        title="Lisää uusi investointi"
+        style={{
+          display: 'flex', alignItems: 'center', gap: '.3rem',
+          padding: '.38rem .65rem', borderRadius: 8,
+          border: '1px dashed var(--border2)', background: 'none',
+          cursor: 'pointer', color: 'var(--text3)', fontSize: '.82rem',
+          transition: 'all .15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--text4)'; e.currentTarget.style.color = 'var(--text2)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--text3)' }}
+      >
+        <Plus size={13} /> Uusi investointi
+      </button>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Investoinnit() {
-  const [expenses,    setExpenses]    = useState(DEF_EXPENSES)
-  const [memberships, setMemberships] = useState(DEF_MEMBERSHIPS)
-  const [otherRevs,   setOtherRevs]   = useState(DEF_OTHER_REVS)
-  const [horisontti,  setHorisontti]  = useState(36)
+  const [investments, setInvestments] = useState(() => [makeInvestment(1)])
+  const [activeId,    setActiveId]    = useState(null)
 
-  // ── Projections ─────────────────────────────────────────────────────────
+  const currentId = activeId ?? investments[0]?.id
+  const inv       = investments.find(i => i.id === currentId) ?? investments[0]
+
+  // ── Investment management ────────────────────────────────────────────────
+  function addInvestment() {
+    const next = makeInvestment(investments.length + 1)
+    setInvestments(p => [...p, next])
+    setActiveId(next.id)
+  }
+
+  function deleteInvestment(id) {
+    setInvestments(p => {
+      const remaining = p.filter(i => i.id !== id)
+      if (currentId === id) setActiveId(remaining[0]?.id ?? null)
+      return remaining
+    })
+  }
+
+  function renameInvestment(id, name) {
+    setInvestments(p => p.map(i => i.id === id ? { ...i, name } : i))
+  }
+
+  // Patch a field inside the active investment
+  function patch(changes) {
+    setInvestments(p => p.map(i => i.id === currentId ? { ...i, ...changes } : i))
+  }
+
+  // ── Expense handlers ─────────────────────────────────────────────────────
+  const updateExpense = (id, field, val) =>
+    patch({ expenses: inv.expenses.map(e => e.id === id ? { ...e, [field]: val } : e) })
+  const addExpense = () =>
+    patch({ expenses: [...inv.expenses, { id: nid(), label: 'Uusi kulu', amount: 0, growthPct: 0 }] })
+  const removeExpense = id =>
+    patch({ expenses: inv.expenses.filter(e => e.id !== id) })
+
+  // ── Membership handlers ──────────────────────────────────────────────────
+  const updateMembership = (id, field, val) =>
+    patch({ memberships: inv.memberships.map(m => m.id === id ? { ...m, [field]: val } : m) })
+
+  // ── Other revenue handlers ───────────────────────────────────────────────
+  const updateOtherRev = (id, field, val) =>
+    patch({ otherRevs: inv.otherRevs.map(r => r.id === id ? { ...r, [field]: val } : r) })
+  const addOtherRev = () =>
+    patch({ otherRevs: [...inv.otherRevs, { id: nid(), label: 'Uusi tulo', amount: 0, growthPct: 0 }] })
+  const removeOtherRev = id =>
+    patch({ otherRevs: inv.otherRevs.filter(r => r.id !== id) })
+
+  // ── Projections ──────────────────────────────────────────────────────────
   const months = useMemo(
-    () => calcMonths(expenses, memberships, otherRevs, horisontti),
-    [expenses, memberships, otherRevs, horisontti],
+    () => calcMonths(inv.expenses, inv.memberships, inv.otherRevs, inv.horisontti),
+    [inv],
   )
 
   const yearSummaries = useMemo(() => {
-    const n = Math.ceil(horisontti / 12)
-    return Array.from({ length: n }, (_, y) => {
+    return Array.from({ length: Math.ceil(inv.horisontti / 12) }, (_, y) => {
       const slice = months.slice(y * 12, (y + 1) * 12)
       return {
         year:  y + 1,
@@ -186,46 +357,19 @@ export default function Investoinnit() {
         Netto: slice.reduce((s, m) => s + m.netto, 0),
       }
     })
-  }, [months, horisontti])
+  }, [months, inv.horisontti])
 
-  const breakEvenMonth = useMemo(
-    () => { const i = months.findIndex(m => m.netto >= 0); return i === -1 ? null : i + 1 },
-    [months],
-  )
-  const cumBreakEvenMonth = useMemo(
-    () => { const i = months.findIndex(m => m.kumulatiivinen >= 0); return i === -1 ? null : i + 1 },
-    [months],
-  )
+  const breakEvenMonth    = useMemo(() => { const i = months.findIndex(m => m.netto >= 0);          return i === -1 ? null : i + 1 }, [months])
+  const cumBreakEvenMonth = useMemo(() => { const i = months.findIndex(m => m.kumulatiivinen >= 0); return i === -1 ? null : i + 1 }, [months])
 
-  // Chart data — thin out x-axis for 36-month view
-  const chartData = horisontti > 24
+  const chartData = inv.horisontti > 24
     ? months.map((m, i) => ({ ...m, label: i % 3 === 2 ? `Kk ${m.kk}` : '' }))
     : months
 
-  // ── Expense handlers ─────────────────────────────────────────────────────
-  const updateExpense = (id, field, val) =>
-    setExpenses(p => p.map(e => e.id === id ? { ...e, [field]: val } : e))
-  const addExpense = () =>
-    setExpenses(p => [...p, { id: nid(), label: 'Uusi kulu', amount: 0, growthPct: 0 }])
-  const removeExpense = id =>
-    setExpenses(p => p.filter(e => e.id !== id))
-
-  // ── Membership handlers ──────────────────────────────────────────────────
-  const updateMembership = (id, field, val) =>
-    setMemberships(p => p.map(m => m.id === id ? { ...m, [field]: val } : m))
-
-  // ── Other revenue handlers ───────────────────────────────────────────────
-  const updateOtherRev = (id, field, val) =>
-    setOtherRevs(p => p.map(r => r.id === id ? { ...r, [field]: val } : r))
-  const addOtherRev = () =>
-    setOtherRevs(p => [...p, { id: nid(), label: 'Uusi tulo', amount: 0, growthPct: 0 }])
-  const removeOtherRev = id =>
-    setOtherRevs(p => p.filter(r => r.id !== id))
-
-  // ── Totals for summary ───────────────────────────────────────────────────
-  const totalExpenseM1 = expenses.reduce((s, e) => s + e.amount, 0)
-  const totalMemberM1  = memberships.reduce((s, m) => s + memberMonthly(m), 0)
-  const totalOtherM1   = otherRevs.reduce((s, r) => s + r.amount, 0)
+  // ── Totals ───────────────────────────────────────────────────────────────
+  const totalExpenseM1 = inv.expenses.reduce((s, e) => s + e.amount, 0)
+  const totalMemberM1  = inv.memberships.reduce((s, m) => s + memberMonthly(m), 0)
+  const totalOtherM1   = inv.otherRevs.reduce((s, r) => s + r.amount, 0)
   const totalRevenueM1 = totalMemberM1 + totalOtherM1
   const nettoM1        = totalRevenueM1 - totalExpenseM1
 
@@ -241,23 +385,31 @@ export default function Investoinnit() {
         <div style={{ display: 'flex', gap: '.3rem' }}>
           {[12, 24, 36].map(h => (
             <button key={h}
-              className={`sub-tab${horisontti === h ? ' active' : ''}`}
+              className={`sub-tab${inv.horisontti === h ? ' active' : ''}`}
               style={{ fontSize: '.8rem', padding: '.35rem .7rem' }}
-              onClick={() => setHorisontti(h)}>
+              onClick={() => patch({ horisontti: h })}>
               {h} kk
             </button>
           ))}
         </div>
       </div>
 
+      {/* Investment tab navigation */}
+      <InvestmentTabs
+        investments={investments}
+        activeId={currentId}
+        onSelect={setActiveId}
+        onAdd={addInvestment}
+        onDelete={deleteInvestment}
+        onRename={renameInvestment}
+      />
+
       {/* KPI cards */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', marginBottom: '1.25rem' }}>
         {yearSummaries.map(y => (
           <div className="stat-card" key={y.year}>
             <div className="stat-label">Vuosi {y.year} netto</div>
-            <div className="stat-value" style={{ color: y.Netto >= 0 ? CLR_GREEN : CLR_RED }}>
-              {fmt(y.Netto)}
-            </div>
+            <div className="stat-value" style={{ color: y.Netto >= 0 ? CLR_GREEN : CLR_RED }}>{fmt(y.Netto)}</div>
             <div style={{ fontSize: '.7rem', color: 'var(--text3)' }}>
               Tulot {fmt(y.Tulot)} · Menot {fmt(y.Menot)}
             </div>
@@ -265,9 +417,7 @@ export default function Investoinnit() {
         ))}
         <div className="stat-card">
           <div className="stat-label">Kk 1 netto</div>
-          <div className="stat-value" style={{ color: nettoM1 >= 0 ? CLR_GREEN : CLR_RED }}>
-            {fmt(nettoM1)}
-          </div>
+          <div className="stat-value" style={{ color: nettoM1 >= 0 ? CLR_GREEN : CLR_RED }}>{fmt(nettoM1)}</div>
           <div style={{ fontSize: '.7rem', color: 'var(--text3)' }}>
             Tulot {fmt(totalRevenueM1)} · Menot {fmt(totalExpenseM1)}
           </div>
@@ -300,18 +450,13 @@ export default function Investoinnit() {
               <span />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
-              {expenses.map(e => (
+              {inv.expenses.map(e => (
                 <div key={e.id} style={{ display: 'grid', gridTemplateColumns: '1fr 76px 54px 22px', gap: '.3rem', alignItems: 'center' }}>
-                  <input
-                    className="input-field"
-                    value={e.label}
+                  <input className="input-field" value={e.label}
                     onChange={ev => updateExpense(e.id, 'label', ev.target.value)}
-                    style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto' }}
-                  />
-                  <NumInput value={e.amount} step={50} min={0}
-                    onChange={v => updateExpense(e.id, 'amount', v)} />
-                  <NumInput value={e.growthPct} step={0.5}
-                    onChange={v => updateExpense(e.id, 'growthPct', v)} />
+                    style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto' }} />
+                  <NumInput value={e.amount} step={50} min={0} onChange={v => updateExpense(e.id, 'amount', v)} />
+                  <NumInput value={e.growthPct} step={0.5} onChange={v => updateExpense(e.id, 'growthPct', v)} />
                   <DeleteBtn onClick={() => removeExpense(e.id)} />
                 </div>
               ))}
@@ -334,21 +479,18 @@ export default function Investoinnit() {
               <ColHeader right>€/kk</ColHeader>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
-              {memberships.map(m => (
+              {inv.memberships.map(m => (
                 <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr 58px 52px 50px 52px', gap: '.3rem', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '.8rem', fontWeight: 500, color: 'var(--text)' }}>{m.label}</div>
+                    <div style={{ fontSize: '.8rem', fontWeight: 500 }}>{m.label}</div>
                     <div style={{ fontSize: '.65rem', color: 'var(--text3)' }}>
                       {m.periodWeeks ? `/${m.periodWeeks} vko` : '/käynti'}
                     </div>
                   </div>
-                  <NumInput value={m.price} step={0.10} min={0}
-                    onChange={v => updateMembership(m.id, 'price', v)} />
-                  <NumInput value={m.count} step={1} min={0}
-                    onChange={v => updateMembership(m.id, 'count', v)} />
-                  <NumInput value={m.growthPct} step={1}
-                    onChange={v => updateMembership(m.id, 'growthPct', v)} />
-                  <span style={{ fontSize: '.8rem', fontWeight: 600, textAlign: 'right', color: 'var(--text)' }}>
+                  <NumInput value={m.price} step={0.10} min={0} onChange={v => updateMembership(m.id, 'price', v)} />
+                  <NumInput value={m.count} step={1}    min={0} onChange={v => updateMembership(m.id, 'count', v)} />
+                  <NumInput value={m.growthPct} step={1}       onChange={v => updateMembership(m.id, 'growthPct', v)} />
+                  <span style={{ fontSize: '.8rem', fontWeight: 600, textAlign: 'right' }}>
                     {fmt(memberMonthly(m))}
                   </span>
                 </div>
@@ -367,18 +509,13 @@ export default function Investoinnit() {
               <span />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
-              {otherRevs.map(r => (
+              {inv.otherRevs.map(r => (
                 <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 76px 54px 22px', gap: '.3rem', alignItems: 'center' }}>
-                  <input
-                    className="input-field"
-                    value={r.label}
+                  <input className="input-field" value={r.label}
                     onChange={ev => updateOtherRev(r.id, 'label', ev.target.value)}
-                    style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto' }}
-                  />
-                  <NumInput value={r.amount} step={50} min={0}
-                    onChange={v => updateOtherRev(r.id, 'amount', v)} />
-                  <NumInput value={r.growthPct} step={0.5}
-                    onChange={v => updateOtherRev(r.id, 'growthPct', v)} />
+                    style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto' }} />
+                  <NumInput value={r.amount} step={50} min={0} onChange={v => updateOtherRev(r.id, 'amount', v)} />
+                  <NumInput value={r.growthPct} step={0.5} onChange={v => updateOtherRev(r.id, 'growthPct', v)} />
                   <DeleteBtn onClick={() => removeOtherRev(r.id)} />
                 </div>
               ))}
@@ -392,10 +529,9 @@ export default function Investoinnit() {
 
         </div>
 
-        {/* ── Right panel: charts + table ──────────────────────────────────── */}
+        {/* ── Right panel ──────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
 
-          {/* Tulot vs Menot */}
           <ChartCard title="Tulot vs. Menot — kuukausittain">
             <ResponsiveContainer width="100%" height={240}>
               <ComposedChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
@@ -404,15 +540,12 @@ export default function Investoinnit() {
                 <YAxis tickFormatter={v => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} width={38} />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '.75rem' }} />
-                <Area type="monotone" dataKey="tulot" name="Tulot"
-                  fill="#00b89422" stroke={CLR_GREEN} strokeWidth={2} />
-                <Area type="monotone" dataKey="menot" name="Menot"
-                  fill="#d6303122" stroke={CLR_RED} strokeWidth={2} />
+                <Area type="monotone" dataKey="tulot" name="Tulot"  fill="#00b89422" stroke="#00b894" strokeWidth={2} />
+                <Area type="monotone" dataKey="menot" name="Menot"  fill="#d6303122" stroke="#d63031" strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
           </ChartCard>
 
-          {/* Kuukausittainen netto */}
           <ChartCard title="Kuukausittainen netto">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
@@ -430,7 +563,6 @@ export default function Investoinnit() {
             </ResponsiveContainer>
           </ChartCard>
 
-          {/* Kumulatiivinen kassavirta */}
           <ChartCard title="Kumulatiivinen kassavirta">
             <ResponsiveContainer width="100%" height={200}>
               <ComposedChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
@@ -445,7 +577,6 @@ export default function Investoinnit() {
             </ResponsiveContainer>
           </ChartCard>
 
-          {/* Vuosittainen vertailu */}
           <ChartCard title="Vuosittainen vertailu">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={yearSummaries} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
@@ -461,7 +592,6 @@ export default function Investoinnit() {
             </ResponsiveContainer>
           </ChartCard>
 
-          {/* Kuukausianalyysi taulukko */}
           <ChartCard title="Kuukausianalyysi">
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.78rem' }}>
@@ -481,9 +611,7 @@ export default function Investoinnit() {
                 <tbody>
                   {months.map((m, i) => (
                     <tr key={m.kk} style={{
-                      borderBottom: m.kk % 12 === 0
-                        ? '2px solid var(--border)'
-                        : '1px solid var(--border)',
+                      borderBottom: m.kk % 12 === 0 ? '2px solid var(--border)' : '1px solid var(--border)',
                       background: i % 2 === 0 ? 'transparent' : 'var(--bg2)',
                     }}>
                       <td style={{ padding: '.32rem .6rem', color: 'var(--text2)' }}>{m.label}</td>
