@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { supabaseAdmin } from '../../lib/supabase'
 import {
   ComposedChart, BarChart, Bar, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -10,22 +11,13 @@ import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 let _id = 100
 function nid() { return ++_id }
 
-const STORAGE_KEY = 'kuntomo_investoinnit'
-
-function loadFromStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const data = JSON.parse(raw)
-    // Sync ID counter so new items don't collide with saved IDs
-    data.forEach(inv => {
-      if (inv.id > _id) _id = inv.id
-      inv.expenses?.forEach(e   => { if (e.id   > _id) _id = e.id   })
-      inv.memberships?.forEach(m => { if (m.id   > _id) _id = m.id   })
-      inv.otherRevs?.forEach(r   => { if (r.id   > _id) _id = r.id   })
-    })
-    return data
-  } catch { return null }
+function syncIdCounter(data) {
+  data.forEach(inv => {
+    if (inv.id > _id) _id = inv.id
+    inv.expenses?.forEach(e    => { if (e.id  > _id) _id = e.id  })
+    inv.memberships?.forEach(m => { if (m.id  > _id) _id = m.id  })
+    inv.otherRevs?.forEach(r   => { if (r.id  > _id) _id = r.id  })
+  })
 }
 
 function fmt(n, dec = 0) {
@@ -373,12 +365,30 @@ function ItemRow({ item, onUpdate, onDelete, maxMonth }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Investoinnit() {
-  const [investments, setInvestments] = useState(() => loadFromStorage() ?? [makeInvestment(1)])
+  const [investments, setInvestments] = useState(() => [makeInvestment(1)])
   const [activeId,    setActiveId]    = useState(null)
-  const [saveStatus,  setSaveStatus]  = useState(null) // null | 'saved' | 'error'
+  const [loading,     setLoading]     = useState(true)
+  const [saveStatus,  setSaveStatus]  = useState(null) // null | 'saving' | 'saved' | 'error'
 
   const currentId = activeId ?? investments[0]?.id
   const inv       = investments.find(i => i.id === currentId) ?? investments[0]
+
+  // ── Load from Supabase on mount ──────────────────────────────────────────
+  useEffect(() => {
+    supabaseAdmin
+      .from('investoinnit_data')
+      .select('data')
+      .eq('id', 'default')
+      .single()
+      .then(({ data: row }) => {
+        if (row?.data?.length) {
+          syncIdCounter(row.data)
+          setInvestments(row.data)
+        }
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
 
   // ── Investment management ────────────────────────────────────────────────
   function addInvestment() {
@@ -397,13 +407,12 @@ export default function Investoinnit() {
     setInvestments(p => p.map(i => i.id === id ? { ...i, name } : i))
   }
 
-  function handleSave() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(investments))
-      setSaveStatus('saved')
-    } catch {
-      setSaveStatus('error')
-    }
+  async function handleSave() {
+    setSaveStatus('saving')
+    const { error } = await supabaseAdmin
+      .from('investoinnit_data')
+      .upsert({ id: 'default', data: investments, updated_at: new Date().toISOString() })
+    setSaveStatus(error ? 'error' : 'saved')
     setTimeout(() => setSaveStatus(null), 2200)
   }
 
@@ -462,6 +471,12 @@ export default function Investoinnit() {
   const memberM1    = inv.memberships.reduce((s, m) => s + memberMonthly(m), 0)
   const otherRevM1  = inv.otherRevs.reduce((s, r) => s + itemAmount(r, 0), 0)
 
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text3)' }}>
+      Ladataan…
+    </div>
+  )
+
   return (
     <div className="page-wrapper">
 
@@ -485,15 +500,14 @@ export default function Investoinnit() {
           <button
             className="btn btn-sm"
             onClick={handleSave}
+            disabled={saveStatus === 'saving'}
             style={{
-              background: saveStatus === 'saved' ? 'var(--green)' : saveStatus === 'error' ? 'var(--red)' : 'var(--violet, #7c5cbf)',
-              color: '#fff',
-              border: 'none',
-              transition: 'background .3s',
-              minWidth: 90,
+              background: saveStatus === 'saved' ? '#00b894' : saveStatus === 'error' ? '#d63031' : 'var(--violet, #7c5cbf)',
+              color: '#fff', border: 'none', transition: 'background .3s',
+              minWidth: 100, opacity: saveStatus === 'saving' ? .7 : 1,
             }}
           >
-            {saveStatus === 'saved' ? 'Tallennettu ✓' : saveStatus === 'error' ? 'Virhe!' : 'Tallenna'}
+            {saveStatus === 'saving' ? 'Tallennetaan…' : saveStatus === 'saved' ? 'Tallennettu ✓' : saveStatus === 'error' ? 'Virhe!' : 'Tallenna'}
           </button>
         </div>
       </div>
