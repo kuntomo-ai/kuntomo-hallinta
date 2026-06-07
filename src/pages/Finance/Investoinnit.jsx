@@ -10,6 +10,24 @@ import { Plus, Trash2, Pencil, Check } from 'lucide-react'
 let _id = 100
 function nid() { return ++_id }
 
+const STORAGE_KEY = 'kuntomo_investoinnit'
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    // Sync ID counter so new items don't collide with saved IDs
+    data.forEach(inv => {
+      if (inv.id > _id) _id = inv.id
+      inv.expenses?.forEach(e   => { if (e.id   > _id) _id = e.id   })
+      inv.memberships?.forEach(m => { if (m.id   > _id) _id = m.id   })
+      inv.otherRevs?.forEach(r   => { if (r.id   > _id) _id = r.id   })
+    })
+    return data
+  } catch { return null }
+}
+
 function fmt(n, dec = 0) {
   const abs = Math.abs(n)
   const s = new Intl.NumberFormat('fi-FI', { maximumFractionDigits: dec }).format(abs) + ' €'
@@ -355,8 +373,9 @@ function ItemRow({ item, onUpdate, onDelete, maxMonth }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Investoinnit() {
-  const [investments, setInvestments] = useState(() => [makeInvestment(1)])
+  const [investments, setInvestments] = useState(() => loadFromStorage() ?? [makeInvestment(1)])
   const [activeId,    setActiveId]    = useState(null)
+  const [saveStatus,  setSaveStatus]  = useState(null) // null | 'saved' | 'error'
 
   const currentId = activeId ?? investments[0]?.id
   const inv       = investments.find(i => i.id === currentId) ?? investments[0]
@@ -377,6 +396,17 @@ export default function Investoinnit() {
   function renameInvestment(id, name) {
     setInvestments(p => p.map(i => i.id === id ? { ...i, name } : i))
   }
+
+  function handleSave() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(investments))
+      setSaveStatus('saved')
+    } catch {
+      setSaveStatus('error')
+    }
+    setTimeout(() => setSaveStatus(null), 2200)
+  }
+
   function patch(changes) {
     setInvestments(p => p.map(i => i.id === currentId ? { ...i, ...changes } : i))
   }
@@ -441,15 +471,30 @@ export default function Investoinnit() {
           <h1 className="page-title">Investointilaskuri</h1>
           <p className="page-subtitle">Uusien toimipisteiden tuotto- ja kuluprojektio</p>
         </div>
-        <div style={{ display: 'flex', gap: '.3rem' }}>
-          {[12, 24, 36].map(h => (
-            <button key={h}
-              className={`sub-tab${inv.horisontti === h ? ' active' : ''}`}
-              style={{ fontSize: '.8rem', padding: '.35rem .7rem' }}
-              onClick={() => patch({ horisontti: h })}>
-              {h} kk
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '.3rem' }}>
+            {[12, 24, 36].map(h => (
+              <button key={h}
+                className={`sub-tab${inv.horisontti === h ? ' active' : ''}`}
+                style={{ fontSize: '.8rem', padding: '.35rem .7rem' }}
+                onClick={() => patch({ horisontti: h })}>
+                {h} kk
+              </button>
+            ))}
+          </div>
+          <button
+            className="btn btn-sm"
+            onClick={handleSave}
+            style={{
+              background: saveStatus === 'saved' ? 'var(--green)' : saveStatus === 'error' ? 'var(--red)' : 'var(--violet, #7c5cbf)',
+              color: '#fff',
+              border: 'none',
+              transition: 'background .3s',
+              minWidth: 90,
+            }}
+          >
+            {saveStatus === 'saved' ? 'Tallennettu ✓' : saveStatus === 'error' ? 'Virhe!' : 'Tallenna'}
+          </button>
         </div>
       </div>
 
