@@ -23,6 +23,7 @@ import Tulos from './pages/Finance/Tulos'
 import Kassavirta from './pages/Finance/Kassavirta'
 import KirjanpitoTuonti from './pages/Finance/KirjanpitoTuonti'
 import Tilinpaatos from './pages/Finance/Tilinpaatos'
+import Investoinnit from './pages/Finance/Investoinnit'
 import Raportointi from './pages/Reporting/Raportointi'
 import RaportointiTerapia from './pages/Reporting/RaportointiTerapia'
 import RaportointiValmennus from './pages/Reporting/RaportointiValmennus'
@@ -108,6 +109,7 @@ function AppRoutes() {
               <Route path="/finance/kirjanpito/kassavirta" element={<RoleRoute><Kassavirta /></RoleRoute>} />
               <Route path="/finance/kirjanpito/raportit" element={<Navigate to="/finance/kirjanpito" replace />} />
               <Route path="/finance/kirjanpito/tilinpaatos" element={<RoleRoute><Tilinpaatos /></RoleRoute>} />
+              <Route path="/finance/investoinnit" element={<RoleRoute><Investoinnit /></RoleRoute>} />
               <Route path="/finance/kirjanpito/tuonti" element={<RoleRoute><KirjanpitoTuonti /></RoleRoute>} />
 
               <Route path="/finance/raportointi/oma" element={<RoleRoute><RaportointiOma /></RoleRoute>} />

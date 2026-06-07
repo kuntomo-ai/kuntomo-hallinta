@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, Calendar, Car, Stethoscope, Dumbbell, Users2,
   Gift, Building2, ClipboardList, CheckSquare, MessageSquare,
-  FileText, Package, TrendingUp, BookOpen, LogOut, Menu, Wrench, Settings
+  FileText, Package, TrendingUp, BookOpen, LogOut, Menu, Wrench, Settings, Calculator
 } from 'lucide-react'
 import logo from '../../logo.svg'
 
@@ -39,6 +39,7 @@ const NAV = [
   { section: 'Talous' },
   { label: 'Kirjanpito',     href: '/finance/kirjanpito',       icon: BookOpen,      roles: TALOUS },
   { label: 'Raportointi',    href: '/finance/raportointi',      icon: TrendingUp,    roles: TALOUS },
+  { label: 'Investoinnit',  href: '/finance/investoinnit',     icon: Calculator,    roles: TALOUS },
   { label: 'Raportointi',    href: '/finance/raportointi/oma',  icon: TrendingUp,    exactRoles: OMA_RAPORTI },
 
   { section: 'Hallinto' },
