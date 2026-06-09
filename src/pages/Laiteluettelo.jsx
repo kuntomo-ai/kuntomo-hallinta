@@ -37,7 +37,7 @@ export default function Laiteluettelo() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('laiteluettelo_items').select('*').order('sijainti').order('name')
+    const { data } = await supabaseAdmin.from('laiteluettelo_items').select('*').order('device_number', { nullsFirst: false }).order('name')
     setRows(data || [])
     setLoading(false)
   }
