@@ -53,6 +53,7 @@ export default function Laiteluettelo() {
   }
 
   function openEdit(row) {
+    setSaveError('')
     setEditing(row.id)
     setEditingDeviceName(row.name)
     setForm({
@@ -75,6 +76,7 @@ export default function Laiteluettelo() {
   }
 
   function openNew() {
+    setSaveError('')
     setEditing(null)
     setEditingDeviceName('')
     setForm(empty)
@@ -86,46 +88,58 @@ export default function Laiteluettelo() {
 
   async function nextDeviceNumber(sijainti) {
     const base = sijainti === 'Etu-Lyötty' ? 0 : sijainti === 'Kempele' ? 100 : sijainti === 'linnakangas' ? 200 : 300
-    const { data } = await supabaseAdmin.from('laiteluettelo_items').select('device_number').eq('sijainti', sijainti)
-    const nums = (data || [])
-      .map(r => parseInt(r.device_number, 10))
-      .filter(n => !isNaN(n) && n > base && n < base + 100)
-    const max = nums.length ? Math.max(...nums) : base
-    return String(max + 1).padStart(3, '0')
+    try {
+      const { data } = await supabaseAdmin
+        .from('laiteluettelo_items')
+        .select('device_number')
+        .eq('sijainti', sijainti)
+      const nums = (data || [])
+        .map(r => parseInt(r.device_number, 10))
+        .filter(n => !isNaN(n) && n > base && n < base + 100)
+      const max = nums.length ? Math.max(...nums) : base
+      return String(max + 1).padStart(3, '0')
+    } catch {
+      return String(base + 1).padStart(3, '0')
+    }
   }
 
   async function handleSave() {
     if (!form.name.trim()) return
     setSaving(true)
     setSaveError('')
-    const payload = {
-      sijainti:      form.sijainti.trim() || null,
-      category:      form.category.trim() || null,
-      name:          form.name.trim(),
-      model:         form.model.trim() || null,
-      serial_number: form.serial_number.trim() || null,
-      price:         form.price !== '' ? parseFloat(form.price) : null,
-      purchase_date: form.purchase_date.trim() || null,
-      notes:         form.notes.trim() || null,
-      device_number: form.device_number.trim() || null,
-      ohjevideo_url: form.ohjevideo_url.trim() || null,
-      updated_at:    new Date().toISOString(),
+    try {
+      const payload = {
+        sijainti:      form.sijainti.trim() || null,
+        category:      form.category.trim() || null,
+        name:          form.name.trim(),
+        model:         form.model.trim() || null,
+        serial_number: form.serial_number.trim() || null,
+        price:         form.price !== '' ? parseFloat(form.price) : null,
+        purchase_date: form.purchase_date.trim() || null,
+        notes:         form.notes.trim() || null,
+        device_number: form.device_number.trim() || null,
+        ohjevideo_url: form.ohjevideo_url.trim() || null,
+        updated_at:    new Date().toISOString(),
+      }
+      if (!editing && !payload.device_number && payload.sijainti) {
+        payload.device_number = await nextDeviceNumber(payload.sijainti)
+      }
+      const { error } = editing
+        ? await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
+        : await supabaseAdmin.from('laiteluettelo_items').insert(payload)
+      if (error) {
+        setSaveError(`Tallennus epäonnistui: ${error.message}`)
+        return
+      }
+      setShowModal(false)
+      setEditing(null)
+      setForm(empty)
+      fetchData()
+    } catch (err) {
+      setSaveError(`Odottamaton virhe: ${err.message}`)
+    } finally {
+      setSaving(false)
     }
-    if (!editing && !payload.device_number && payload.sijainti) {
-      payload.device_number = await nextDeviceNumber(payload.sijainti)
-    }
-    const { error } = editing
-      ? await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
-      : await supabaseAdmin.from('laiteluettelo_items').insert(payload)
-    setSaving(false)
-    if (error) {
-      setSaveError(`Tallennus epäonnistui: ${error.message}`)
-      return
-    }
-    setShowModal(false)
-    setEditing(null)
-    setForm(empty)
-    fetchData()
   }
 
   async function handleDelete(id) {
