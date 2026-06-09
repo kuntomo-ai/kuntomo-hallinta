@@ -13,6 +13,7 @@ import CalendarPage from './pages/CalendarPage'
 import Communication from './pages/Communication'
 import Inventory from './pages/Inventory'
 import Laiteluettelo from './pages/Laiteluettelo'
+import LaiteVika from './pages/LaiteVika'
 import Kaapit from './pages/Kaapit'
 import Documents from './pages/Documents'
 import Lahjakortit from './pages/Finance/Lahjakortit'
@@ -79,6 +80,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/laite/:id" element={<LaiteVika />} />
       <Route path="/*" element={
         <PrivateRoute>
           <Layout>

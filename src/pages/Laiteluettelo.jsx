@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Edit2, Trash2, Wrench, CheckCircle } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, Wrench, CheckCircle, QrCode, Copy, Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase, supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 
 const SIJAINNIT = ['Kaikki', 'linnakangas', 'Etu-Lyötty', 'Kempele']
 
-const empty = { sijainti: '', category: '', name: '', model: '', serial_number: '', price: '', purchase_date: '', notes: '' }
+const empty = { sijainti: '', category: '', name: '', model: '', serial_number: '', price: '', purchase_date: '', notes: '', device_number: '' }
 
 export default function Laiteluettelo() {
   const { profile, isAdmin, role } = useAuth()
@@ -22,6 +23,8 @@ export default function Laiteluettelo() {
   const [editingDeviceName, setEditingDeviceName] = useState('')
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
+
+  const [copiedUrl, setCopiedUrl] = useState(false)
 
   const [serviceHistory, setServiceHistory] = useState([])
   const [serviceRequest, setServiceRequest] = useState(false)
@@ -52,15 +55,17 @@ export default function Laiteluettelo() {
     setEditing(row.id)
     setEditingDeviceName(row.name)
     setForm({
-      sijainti: row.sijainti || '',
-      category: row.category || '',
-      name: row.name || '',
-      model: row.model || '',
+      sijainti:      row.sijainti || '',
+      category:      row.category || '',
+      name:          row.name || '',
+      model:         row.model || '',
       serial_number: row.serial_number || '',
-      price: row.price != null ? String(row.price) : '',
+      price:         row.price != null ? String(row.price) : '',
       purchase_date: row.purchase_date || '',
-      notes: row.notes || '',
+      notes:         row.notes || '',
+      device_number: row.device_number || '',
     })
+    setCopiedUrl(false)
     setServiceRequest(false)
     setServiceNote('')
     fetchServiceHistory(row.id)
@@ -81,15 +86,16 @@ export default function Laiteluettelo() {
     if (!form.name.trim()) return
     setSaving(true)
     const payload = {
-      sijainti: form.sijainti.trim() || null,
-      category: form.category.trim() || null,
-      name: form.name.trim(),
-      model: form.model.trim() || null,
+      sijainti:      form.sijainti.trim() || null,
+      category:      form.category.trim() || null,
+      name:          form.name.trim(),
+      model:         form.model.trim() || null,
       serial_number: form.serial_number.trim() || null,
-      price: form.price !== '' ? parseFloat(form.price) : null,
+      price:         form.price !== '' ? parseFloat(form.price) : null,
       purchase_date: form.purchase_date.trim() || null,
-      notes: form.notes.trim() || null,
-      updated_at: new Date().toISOString(),
+      notes:         form.notes.trim() || null,
+      device_number: form.device_number.trim() || null,
+      updated_at:    new Date().toISOString(),
     }
     if (editing) {
       await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
@@ -277,13 +283,16 @@ export default function Laiteluettelo() {
               <table>
                 <thead>
                   <tr>
-                    <th>Nimi</th><th>Kategoria</th><th>Malli</th><th>Sarjanumero</th>
+                    <th>Nro</th><th>Nimi</th><th>Kategoria</th><th>Malli</th><th>Sarjanumero</th>
                     <th>Hinta</th><th>Hankintapvm</th><th>Muistiinpanot</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map(r => (
                     <tr key={r.id} style={r.service_requested ? { background: '#FFF3F3' } : {}}>
+                      <td style={{ fontSize: '.75rem', color: 'var(--violet)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        {r.device_number || '—'}
+                      </td>
                       <td style={{ fontWeight: 600 }}>
                         {r.service_requested && <span style={{ color: 'var(--red)', marginRight: '.4rem' }}>🔴</span>}
                         {r.name}
@@ -337,6 +346,10 @@ export default function Laiteluettelo() {
           <div className="form-grid">
             <div className="form-grid form-grid-2">
               <div className="input-group">
+                <label className="input-label">Laitenumero</label>
+                <input className="input-field" name="device_number" placeholder="Esim. KNT-001" value={form.device_number} onChange={handleChange} />
+              </div>
+              <div className="input-group">
                 <label className="input-label">Sijainti</label>
                 <select className="input-field" name="sijainti" value={form.sijainti} onChange={handleChange}>
                   <option value="">Valitse...</option>
@@ -376,6 +389,45 @@ export default function Laiteluettelo() {
               <label className="input-label">Muistiinpanot</label>
               <textarea className="input-field" name="notes" rows={2} value={form.notes} onChange={handleChange} style={{ resize: 'vertical' }} />
             </div>
+
+            {/* ── QR-koodi (only when editing) ────────────────────────────── */}
+            {editing && (() => {
+              const publicUrl = `${window.location.origin}/laite/${editing}`
+              return (
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.1rem', marginTop: '.25rem' }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.95rem', marginBottom: '.85rem', display: 'flex', alignItems: 'center', gap: '.5rem', color: 'var(--text)' }}>
+                    <QrCode size={15} style={{ color: 'var(--violet)' }} /> QR-koodi ja vikailmoituslinkki
+                  </div>
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div style={{ flexShrink: 0, padding: 8, background: '#fff', border: '1px solid var(--border)', borderRadius: 8 }}>
+                      <QRCodeSVG value={publicUrl} size={112} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 180, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                      <div style={{ fontSize: '.75rem', color: 'var(--text3)' }}>
+                        Tähän URL:iin QR-koodi ohjaa. Asiakas voi ilmoittaa vian kirjautumatta.
+                      </div>
+                      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+                        <code style={{
+                          flex: 1, fontSize: '.72rem', background: 'var(--bg2)', border: '1px solid var(--border)',
+                          borderRadius: 6, padding: '.3rem .55rem', wordBreak: 'break-all', color: 'var(--text2)',
+                        }}>{publicUrl}</code>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ flexShrink: 0, gap: '.25rem' }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(publicUrl)
+                            setCopiedUrl(true)
+                            setTimeout(() => setCopiedUrl(false), 2000)
+                          }}>
+                          {copiedUrl ? <Check size={13} style={{ color: 'var(--green)' }} /> : <Copy size={13} />}
+                          {copiedUrl ? 'Kopioitu!' : 'Kopioi'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* ── Huoltohistoria (only when editing) ─────────────────────── */}
             {editing && (
