@@ -20,7 +20,7 @@ export default function LaiteVika() {
   useEffect(() => {
     supabaseAdmin
       .from('laiteluettelo_items')
-      .select('id, name, sijainti, device_number, ohjevideo_url')
+      .select('id, name, model, sijainti, device_number, ohjevideo_url')
       .eq('id', id)
       .single()
       .then(({ data, error }) => {
@@ -122,9 +122,8 @@ export default function LaiteVika() {
       fontFamily: 'Inter, system-ui, sans-serif',
     }}>
       {/* Logo */}
-      <div style={{ marginBottom: '1.75rem', display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+      <div style={{ marginBottom: '1.75rem' }}>
         <img src={logo} alt="Kuntomo" style={{ height: 32 }} />
-        <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#1A1A2E', letterSpacing: '-.01em' }}>Kuntomo</span>
       </div>
 
       <div style={card}>
@@ -160,8 +159,11 @@ export default function LaiteVika() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#1A1A2E' }}>{device.name}</div>
+                  {device.model && (
+                    <div style={{ fontSize: '.82rem', color: '#475569', marginTop: '.1rem' }}>{device.model}</div>
+                  )}
                   {device.sijainti && (
-                    <div style={{ fontSize: '.8rem', color: '#64748B', marginTop: '.2rem' }}>{device.sijainti}</div>
+                    <div style={{ fontSize: '.78rem', color: '#94A3B8', marginTop: '.15rem' }}>{device.sijainti}</div>
                   )}
                 </div>
                 {device.device_number && (
@@ -259,7 +261,7 @@ export default function LaiteVika() {
                 ← Takaisin
               </button>
               <span style={{ fontWeight: 700, fontSize: '.9rem', color: '#1A1A2E', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {device.name}
+                {device.name}{device.model ? ` — ${device.model}` : ''}
               </span>
               {device.device_number && (
                 <span style={{ background: '#EDE9FE', color: '#6D28D9', fontSize: '.7rem', fontWeight: 700, padding: '.15rem .45rem', borderRadius: 5, flexShrink: 0 }}>
@@ -382,6 +384,7 @@ export default function LaiteVika() {
               fontSize: '.82rem', color: '#166534', textAlign: 'left',
             }}>
               <strong>{device?.name}</strong>
+              {device?.model && <span style={{ color: '#166534' }}> — {device.model}</span>}
               {device?.sijainti && <span style={{ color: '#16A34A', marginLeft: '.5rem' }}>· {device.sijainti}</span>}
               <br />
               <span>{form.kuvaus}</span>
