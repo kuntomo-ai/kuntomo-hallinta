@@ -48,20 +48,20 @@ export default function Laiteluettelo() {
     setServiceHistory(data || [])
   }
 
-  async function handleChange(e) {
+  function handleChange(e) {
     const { name, value } = e.target
-    setForm(f => ({ ...f, [name]: value }))
-    // Kun uusi laite ja sijainti vaihtuu: ehdota seuraavaa laitenumeroa
-    if (name === 'sijainti' && !editing) {
+    const updated = { ...form, [name]: value }
+    if (name === 'sijainti' && !editing && !form.device_number) {
       const base = value === 'Etu-Lyötty' ? 0 : value === 'Kempele' ? 100 : value === 'linnakangas' ? 200 : null
-      if (base === null) return
-      const { data } = await supabaseAdmin.from('laiteluettelo_items').select('device_number').eq('sijainti', value)
-      const nums = (data || [])
-        .map(r => parseInt(r.device_number, 10))
-        .filter(n => !isNaN(n) && n > base && n < base + 100)
-      const next = String((nums.length ? Math.max(...nums) : base) + 1).padStart(3, '0')
-      setForm(f => ({ ...f, device_number: f.device_number || next }))
+      if (base !== null) {
+        const nums = rows
+          .filter(r => r.sijainti === value)
+          .map(r => parseInt(r.device_number, 10))
+          .filter(n => !isNaN(n) && n > base && n < base + 100)
+        updated.device_number = String((nums.length ? Math.max(...nums) : base) + 1).padStart(3, '0')
+      }
     }
+    setForm(updated)
   }
 
   function openEdit(row) {
@@ -102,36 +102,31 @@ export default function Laiteluettelo() {
     if (!form.name.trim()) return
     setSaving(true)
     setSaveError('')
-    try {
-      const payload = {
-        sijainti:      form.sijainti.trim() || null,
-        category:      form.category.trim() || null,
-        name:          form.name.trim(),
-        model:         form.model.trim() || null,
-        serial_number: form.serial_number.trim() || null,
-        price:         form.price !== '' ? parseFloat(form.price) : null,
-        purchase_date: form.purchase_date.trim() || null,
-        notes:         form.notes.trim() || null,
-        device_number: form.device_number.trim() || null,
-        ohjevideo_url: form.ohjevideo_url.trim() || null,
-        updated_at:    new Date().toISOString(),
-      }
-      const { error } = editing
-        ? await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
-        : await supabaseAdmin.from('laiteluettelo_items').insert(payload)
-      if (error) {
-        setSaveError(`Tallennus epäonnistui: ${error.message}`)
-        return
-      }
-      setShowModal(false)
-      setEditing(null)
-      setForm(empty)
-      fetchData()
-    } catch (err) {
-      setSaveError(`Odottamaton virhe: ${err.message}`)
-    } finally {
-      setSaving(false)
+    const payload = {
+      sijainti:      form.sijainti.trim() || null,
+      category:      form.category.trim() || null,
+      name:          form.name.trim(),
+      model:         form.model.trim() || null,
+      serial_number: form.serial_number.trim() || null,
+      price:         form.price !== '' ? parseFloat(form.price) : null,
+      purchase_date: form.purchase_date.trim() || null,
+      notes:         form.notes.trim() || null,
+      device_number: form.device_number.trim() || null,
+      ohjevideo_url: form.ohjevideo_url.trim() || null,
+      updated_at:    new Date().toISOString(),
     }
+    const { error } = editing
+      ? await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
+      : await supabaseAdmin.from('laiteluettelo_items').insert(payload)
+    setSaving(false)
+    if (error) {
+      setSaveError(`Tallennus epäonnistui: ${error.message}`)
+      return
+    }
+    setShowModal(false)
+    setEditing(null)
+    setForm(empty)
+    fetchData()
   }
 
   async function handleDelete(id) {
