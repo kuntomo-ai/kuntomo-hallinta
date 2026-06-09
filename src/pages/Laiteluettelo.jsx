@@ -84,6 +84,16 @@ export default function Laiteluettelo() {
     setShowModal(true)
   }
 
+  async function nextDeviceNumber(sijainti) {
+    const base = sijainti === 'Etu-Lyötty' ? 0 : sijainti === 'Kempele' ? 100 : sijainti === 'linnakangas' ? 200 : 300
+    const { data } = await supabaseAdmin.from('laiteluettelo_items').select('device_number').eq('sijainti', sijainti)
+    const nums = (data || [])
+      .map(r => parseInt(r.device_number, 10))
+      .filter(n => !isNaN(n) && n > base && n < base + 100)
+    const max = nums.length ? Math.max(...nums) : base
+    return String(max + 1).padStart(3, '0')
+  }
+
   async function handleSave() {
     if (!form.name.trim()) return
     setSaving(true)
@@ -100,6 +110,9 @@ export default function Laiteluettelo() {
       device_number: form.device_number.trim() || null,
       ohjevideo_url: form.ohjevideo_url.trim() || null,
       updated_at:    new Date().toISOString(),
+    }
+    if (!editing && !payload.device_number && payload.sijainti) {
+      payload.device_number = await nextDeviceNumber(payload.sijainti)
     }
     const { error } = editing
       ? await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
