@@ -48,8 +48,20 @@ export default function Laiteluettelo() {
     setServiceHistory(data || [])
   }
 
-  function handleChange(e) {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }))
+  async function handleChange(e) {
+    const { name, value } = e.target
+    setForm(f => ({ ...f, [name]: value }))
+    // Kun uusi laite ja sijainti vaihtuu: ehdota seuraavaa laitenumeroa
+    if (name === 'sijainti' && !editing) {
+      const base = value === 'Etu-Lyötty' ? 0 : value === 'Kempele' ? 100 : value === 'linnakangas' ? 200 : null
+      if (base === null) return
+      const { data } = await supabaseAdmin.from('laiteluettelo_items').select('device_number').eq('sijainti', value)
+      const nums = (data || [])
+        .map(r => parseInt(r.device_number, 10))
+        .filter(n => !isNaN(n) && n > base && n < base + 100)
+      const next = String((nums.length ? Math.max(...nums) : base) + 1).padStart(3, '0')
+      setForm(f => ({ ...f, device_number: f.device_number || next }))
+    }
   }
 
   function openEdit(row) {
@@ -86,23 +98,6 @@ export default function Laiteluettelo() {
     setShowModal(true)
   }
 
-  async function nextDeviceNumber(sijainti) {
-    const base = sijainti === 'Etu-Lyötty' ? 0 : sijainti === 'Kempele' ? 100 : sijainti === 'linnakangas' ? 200 : 300
-    try {
-      const { data } = await supabaseAdmin
-        .from('laiteluettelo_items')
-        .select('device_number')
-        .eq('sijainti', sijainti)
-      const nums = (data || [])
-        .map(r => parseInt(r.device_number, 10))
-        .filter(n => !isNaN(n) && n > base && n < base + 100)
-      const max = nums.length ? Math.max(...nums) : base
-      return String(max + 1).padStart(3, '0')
-    } catch {
-      return String(base + 1).padStart(3, '0')
-    }
-  }
-
   async function handleSave() {
     if (!form.name.trim()) return
     setSaving(true)
@@ -120,9 +115,6 @@ export default function Laiteluettelo() {
         device_number: form.device_number.trim() || null,
         ohjevideo_url: form.ohjevideo_url.trim() || null,
         updated_at:    new Date().toISOString(),
-      }
-      if (!editing && !payload.device_number && payload.sijainti) {
-        payload.device_number = await nextDeviceNumber(payload.sijainti)
       }
       const { error } = editing
         ? await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
