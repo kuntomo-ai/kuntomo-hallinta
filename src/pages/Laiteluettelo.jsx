@@ -8,7 +8,7 @@ import Modal from '../components/ui/Modal'
 
 const SIJAINNIT = ['Kaikki', 'linnakangas', 'Etu-Lyötty', 'Kempele']
 
-const empty = { sijainti: '', category: '', name: '', model: '', serial_number: '', price: '', purchase_date: '', notes: '', device_number: '' }
+const empty = { sijainti: '', category: '', name: '', model: '', serial_number: '', price: '', purchase_date: '', notes: '', device_number: '', ohjevideo_url: '' }
 
 export default function Laiteluettelo() {
   const { profile, isAdmin, role } = useAuth()
@@ -64,6 +64,7 @@ export default function Laiteluettelo() {
       purchase_date: row.purchase_date || '',
       notes:         row.notes || '',
       device_number: row.device_number || '',
+      ohjevideo_url: row.ohjevideo_url || '',
     })
     setCopiedUrl(false)
     setServiceRequest(false)
@@ -95,6 +96,7 @@ export default function Laiteluettelo() {
       purchase_date: form.purchase_date.trim() || null,
       notes:         form.notes.trim() || null,
       device_number: form.device_number.trim() || null,
+      ohjevideo_url: form.ohjevideo_url.trim() || null,
       updated_at:    new Date().toISOString(),
     }
     if (editing) {
@@ -388,6 +390,10 @@ export default function Laiteluettelo() {
             <div className="input-group">
               <label className="input-label">Muistiinpanot</label>
               <textarea className="input-field" name="notes" rows={2} value={form.notes} onChange={handleChange} style={{ resize: 'vertical' }} />
+            </div>
+            <div className="input-group">
+              <label className="input-label">Ohjevideo URL</label>
+              <input className="input-field" name="ohjevideo_url" type="url" placeholder="https://youtube.com/watch?v=..." value={form.ohjevideo_url} onChange={handleChange} />
             </div>
 
             {/* ── QR-koodi (only when editing) ────────────────────────────── */}

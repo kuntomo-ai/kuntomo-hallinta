@@ -1,6 +1,7 @@
--- Laiteluettelo: lisää laitenumero
+-- Laiteluettelo: lisää laitenumero ja ohjevideo
 ALTER TABLE laiteluettelo_items
-  ADD COLUMN IF NOT EXISTS device_number TEXT;
+  ADD COLUMN IF NOT EXISTS device_number  TEXT,
+  ADD COLUMN IF NOT EXISTS ohjevideo_url  TEXT;
 
 -- Huoltohistoria: lisää julkisen lomakkeen kentät
 ALTER TABLE laite_huoltohistoria
