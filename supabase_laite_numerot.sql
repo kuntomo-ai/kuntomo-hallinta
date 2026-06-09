@@ -1,7 +1,7 @@
--- Numeroi laitteet sijaintikohtaisilla sarjoilla:
---   Etu-Lyötty  → 001, 002, 003 ...
---   Kempele     → 101, 102, 103 ...
---   Linnakangas → 201, 202, 203 ...
+-- Numeroi laitteet sijaintikohtaisilla sarjoilla (4 merkkiä):
+--   Etu-Lyötty  → 0001, 0002, 0003 ...
+--   Kempele     → 1001, 1002, 1003 ...
+--   Linnakangas → 2001, 2002, 2003 ...
 
 WITH ordered AS (
   SELECT id,
@@ -9,9 +9,9 @@ WITH ordered AS (
       (
         CASE sijainti
           WHEN 'Etu-Lyötty'  THEN 0
-          WHEN 'Kempele'     THEN 100
-          WHEN 'linnakangas' THEN 200
-          ELSE 300
+          WHEN 'Kempele'     THEN 1000
+          WHEN 'linnakangas' THEN 2000
+          ELSE 3000
         END
         +
         ROW_NUMBER() OVER (
@@ -19,7 +19,7 @@ WITH ordered AS (
           ORDER BY name
         )
       )::TEXT,
-      3, '0'
+      4, '0'
     ) AS uusi_numero
   FROM laiteluettelo_items
 )

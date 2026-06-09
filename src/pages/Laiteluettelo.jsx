@@ -52,13 +52,13 @@ export default function Laiteluettelo() {
     const { name, value } = e.target
     const updated = { ...form, [name]: value }
     if (name === 'sijainti' && !editing && !form.device_number) {
-      const base = value === 'Etu-Lyötty' ? 0 : value === 'Kempele' ? 100 : value === 'linnakangas' ? 200 : null
+      const base = value === 'Etu-Lyötty' ? 0 : value === 'Kempele' ? 1000 : value === 'linnakangas' ? 2000 : null
       if (base !== null) {
         const nums = rows
           .filter(r => r.sijainti === value)
           .map(r => parseInt(r.device_number, 10))
-          .filter(n => !isNaN(n) && n > base && n < base + 100)
-        updated.device_number = String((nums.length ? Math.max(...nums) : base) + 1).padStart(3, '0')
+          .filter(n => !isNaN(n) && n > base && n < base + 1000)
+        updated.device_number = String((nums.length ? Math.max(...nums) : base) + 1).padStart(4, '0')
       }
     }
     setForm(updated)
