@@ -23,6 +23,7 @@ export default function Laiteluettelo() {
   const [editingDeviceName, setEditingDeviceName] = useState('')
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const [copiedUrl, setCopiedUrl] = useState(false)
 
@@ -86,6 +87,7 @@ export default function Laiteluettelo() {
   async function handleSave() {
     if (!form.name.trim()) return
     setSaving(true)
+    setSaveError('')
     const payload = {
       sijainti:      form.sijainti.trim() || null,
       category:      form.category.trim() || null,
@@ -99,12 +101,14 @@ export default function Laiteluettelo() {
       ohjevideo_url: form.ohjevideo_url.trim() || null,
       updated_at:    new Date().toISOString(),
     }
-    if (editing) {
-      await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
-    } else {
-      await supabaseAdmin.from('laiteluettelo_items').insert(payload)
-    }
+    const { error } = editing
+      ? await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
+      : await supabaseAdmin.from('laiteluettelo_items').insert(payload)
     setSaving(false)
+    if (error) {
+      setSaveError(`Tallennus epäonnistui: ${error.message}`)
+      return
+    }
     setShowModal(false)
     setEditing(null)
     setForm(empty)
@@ -338,6 +342,11 @@ export default function Laiteluettelo() {
           wide
           footer={
             <>
+              {saveError && (
+                <div style={{ flex: 1, fontSize: '.78rem', color: 'var(--red)', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius)', padding: '.4rem .7rem' }}>
+                  ⚠️ {saveError}
+                </div>
+              )}
               <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Peruuta</button>
               <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
                 {saving ? 'Tallennetaan...' : 'Tallenna'}
@@ -393,7 +402,7 @@ export default function Laiteluettelo() {
             </div>
             <div className="input-group">
               <label className="input-label">Ohjevideo URL</label>
-              <input className="input-field" name="ohjevideo_url" type="url" placeholder="https://youtube.com/watch?v=..." value={form.ohjevideo_url} onChange={handleChange} />
+              <input className="input-field" name="ohjevideo_url" type="text" placeholder="https://youtube.com/watch?v=..." value={form.ohjevideo_url} onChange={handleChange} />
             </div>
 
             {/* ── QR-koodi (only when editing) ────────────────────────────── */}
