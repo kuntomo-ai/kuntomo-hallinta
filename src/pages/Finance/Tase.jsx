@@ -108,10 +108,13 @@ function DonutChart({ title, data, total }) {
 }
 
 function OmavaraisuusGauge({ pct }) {
-  const color = pct >= 40 ? '#16A34A' : pct >= 20 ? '#D97706' : '#DC2626'
-  const label = pct >= 40 ? 'Hyvä' : pct >= 20 ? 'Tyydyttävä' : 'Heikko'
+  const { color, label, desc } =
+    pct >= 50 ? { color: '#16A34A', label: 'Erinomainen', desc: 'Yritys on hyvin vakavarainen ja kestää suuriakin riskejä.' }
+    : pct >= 35 ? { color: '#2563EB', label: 'Hyvä',        desc: 'Liiketoiminta on vakaalla pohjalla ja yritys on luotettava kumppani.' }
+    : pct >= 20 ? { color: '#D97706', label: 'Tyydyttävä',  desc: 'Ulkopuolisen rahoituksen osuus on merkittävä ja vaatii tarkkaa kassanhallintaa.' }
+    :             { color: '#DC2626', label: 'Heikko',      desc: 'Vaatii toimenpiteitä, sillä yhtiö on altis ylivelkaantumiselle.' }
   return (
-    <div className="card" style={{ padding: '1.25rem', flex: '0 0 auto', minWidth: 200 }}>
+    <div className="card" style={{ padding: '1.25rem', flex: '0 0 auto', minWidth: 220 }}>
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.88rem', marginBottom: '1rem' }}>Omavaraisuusaste</div>
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '2.5rem', fontWeight: 900, color, lineHeight: 1 }}>{pct.toFixed(1)} %</div>
@@ -119,12 +122,15 @@ function OmavaraisuusGauge({ pct }) {
           <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color, borderRadius: 6, transition: 'width .6s' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.65rem', color: 'var(--text3)', marginTop: '.25rem' }}>
-          <span>0 %</span><span>20 %</span><span>40 %</span><span>100 %</span>
+          <span>0 %</span><span>20 %</span><span>35 %</span><span>50 %</span><span>100 %</span>
         </div>
         <div style={{ marginTop: '.6rem', fontSize: '.78rem', fontWeight: 700, color, background: `color-mix(in srgb, ${color} 12%, var(--bg1))`, borderRadius: 6, padding: '.3rem .75rem', display: 'inline-block' }}>
           {label}
         </div>
-        <div style={{ fontSize: '.7rem', color: 'var(--text3)', marginTop: '.5rem' }}>
+        <div style={{ fontSize: '.72rem', color: 'var(--text2)', marginTop: '.6rem', lineHeight: 1.45, textAlign: 'left' }}>
+          {desc}
+        </div>
+        <div style={{ fontSize: '.7rem', color: 'var(--text3)', marginTop: '.5rem', borderTop: '1px solid var(--border)', paddingTop: '.5rem' }}>
           Oma pääoma / Vastaavaa yhteensä
         </div>
       </div>
