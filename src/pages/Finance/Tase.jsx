@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { supabase, supabaseAdmin } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
@@ -26,6 +27,21 @@ const SECTIONS = {
   ],
 }
 
+const ASSET_COLORS = {
+  aineettomat: '#7C3AED',
+  aineelliset: '#2563EB',
+  sijoitukset: '#0891B2',
+  vaihto:      '#D97706',
+  saamiset:    '#EA580C',
+  rahat:       '#16A34A',
+}
+
+const LIAB_COLORS = {
+  oma_paaoma:  '#16A34A',
+  vieras_pit:  '#DC2626',
+  vieras_lyh:  '#F97316',
+}
+
 function fmt(v, sign = false) {
   if (v == null) return '—'
   const n = Number(v)
@@ -39,6 +55,81 @@ function fmtChange(v) {
   const n = Number(v)
   const s = Math.abs(n).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return <span style={{ color: n > 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{n > 0 ? '+' : '-'}{s} €</span>
+}
+
+function EuroTip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const { name, value } = payload[0]
+  return (
+    <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '.5rem .8rem', fontSize: '.78rem' }}>
+      <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '.2rem' }}>{name}</div>
+      <div style={{ color: payload[0].payload.fill }}>{fmt(value)}</div>
+    </div>
+  )
+}
+
+function DonutChart({ title, data, total }) {
+  return (
+    <div className="card" style={{ padding: '1.25rem', flex: 1, minWidth: 260 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.88rem', marginBottom: '.75rem' }}>{title}</div>
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="45%"
+            innerRadius="52%"
+            outerRadius="75%"
+            paddingAngle={2}
+            dataKey="value"
+          >
+            {data.map((entry, i) => (
+              <Cell key={i} fill={entry.fill} />
+            ))}
+          </Pie>
+          <Tooltip content={<EuroTip />} />
+          <Legend
+            wrapperStyle={{ fontSize: '.72rem', paddingTop: '.5rem' }}
+            formatter={(value, entry) => (
+              <span style={{ color: 'var(--text2)' }}>
+                {value} <span style={{ color: 'var(--text3)' }}>
+                  {total > 0 ? `${((entry.payload.value / total) * 100).toFixed(0)} %` : ''}
+                </span>
+              </span>
+            )}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+      <div style={{ textAlign: 'center', fontSize: '.75rem', color: 'var(--text3)', marginTop: '.25rem' }}>
+        Yhteensä <strong style={{ color: 'var(--text)' }}>{fmt(total)}</strong>
+      </div>
+    </div>
+  )
+}
+
+function OmavaraisuusGauge({ pct }) {
+  const color = pct >= 40 ? '#16A34A' : pct >= 20 ? '#D97706' : '#DC2626'
+  const label = pct >= 40 ? 'Hyvä' : pct >= 20 ? 'Tyydyttävä' : 'Heikko'
+  return (
+    <div className="card" style={{ padding: '1.25rem', flex: '0 0 auto', minWidth: 200 }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.88rem', marginBottom: '1rem' }}>Omavaraisuusaste</div>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '2.5rem', fontWeight: 900, color, lineHeight: 1 }}>{pct.toFixed(1)} %</div>
+        <div style={{ marginTop: '.65rem', height: 10, background: 'var(--bg2)', borderRadius: 6, overflow: 'hidden' }}>
+          <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: color, borderRadius: 6, transition: 'width .6s' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.65rem', color: 'var(--text3)', marginTop: '.25rem' }}>
+          <span>0 %</span><span>20 %</span><span>40 %</span><span>100 %</span>
+        </div>
+        <div style={{ marginTop: '.6rem', fontSize: '.78rem', fontWeight: 700, color, background: `color-mix(in srgb, ${color} 12%, var(--bg1))`, borderRadius: 6, padding: '.3rem .75rem', display: 'inline-block' }}>
+          {label}
+        </div>
+        <div style={{ fontSize: '.7rem', color: 'var(--text3)', marginTop: '.5rem' }}>
+          Oma pääoma / Vastaavaa yhteensä
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function SubSection({ title, rows }) {
@@ -79,7 +170,6 @@ function Side({ title, sections, rows, total }) {
       <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.1rem', letterSpacing: '.06em', marginBottom: '1rem', color: 'var(--violet)', textTransform: 'uppercase' }}>
         {title}
       </div>
-      {/* Column headers */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '0.5rem', padding: '4px 12px', fontSize: '.7rem', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '1px solid var(--border)', marginBottom: '0.75rem' }}>
         <div>Tili</div>
         <div style={{ textAlign: 'right' }}>Alkusaldo</div>
@@ -100,11 +190,7 @@ function Side({ title, sections, rows, total }) {
               <span style={{ fontWeight: 800, fontSize: '.9rem' }}>{fmt(secTotal)}</span>
             </div>
             {sec.subs.map(sub => (
-              <SubSection
-                key={sub.key}
-                title={sub.label}
-                rows={rows.filter(r => r.sub_section === sub.key)}
-              />
+              <SubSection key={sub.key} title={sub.label} rows={rows.filter(r => r.sub_section === sub.key)} />
             ))}
           </div>
         )
@@ -134,11 +220,31 @@ export default function Tase() {
     setLoading(false)
   }
 
-  const vastaavaaRows = rows.filter(r => r.side === 'vastaavaa')
+  const vastaavaaRows   = rows.filter(r => r.side === 'vastaavaa')
   const vastattavaaRows = rows.filter(r => r.side === 'vastattavaa')
-  const vastaavaaTotal = vastaavaaRows.reduce((s, r) => s + (r.loppusaldo || 0), 0)
+  const vastaavaaTotal  = vastaavaaRows.reduce((s, r) => s + (r.loppusaldo || 0), 0)
   const vastattavaaTotal = vastattavaaRows.reduce((s, r) => s + (r.loppusaldo || 0), 0)
   const balanced = Math.abs(vastaavaaTotal - vastattavaaTotal) < 0.1
+
+  const subTotal = (key) => rows.filter(r => r.sub_section === key).reduce((s, r) => s + (r.loppusaldo || 0), 0)
+
+  const assetData = [
+    { name: 'Aineettomat hyödykkeet', value: subTotal('aineettomat'), fill: ASSET_COLORS.aineettomat },
+    { name: 'Aineelliset hyödykkeet', value: subTotal('aineelliset'), fill: ASSET_COLORS.aineelliset },
+    { name: 'Sijoitukset',            value: subTotal('sijoitukset'), fill: ASSET_COLORS.sijoitukset },
+    { name: 'Vaihto-omaisuus',        value: subTotal('vaihto'),      fill: ASSET_COLORS.vaihto      },
+    { name: 'Saamiset',               value: subTotal('saamiset'),    fill: ASSET_COLORS.saamiset    },
+    { name: 'Rahat ja pankkisaamiset',value: subTotal('rahat'),       fill: ASSET_COLORS.rahat       },
+  ].filter(d => d.value > 0)
+
+  const liabData = [
+    { name: 'Oma pääoma',                  value: subTotal('oma_paaoma'),  fill: LIAB_COLORS.oma_paaoma  },
+    { name: 'Pitkäaikainen vieras pääoma', value: subTotal('vieras_pit'),  fill: LIAB_COLORS.vieras_pit  },
+    { name: 'Lyhytaikainen vieras pääoma', value: subTotal('vieras_lyh'),  fill: LIAB_COLORS.vieras_lyh  },
+  ].filter(d => d.value > 0)
+
+  const omaPaaoma = subTotal('oma_paaoma')
+  const omavaraisuus = vastaavaaTotal > 0 ? (omaPaaoma / vastaavaaTotal) * 100 : 0
 
   return (
     <div>
@@ -148,7 +254,7 @@ export default function Tase() {
         <div className="page-header-left">
           <h1 className="page-title">Tase</h1>
           <p className="page-subtitle">
-            {period ? `30.4.2026 loppusaldo · tilikausi 1.5.2025–30.4.2026` : 'Vastaavaa ja vastattavaa'}
+            {period ? `${period} loppusaldo` : 'Vastaavaa ja vastattavaa'}
           </p>
         </div>
         {!loading && (
@@ -173,48 +279,45 @@ export default function Tase() {
         </div>
       ) : (
         <>
-          {/* Summary cards */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', marginBottom: '2rem' }}>
+          {/* KPI-kortit */}
+          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))', marginBottom: '1.5rem' }}>
             <div className="stat-card">
               <div className="stat-label">Vastaavaa yhteensä</div>
               <div className="stat-value gold">{fmt(vastaavaaTotal)}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Oma pääoma</div>
-              <div className="stat-value" style={{ color: 'var(--green)' }}>
-                {fmt(vastattavaaRows.filter(r => r.sub_section === 'oma_paaoma').reduce((s, r) => s + (r.loppusaldo || 0), 0))}
-              </div>
+              <div className="stat-value" style={{ color: 'var(--green)' }}>{fmt(omaPaaoma)}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Rahat & pankkisaamiset</div>
-              <div className="stat-value">
-                {fmt(vastaavaaRows.filter(r => r.sub_section === 'rahat').reduce((s, r) => s + (r.loppusaldo || 0), 0))}
-              </div>
+              <div className="stat-value">{fmt(subTotal('rahat'))}</div>
             </div>
             <div className="stat-card">
               <div className="stat-label">Vieras pääoma yht.</div>
               <div className="stat-value" style={{ color: 'var(--red)' }}>
-                {fmt(vastattavaaRows.filter(r => r.sub_section?.startsWith('vieras')).reduce((s, r) => s + (r.loppusaldo || 0), 0))}
+                {fmt(subTotal('vieras_pit') + subTotal('vieras_lyh'))}
               </div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Saamiset</div>
+              <div className="stat-value">{fmt(subTotal('saamiset'))}</div>
             </div>
           </div>
 
-          {/* Balance sheet two-column layout */}
+          {/* Graafit */}
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            <DonutChart title="Varojen rakenne (vastaavaa)" data={assetData} total={vastaavaaTotal} />
+            <DonutChart title="Rahoitusrakenne (vastattavaa)" data={liabData} total={vastattavaaTotal} />
+            <OmavaraisuusGauge pct={omavaraisuus} />
+          </div>
+
+          {/* Taulukkotase */}
           <div className="card" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
-              <Side
-                title="Vastaavaa"
-                sections={SECTIONS.vastaavaa}
-                rows={vastaavaaRows}
-                total={vastaavaaTotal}
-              />
+              <Side title="Vastaavaa" sections={SECTIONS.vastaavaa} rows={vastaavaaRows} total={vastaavaaTotal} />
               <div style={{ width: 1, background: 'var(--border)', flexShrink: 0 }} />
-              <Side
-                title="Vastattavaa"
-                sections={SECTIONS.vastattavaa}
-                rows={vastattavaaRows}
-                total={vastattavaaTotal}
-              />
+              <Side title="Vastattavaa" sections={SECTIONS.vastattavaa} rows={vastattavaaRows} total={vastattavaaTotal} />
             </div>
           </div>
         </>
