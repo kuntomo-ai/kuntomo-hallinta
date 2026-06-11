@@ -17,6 +17,7 @@ function syncIdCounter(data) {
     inv.expenses?.forEach(e    => { if (e.id  > _id) _id = e.id  })
     inv.memberships?.forEach(m => { if (m.id  > _id) _id = m.id  })
     inv.otherRevs?.forEach(r   => { if (r.id  > _id) _id = r.id  })
+    inv.savings?.forEach(s     => { if (s.id  > _id) _id = s.id  })
   })
 }
 
@@ -59,13 +60,14 @@ function withGrowth(base, pct, monthIdx) {
   return base * Math.pow(1 + pct / 100, Math.floor(monthIdx / 12))
 }
 
-function calcMonths(expenses, memberships, otherRevs, horisontti) {
+function calcMonths(expenses, memberships, otherRevs, savings, horisontti) {
   let cum = 0
   return Array.from({ length: horisontti }, (_, i) => {
     const menot      = expenses.reduce((s, e) => s + itemAmount(e, i), 0)
     const jasenTulot = memberships.reduce((s, m) => s + withGrowth(memberMonthly(m), m.growthPct, i), 0)
     const muutTulot  = otherRevs.reduce((s, r) => s + itemAmount(r, i), 0)
-    const tulot      = jasenTulot + muutTulot
+    const saastot    = savings.reduce((s, r) => s + itemAmount(r, i), 0)
+    const tulot      = jasenTulot + muutTulot + saastot
     const netto      = tulot - menot
     cum += netto
     return {
@@ -75,6 +77,7 @@ function calcMonths(expenses, memberships, otherRevs, horisontti) {
       menot:          Math.round(menot),
       netto:          Math.round(netto),
       kumulatiivinen: Math.round(cum),
+      saastot:        Math.round(saastot),
     }
   })
 }
@@ -100,6 +103,11 @@ const DEF_OTHER_REVS = [
   { label: 'Lisäravinnemyynti', amount:  800, growthPct: 5, type: 'kk', startMonth: 1 },
 ]
 
+const DEF_SAVINGS = [
+  { label: 'Energiasäästö (LED, pumput)', amount: 150, growthPct: 0, type: 'kk', startMonth: 1 },
+  { label: 'Laitteiden tuottoarvo',       amount: 300, growthPct: 2, type: 'kk', startMonth: 1 },
+]
+
 function makeInvestment(n) {
   return {
     id:          nid(),
@@ -108,6 +116,7 @@ function makeInvestment(n) {
     expenses:    DEF_EXPENSES.map(e => ({ ...e, id: nid() })),
     memberships: DEF_MEMBERSHIPS.map(m => ({ ...m, id: nid() })),
     otherRevs:   DEF_OTHER_REVS.map(r => ({ ...r, id: nid() })),
+    savings:     DEF_SAVINGS.map(s => ({ ...s, id: nid() })),
   }
 }
 
@@ -438,9 +447,17 @@ export default function Investoinnit() {
   const removeOtherRev = id =>
     patch({ otherRevs: inv.otherRevs.filter(r => r.id !== id) })
 
+  const savings = inv.savings ?? []
+  const updateSaving = (id, field, val) =>
+    patch({ savings: savings.map(s => s.id === id ? { ...s, [field]: val } : s) })
+  const addSaving = () =>
+    patch({ savings: [...savings, { id: nid(), label: 'Uusi säästö / tuotto', amount: 0, growthPct: 0, type: 'kk', startMonth: 1 }] })
+  const removeSaving = id =>
+    patch({ savings: savings.filter(s => s.id !== id) })
+
   // ── Projections ──────────────────────────────────────────────────────────
   const months = useMemo(
-    () => calcMonths(inv.expenses, inv.memberships, inv.otherRevs, inv.horisontti),
+    () => calcMonths(inv.expenses, inv.memberships, inv.otherRevs, inv.savings ?? [], inv.horisontti),
     [inv],
   )
 
@@ -470,6 +487,7 @@ export default function Investoinnit() {
   const expenseM1   = inv.expenses.reduce((s, e) => s + itemAmount(e, 0), 0)
   const memberM1    = inv.memberships.reduce((s, m) => s + memberMonthly(m), 0)
   const otherRevM1  = inv.otherRevs.reduce((s, r) => s + itemAmount(r, 0), 0)
+  const savingM1    = savings.reduce((s, r) => s + itemAmount(r, 0), 0)
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text3)' }}>
@@ -625,6 +643,27 @@ export default function Investoinnit() {
             <RowTotal label="Muut tulot kk 1 yhteensä" value={fmt(otherRevM1)} />
           </div>
 
+          {/* Säästö / tuotto */}
+          <div className="card" style={{ padding: '1rem', borderLeft: '3px solid #00b894' }}>
+            <SectionLabel>Säästö / tuotto</SectionLabel>
+            <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginBottom: '.65rem', lineHeight: 1.45 }}>
+              Kirjaa investoinnin tuomat säästöt tai lisätuotot — esim. energiasäästöt, laitteiden tuotto tai kulujen pieneneminen. Nämä lasketaan mukaan tuloihin.
+            </div>
+            <ItemRowHeader />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+              {savings.map(s => (
+                <ItemRow key={s.id} item={s} maxMonth={inv.horisontti}
+                  onUpdate={(f, v) => updateSaving(s.id, f, v)}
+                  onDelete={() => removeSaving(s.id)} />
+              ))}
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={addSaving}
+              style={{ marginTop: '.6rem', width: '100%', justifyContent: 'center', gap: '.3rem', color: '#00b894', borderColor: '#00b89440' }}>
+              <Plus size={13} /> Lisää säästö / tuotto
+            </button>
+            <RowTotal label="Säästöt / tuotot kk 1 yhteensä" value={fmt(savingM1)} />
+          </div>
+
         </div>
 
         {/* ── Right panel ──────────────────────────────────────────────────── */}
@@ -695,7 +734,7 @@ export default function Investoinnit() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.78rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    {['Kk', 'Tulot', 'Menot', 'Netto', 'Kumulatiivinen'].map(h => (
+                    {['Kk', 'Tulot', 'josta säästöt', 'Menot', 'Netto', 'Kumulatiivinen'].map(h => (
                       <th key={h} style={{
                         padding: '.4rem .6rem', textAlign: h === 'Kk' ? 'left' : 'right',
                         color: 'var(--text3)', fontSize: '.68rem', fontWeight: 700,
@@ -714,6 +753,9 @@ export default function Investoinnit() {
                     }}>
                       <td style={{ padding: '.32rem .6rem', color: 'var(--text2)' }}>{m.label}</td>
                       <td style={{ padding: '.32rem .6rem', textAlign: 'right', color: '#00b894', fontWeight: 500 }}>{fmt(m.tulot)}</td>
+                      <td style={{ padding: '.32rem .6rem', textAlign: 'right', color: '#00b894', fontWeight: 400, opacity: .7, fontSize: '.72rem' }}>
+                        {m.saastot > 0 ? fmt(m.saastot) : '—'}
+                      </td>
                       <td style={{ padding: '.32rem .6rem', textAlign: 'right', color: '#d63031', fontWeight: 500 }}>{fmt(m.menot)}</td>
                       <td style={{ padding: '.32rem .6rem', textAlign: 'right', fontWeight: 600,
                         color: m.netto >= 0 ? '#00b894' : '#d63031' }}>{fmt(m.netto)}</td>
