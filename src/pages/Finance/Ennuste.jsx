@@ -354,8 +354,20 @@ export default function Ennuste() {
   const [loans,     setLoans]     = useState([])
   const [tab,       setTab]       = useState('t2')
   const [loading,   setLoading]   = useState(true)
+  const [history,   setHistory]   = useState([]) // undo stack: array of manual snapshots
 
   useEffect(() => { loadAll() }, [])
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        handleUndo()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  })
 
   async function loadAll() {
     const [{ data: months }, { data: params }, { data: lns }] = await Promise.all([
@@ -392,6 +404,8 @@ export default function Ennuste() {
   const r = { e1: resolve('e1'), e2: resolve('e2'), e3: resolve('e3') }
 
   async function saveCell(p, key, value) {
+    setHistory(h => [...h.slice(-29), manual]) // max 30 steps
+
     const nm = { ...manual, [p]: { ...manual[p] } }
     if (value === null) delete nm[p][key]; else nm[p][key] = value
     setManual(nm)
@@ -399,6 +413,23 @@ export default function Ennuste() {
     const row = { period: p }
     for (const k of ALL_KEYS) row[k] = nm[p][k] ?? null
     await supabaseAdmin.from('ennuste_params').upsert(row, { onConflict: 'period' })
+  }
+
+  async function handleUndo() {
+    setHistory(h => {
+      if (!h.length) return h
+      const prev = h[h.length - 1]
+      setManual(prev)
+      // Persist all three periods to DB
+      Promise.all(
+        PERIODS.map(p => {
+          const row = { period: p }
+          for (const k of ALL_KEYS) row[k] = prev[p]?.[k] ?? null
+          return supabaseAdmin.from('ennuste_params').upsert(row, { onConflict: 'period' })
+        })
+      )
+      return h.slice(0, -1)
+    })
   }
 
   const chartData = [
@@ -482,16 +513,33 @@ export default function Ennuste() {
           <h1 className="page-title">Ennuste</h1>
           <p className="page-subtitle">Tulossuunnitelma · Rahoitussuunnitelma · Lainat</p>
         </div>
-        {growth !== 0 && (
-          <div style={{
-            padding: '6px 14px', borderRadius: 20, fontSize: '.78rem', fontWeight: 700,
-            background: growth > 0 ? 'color-mix(in srgb, var(--green) 12%, var(--bg1))' : 'color-mix(in srgb, var(--red) 12%, var(--bg1))',
-            color: growth > 0 ? 'var(--green)' : 'var(--red)',
-            border: `1px solid ${growth > 0 ? 'var(--green)' : 'var(--red)'}`,
-          }}>
-            Arvioitu kasvu {growth > 0 ? '+' : ''}{growth} %/v (historiadatasta)
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={handleUndo}
+            disabled={history.length === 0}
+            title="Kumoa viimeisin muutos (⌘Z)"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '6px 12px', borderRadius: 8, fontSize: '.78rem', fontWeight: 600,
+              border: '1px solid var(--border)', cursor: history.length ? 'pointer' : 'not-allowed',
+              background: history.length ? 'var(--bg)' : 'var(--bg2)',
+              color: history.length ? 'var(--text2)' : 'var(--text3)',
+              transition: 'background .15s',
+            }}
+          >
+            ↩ Kumoa{history.length > 0 ? ` (${history.length})` : ''}
+          </button>
+          {growth !== 0 && (
+            <div style={{
+              padding: '6px 14px', borderRadius: 20, fontSize: '.78rem', fontWeight: 700,
+              background: growth > 0 ? 'color-mix(in srgb, var(--green) 12%, var(--bg1))' : 'color-mix(in srgb, var(--red) 12%, var(--bg1))',
+              color: growth > 0 ? 'var(--green)' : 'var(--red)',
+              border: `1px solid ${growth > 0 ? 'var(--green)' : 'var(--red)'}`,
+            }}>
+              Arvioitu kasvu {growth > 0 ? '+' : ''}{growth} %/v (historiadatasta)
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Yhteenveto-kaavio */}
