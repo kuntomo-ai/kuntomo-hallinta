@@ -161,7 +161,6 @@ export default function Lahjakortit() {
     const prevNotes = saleRow.notes ? saleRow.notes + ' | ' : ''
     const { error } = await supabaseAdmin.from('lahjakortit').update({
       used_amount: newUsed,
-      used_date: saleDate,
       notes: prevNotes + noteAppend,
     }).eq('id', saleRow.id)
     setSaleSaving(false)
