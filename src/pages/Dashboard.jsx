@@ -489,7 +489,19 @@ export default function Dashboard() {
     }
 
     const results = await Promise.all(baseFetches)
-    setTasks(results[0].data || [])
+    const rawTasks = results[0].data || []
+    if (isAdmin) {
+      setTasks(rawTasks)
+    } else {
+      const myEmail = profile?.email || ''
+      const myRole  = role || ''
+      setTasks(rawTasks.filter(r => {
+        const at = (r.assigned_to || '').trim()
+        if (!at) return true
+        const parts = at.split(',').map(s => s.trim())
+        return at === myEmail || at === empName || parts.some(p => p === myRole)
+      }))
+    }
     const allEvents = results[1].data || []
     setEvents(allEvents.filter(e => {
       if (isAdmin || isHallitus) return true
