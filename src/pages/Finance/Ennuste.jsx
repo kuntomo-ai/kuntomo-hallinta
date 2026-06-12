@@ -230,7 +230,7 @@ function T4Tab({ r, manual, auto, saveCell }) {
 
 const EMPTY_LOAN = { luotonantaja: '', lainamaara: 0, laina_aika_v: 5, korko_pct: 0, is_new: false, sort_order: 0 }
 
-function T7Tab({ loans, setLoans }) {
+function T7Tab({ loans, setLoans, taseLoans }) {
   const [editId, setEditId] = useState(null)
   const [form, setForm]     = useState(EMPTY_LOAN)
 
@@ -246,8 +246,8 @@ function T7Tab({ loans, setLoans }) {
     />
   )
 
-  async function addLoan(isNew) {
-    const row = { ...EMPTY_LOAN, is_new: isNew, sort_order: loans.length }
+  async function addLoan(isNew, prefill = {}) {
+    const row = { ...EMPTY_LOAN, ...prefill, is_new: isNew, sort_order: loans.length }
     const { data, error } = await supabaseAdmin.from('ennuste_lainat').insert(row).select().single()
     if (!error && data) { setLoans(ls => [...ls, data]); setEditId(data.id); setForm(data) }
   }
@@ -338,10 +338,70 @@ function T7Tab({ loans, setLoans }) {
     )
   }
 
+  // Kirjanpidosta haetut lainat (read-only)
+  const taseTotal = taseLoans.reduce((s, l) => s + (l.loppusaldo || 0), 0)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <Section title="Nykyiset lainat" lns={current}  isNew={false} />
-      <Section title="Uudet lainat"    lns={newLoans} isNew={true}  />
+
+      {/* Kirjanpidosta haetut lainat */}
+      {taseLoans.length > 0 && (
+        <div className="card" style={{ overflow: 'auto', borderLeft: '3px solid var(--violet)' }}>
+          <div style={{ padding: '1rem 1rem .5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.9rem' }}>Nykyiset lainat</span>
+              <span style={{ marginLeft: '.6rem', fontSize: '.72rem', fontWeight: 600, color: 'var(--violet)', background: 'color-mix(in srgb, var(--violet) 10%, var(--bg1))', padding: '.2rem .55rem', borderRadius: 10 }}>
+                Kirjanpidosta (tase)
+              </span>
+            </div>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                {['Tili', 'Nimi', 'Saldo (€)', 'Tyyppi', ''].map((h, i) => (
+                  <th key={i} style={{ textAlign: i >= 2 && i <= 3 ? 'right' : 'left', padding: '7px 10px', fontSize: '.78rem', fontWeight: 700 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {taseLoans.map(r => (
+                <tr key={r.account_code} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 10px', fontSize: '.75rem', fontFamily: 'monospace', color: 'var(--text3)' }}>{r.account_code}</td>
+                  <td style={{ padding: '6px 10px', fontSize: '.82rem' }}>{r.account_name}</td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '.82rem', fontWeight: 600, color: r.loppusaldo < 0 ? 'var(--red)' : 'var(--text)' }}>
+                    {Math.abs(r.loppusaldo).toLocaleString('fi-FI', { maximumFractionDigits: 2 })} €
+                  </td>
+                  <td style={{ padding: '6px 10px', textAlign: 'right', fontSize: '.72rem', color: 'var(--text3)' }}>
+                    {r.sub_section === 'vieras_pit' ? 'Pitkäaikainen' : 'Lyhytaikainen'}
+                  </td>
+                  <td style={{ padding: '6px 10px' }}>
+                    <button
+                      onClick={() => addLoan(false, { luotonantaja: r.account_name, lainamaara: Math.abs(r.loppusaldo) })}
+                      title="Lisää muokattavaksi"
+                      style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 5, padding: '2px 8px', cursor: 'pointer', fontSize: '.72rem', color: 'var(--text2)', whiteSpace: 'nowrap' }}
+                    >
+                      + Muokkaa
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              <tr style={{ background: 'var(--bg2)', fontWeight: 800, borderTop: '2px solid var(--border)' }}>
+                <td colSpan={2} style={{ padding: '6px 10px', fontSize: '.8rem' }}>Yhteensä</td>
+                <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '.8rem' }}>
+                  {taseTotal.toLocaleString('fi-FI', { maximumFractionDigits: 2 })} €
+                </td>
+                <td /><td />
+              </tr>
+            </tbody>
+          </table>
+          <p style={{ margin: 0, padding: '.5rem 1rem', fontSize: '.7rem', color: 'var(--text3)', borderTop: '1px solid var(--border)' }}>
+            Haettu automaattisesti viimeisimmästä tase-snapshotista. Paina "+ Muokkaa" lisätäksesi laina-ajan ja koron.
+          </p>
+        </div>
+      )}
+
+      <Section title="Muokattavat lainat (nykyiset)" lns={current}  isNew={false} />
+      <Section title="Uudet lainat"                  lns={newLoans} isNew={true}  />
     </div>
   )
 }
@@ -352,6 +412,7 @@ export default function Ennuste() {
   const [monthData, setMonthData] = useState([])
   const [manual,    setManual]    = useState({ e1: {}, e2: {}, e3: {} })
   const [loans,     setLoans]     = useState([])
+  const [taseLoans, setTaseLoans] = useState([])
   const [tab,       setTab]       = useState('t2')
   const [loading,   setLoading]   = useState(true)
   const [history,   setHistory]   = useState([]) // undo stack: array of manual snapshots
@@ -370,13 +431,20 @@ export default function Ennuste() {
   })
 
   async function loadAll() {
-    const [{ data: months }, { data: params }, { data: lns }] = await Promise.all([
+    const [{ data: months }, { data: params }, { data: lns }, { data: tase }] = await Promise.all([
       supabaseAdmin
         .from('tulos_kuukausiraportti')
         .select('period, liikevaihto, muut_tuotot, materiaalit_palvelut, henkilostokulut, muut_kulut, poistot')
         .order('period'),
       supabaseAdmin.from('ennuste_params').select('*'),
       supabaseAdmin.from('ennuste_lainat').select('*').order('sort_order').order('created_at'),
+      supabaseAdmin
+        .from('tase_snapshot')
+        .select('account_code, account_name, sub_section, loppusaldo')
+        .in('sub_section', ['vieras_pit', 'vieras_lyh'])
+        .not('account_code', 'is', null)
+        .order('sub_section')
+        .order('account_code'),
     ])
     setMonthData(months || [])
 
@@ -389,6 +457,14 @@ export default function Ennuste() {
     }
     setManual(m)
     setLoans(lns || [])
+
+    // Suodata vain rahoituslainat (tilit 262x = pit. lainat, 282x = lyhennyserät)
+    const loanAccounts = (tase || []).filter(r =>
+      r.loppusaldo !== 0 &&
+      (r.account_code.startsWith('262') || r.account_code.startsWith('282'))
+    )
+    setTaseLoans(loanAccounts)
+
     setLoading(false)
   }
 
@@ -615,7 +691,7 @@ export default function Ennuste() {
       )}
 
       {tab === 't4' && <T4Tab r={r} manual={manual} auto={auto} saveCell={saveCell} />}
-      {tab === 't7' && <T7Tab loans={loans} setLoans={setLoans} />}
+      {tab === 't7' && <T7Tab loans={loans} setLoans={setLoans} taseLoans={taseLoans} />}
     </div>
   )
 }
