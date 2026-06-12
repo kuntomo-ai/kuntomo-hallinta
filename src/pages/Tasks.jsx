@@ -65,11 +65,11 @@ export default function Tasks() {
     let assignedTo = form.assigned_to.trim() || null
     if (isAdmin) {
       if (assignType === 'self') {
-        assignedTo = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || profile?.email || null
+        assignedTo = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || profile?.email || 'admin'
       } else if (assignType === 'person') {
-        assignedTo = selectedPerson || null
+        assignedTo = selectedPerson || 'admin'
       } else if (assignType === 'role') {
-        assignedTo = selectedRoles.length > 0 ? selectedRoles.join(', ') : null
+        assignedTo = selectedRoles.length > 0 ? selectedRoles.join(', ') : 'admin'
       }
     }
 

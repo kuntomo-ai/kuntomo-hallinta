@@ -68,7 +68,7 @@ function calcValues(inp) {
   return { ...inp, tuotot_yht, kayttokate, liiketulos, nettotulos, kokonaistulos }
 }
 
-function deriveAuto(monthRows) {
+function deriveAuto(monthRows, taseLoans = []) {
   const sorted = [...monthRows].sort((a, b) => b.period.localeCompare(a.period)).slice(0, 12)
   if (!sorted.length) return { actuals: {}, auto: { e1: {}, e2: {}, e3: {} }, growth: 0 }
 
@@ -83,8 +83,21 @@ function deriveAuto(monthRows) {
     muut_kulut:           Math.round(sumAbs('muut_kulut')),
     varasto_muutos:       0,
     poistot:              Math.round(sumAbs('poistot')),
-    rahoitustuotot: 0, korkokulut: 0, verot: 0, satunnaiset_erat: 0,
+    rahoitustuotot: 0, verot: 0, satunnaiset_erat: 0,
   }
+
+  // Derive korkokulut+verot from difference: tilikauden_voitto vs computed liiketulos
+  const compLiiketulos = (act.liikevaihto + act.muut_tuotot)
+    - act.materiaalit_palvelut - act.henkilostokulut - act.muut_kulut - act.poistot
+  const sumTilik  = Math.round(sumPos('tilikauden_voitto'))
+  const netBelow  = sumTilik - compLiiketulos
+  act.korkokulut  = Math.round(Math.max(0, -netBelow))
+
+  // T4: annual loan repayment from tase 282x (lyhennyserät)
+  const annualLyhennys = Math.round(
+    taseLoans.filter(l => l.account_code?.startsWith('282'))
+      .reduce((s, l) => s + Math.abs(l.loppusaldo || 0), 0)
+  )
 
   const half   = Math.ceil(sorted.length / 2)
   const avgNew = sorted.slice(0, half).reduce((s, r) => s + (r.liikevaihto || 0), 0) / half
@@ -98,7 +111,8 @@ function deriveAuto(monthRows) {
     henkilostokulut:      Math.round(act.henkilostokulut * m),
     muut_kulut:           Math.round(act.muut_kulut * m),
     varasto_muutos: 0, poistot: act.poistot,
-    rahoitustuotot: 0, korkokulut: 0, verot: 0, satunnaiset_erat: 0,
+    rahoitustuotot: 0, korkokulut: act.korkokulut, verot: 0, satunnaiset_erat: 0,
+    lainojen_lyhennys: annualLyhennys,
   })
 
   return {
@@ -434,7 +448,7 @@ export default function Ennuste() {
     const [{ data: months }, { data: params }, { data: lns }, { data: tase }] = await Promise.all([
       supabaseAdmin
         .from('tulos_kuukausiraportti')
-        .select('period, liikevaihto, muut_tuotot, materiaalit_palvelut, henkilostokulut, muut_kulut, poistot')
+        .select('period, liikevaihto, muut_tuotot, materiaalit_palvelut, henkilostokulut, muut_kulut, poistot, tilikauden_voitto')
         .order('period'),
       supabaseAdmin.from('ennuste_params').select('*'),
       supabaseAdmin.from('ennuste_lainat').select('*').order('sort_order').order('created_at'),
@@ -468,7 +482,7 @@ export default function Ennuste() {
     setLoading(false)
   }
 
-  const { actuals, auto, growth } = deriveAuto(monthData)
+  const { actuals, auto, growth } = deriveAuto(monthData, taseLoans)
   const actualsCalc = calcValues(actuals)
 
   function resolve(p) {
