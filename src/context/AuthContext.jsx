@@ -52,6 +52,8 @@ export function AuthProvider({ children }) {
 
   function canAccess(path) {
     if (!role) return false
+    // Strict routes — admin/manager bypass does not apply.
+    if (path.startsWith('/instagram')) return role === 'admin' || role === 'respa'
     if (isAdmin) return true
     const entry = Object.entries(ROUTE_PERMISSIONS).find(([prefix]) => path.startsWith(prefix))
     if (!entry) return true

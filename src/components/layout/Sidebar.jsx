@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, Calendar, Car, Stethoscope, Dumbbell, Users2,
   Gift, Building2, ClipboardList, CheckSquare, MessageSquare,
-  FileText, Package, TrendingUp, BookOpen, LogOut, Menu, Wrench, Settings, Calculator
+  FileText, Package, TrendingUp, BookOpen, LogOut, Menu, Wrench, Settings, Calculator, Instagram
 } from 'lucide-react'
 import logo from '../../logo.svg'
 
@@ -41,6 +41,7 @@ const NAV = [
   { label: 'Raportointi',    href: '/finance/raportointi',      icon: TrendingUp,    roles: TALOUS },
   { label: 'Investoinnit',  href: '/finance/investoinnit',     icon: Calculator,    roles: TALOUS },
   { label: 'Raportointi',    href: '/finance/raportointi/oma',  icon: TrendingUp,    exactRoles: OMA_RAPORTI },
+  { label: 'Instagram',      href: '/instagram',                icon: Instagram,     exactRoles: ['admin', 'respa'] },
 
   { section: 'Hallinto' },
   { label: 'Henkilöstö',         href: '/employees',                        icon: Users2,        roles: HENK },
