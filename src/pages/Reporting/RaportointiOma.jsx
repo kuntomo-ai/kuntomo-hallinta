@@ -47,14 +47,20 @@ function fmtEur(v) {
   return Number(v || 0).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
 }
 
+// Use the actual visit date for bucketing/sorting; fall back to created_at if older rows
+// lack visit_date. This keeps daily bars on the day the work was done, not when entered.
+function eventDate(r) {
+  return r.visit_date || (r.created_at ? r.created_at.slice(0, 10) : '')
+}
+
 const FI_MONTHS = ['Tammi', 'Helmi', 'Maalis', 'Huhti', 'Touko', 'Kesä', 'Heinä', 'Elo', 'Syys', 'Loka', 'Marras', 'Joulu']
 const FI_DAYS = ['Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su']
 
 function buildChartData(terapiaRows, valmennusRows, period) {
   if (period === 'year') {
     const map = FI_MONTHS.map(label => ({ label, terapia: 0, valmennus: 0 }))
-    terapiaRows.forEach(r => { const m = new Date(r.created_at).getMonth(); map[m].terapia += r.price || 0 })
-    valmennusRows.forEach(r => { const m = new Date(r.created_at).getMonth(); map[m].valmennus += r.price || 0 })
+    terapiaRows.forEach(r => { const d = eventDate(r); if (d) map[new Date(d).getMonth()].terapia += r.price || 0 })
+    valmennusRows.forEach(r => { const d = eventDate(r); if (d) map[new Date(d).getMonth()].valmennus += r.price || 0 })
     return map.map(d => ({ ...d, terapia: +d.terapia.toFixed(2), valmennus: +d.valmennus.toFixed(2) }))
   }
 
@@ -66,8 +72,8 @@ function buildChartData(terapiaRows, valmennusRows, period) {
       const key = d.toISOString().slice(0, 10)
       slots[key] = { label: `${FI_DAYS[i - 1]} ${d.getDate()}.`, terapia: 0, valmennus: 0 }
     }
-    terapiaRows.forEach(r => { const k = r.created_at.slice(0, 10); if (slots[k]) slots[k].terapia += r.price || 0 })
-    valmennusRows.forEach(r => { const k = r.created_at.slice(0, 10); if (slots[k]) slots[k].valmennus += r.price || 0 })
+    terapiaRows.forEach(r => { const k = eventDate(r); if (slots[k]) slots[k].terapia += r.price || 0 })
+    valmennusRows.forEach(r => { const k = eventDate(r); if (slots[k]) slots[k].valmennus += r.price || 0 })
     return Object.values(slots).map(d => ({ ...d, terapia: +d.terapia.toFixed(2), valmennus: +d.valmennus.toFixed(2) }))
   }
 
@@ -79,20 +85,20 @@ function buildChartData(terapiaRows, valmennusRows, period) {
       const key = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       slots[key] = { label: `${day}.`, terapia: 0, valmennus: 0 }
     }
-    terapiaRows.forEach(r => { const k = r.created_at.slice(0, 10); if (slots[k]) slots[k].terapia += r.price || 0 })
-    valmennusRows.forEach(r => { const k = r.created_at.slice(0, 10); if (slots[k]) slots[k].valmennus += r.price || 0 })
+    terapiaRows.forEach(r => { const k = eventDate(r); if (slots[k]) slots[k].terapia += r.price || 0 })
+    valmennusRows.forEach(r => { const k = eventDate(r); if (slots[k]) slots[k].valmennus += r.price || 0 })
     return Object.values(slots).map(d => ({ ...d, terapia: +d.terapia.toFixed(2), valmennus: +d.valmennus.toFixed(2) }))
   }
 
   // today / custom
   const dayMap = {}
   terapiaRows.forEach(r => {
-    const d = r.created_at.slice(0, 10)
+    const d = eventDate(r); if (!d) return
     if (!dayMap[d]) dayMap[d] = { terapia: 0, valmennus: 0 }
     dayMap[d].terapia += r.price || 0
   })
   valmennusRows.forEach(r => {
-    const d = r.created_at.slice(0, 10)
+    const d = eventDate(r); if (!d) return
     if (!dayMap[d]) dayMap[d] = { terapia: 0, valmennus: 0 }
     dayMap[d].valmennus += r.price || 0
   })
@@ -164,13 +170,18 @@ export default function RaportointiOma() {
     if (!from || !to) return
     setLoading(true)
 
+    // Range filter on visit_date (the actual day of the appointment). Fall back to
+    // created_at for legacy rows where visit_date is null.
+    const visitFilter = (f, t) =>
+      `and(visit_date.gte.${f},visit_date.lte.${t}),and(visit_date.is.null,created_at.gte.${f},created_at.lte.${t}T23:59:59)`
+
     const [tr, vr] = await Promise.all([
-      supabaseAdmin.from('terapiamyynti').select('id, price, service, created_at, payment_method, receipt_url')
-        .eq('employee_name', empName).gte('created_at', from).lte('created_at', to + 'T23:59:59')
-        .order('created_at', { ascending: true }),
-      supabaseAdmin.from('valmennusmyynti').select('id, price, service, created_at, payment_method, receipt_url')
-        .eq('employee_name', empName).gte('created_at', from).lte('created_at', to + 'T23:59:59')
-        .order('created_at', { ascending: true }),
+      supabaseAdmin.from('terapiamyynti').select('id, price, service, visit_date, created_at, payment_method, receipt_url')
+        .eq('employee_name', empName).or(visitFilter(from, to))
+        .order('visit_date', { ascending: true, nullsFirst: true }).order('created_at', { ascending: true }),
+      supabaseAdmin.from('valmennusmyynti').select('id, price, service, visit_date, created_at, payment_method, receipt_url')
+        .eq('employee_name', empName).or(visitFilter(from, to))
+        .order('visit_date', { ascending: true, nullsFirst: true }).order('created_at', { ascending: true }),
     ])
     setTerapiaRows(tr.data || [])
     setValmennusRows(vr.data || [])
@@ -178,8 +189,8 @@ export default function RaportointiOma() {
     const prev = getPrevRange(period, customFrom, customTo)
     if (prev) {
       const [pt, pv] = await Promise.all([
-        supabaseAdmin.from('terapiamyynti').select('price').eq('employee_name', empName).gte('created_at', prev.from).lte('created_at', prev.to + 'T23:59:59'),
-        supabaseAdmin.from('valmennusmyynti').select('price').eq('employee_name', empName).gte('created_at', prev.from).lte('created_at', prev.to + 'T23:59:59'),
+        supabaseAdmin.from('terapiamyynti').select('price').eq('employee_name', empName).or(visitFilter(prev.from, prev.to)),
+        supabaseAdmin.from('valmennusmyynti').select('price').eq('employee_name', empName).or(visitFilter(prev.from, prev.to)),
       ])
       const t = [...(pt.data || []), ...(pv.data || [])].reduce((s, r) => s + (r.price || 0), 0)
       setPrevTotal(t)
@@ -386,7 +397,7 @@ export default function RaportointiOma() {
         ]
         const sortedRows = [...combined].sort((a, b) => {
           if (tableSort.col === 'date') {
-            const d = (a.created_at || '').localeCompare(b.created_at || '')
+            const d = eventDate(a).localeCompare(eventDate(b))
             return tableSort.dir === 'desc' ? -d : d
           }
           if (tableSort.col === 'price') {
@@ -435,7 +446,7 @@ export default function RaportointiOma() {
                     ) : sortedRows.map((r, i) => (
                       <tr key={i}>
                         <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>
-                          {new Date(r.created_at).toLocaleDateString('fi-FI')}
+                          {eventDate(r) ? new Date(eventDate(r)).toLocaleDateString('fi-FI') : '—'}
                         </td>
                         <td>
                           <span style={{ fontSize: '.72rem', fontWeight: 700, padding: '.15em .55em', borderRadius: 99,
