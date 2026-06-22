@@ -3,6 +3,7 @@ import { Plus, Search, Edit2, Trash2 } from 'lucide-react'
 import { supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/ui/Modal'
+import EmployeesNav from '../../components/EmployeesNav'
 
 const SALIT = ['Etu-Lyötty', 'Kempele', 'Linnakangas']
 const KOOT  = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
@@ -166,6 +167,7 @@ export default function Kausityontekijat() {
 
   return (
     <div>
+      <EmployeesNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Kausityöntekijät</h1>

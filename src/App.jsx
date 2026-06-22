@@ -91,12 +91,13 @@ function AppRoutes() {
               <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/communication" element={<Communication />} />
               <Route path="/tasks" element={<Tasks />} />
-              <Route path="/surveys" element={<Surveys />} />
+              <Route path="/surveys" element={<Navigate to="/employees/kyselyt-ja-ohjeet" replace />} />
               <Route path="/documents" element={<Documents />} />
 
               <Route path="/timelog" element={<RoleRoute><Timelog /></RoleRoute>} />
               <Route path="/employees" element={<RoleRoute><Employees /></RoleRoute>} />
               <Route path="/employees/kausityontekijat" element={<RoleRoute><Kausityontekijat /></RoleRoute>} />
+              <Route path="/employees/kyselyt-ja-ohjeet" element={<RoleRoute><Surveys /></RoleRoute>} />
               <Route path="/inventory" element={<RoleRoute><Inventory /></RoleRoute>} />
               <Route path="/laiteluettelo" element={<RoleRoute><Laiteluettelo /></RoleRoute>} />
               <Route path="/laiteluettelo/kaapit" element={<RoleRoute><Kaapit /></RoleRoute>} />

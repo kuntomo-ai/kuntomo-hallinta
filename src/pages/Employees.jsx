@@ -3,6 +3,7 @@ import { Plus, Search } from 'lucide-react'
 import { supabase, supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
+import EmployeesNav from '../components/EmployeesNav'
 
 const ROLES = ['myynti', 'terapia_valmennus', 'huolto', 'sport', 'respa', 'hallitus', 'admin']
 const EMPLOYMENT_TYPES = ['Työsuhde', 'Yrittäjä', 'Tuntityöntekijä', 'Harjoittelija']
@@ -283,6 +284,7 @@ export default function Employees() {
 
   return (
     <div>
+      <EmployeesNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Henkilöstö</h1>

@@ -3,6 +3,7 @@ import { Plus, Trash2, Edit2, X, GripVertical } from 'lucide-react'
 import { supabase, supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
+import EmployeesNav from '../components/EmployeesNav'
 
 // ── Vaatetilaus constants ─────────────────────────────────────────────────────
 const PRODUCTS = [
@@ -250,6 +251,7 @@ export default function Surveys() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div>
+      <EmployeesNav />
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Kyselyt ja ohjeet</h1>

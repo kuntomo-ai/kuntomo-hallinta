@@ -54,6 +54,8 @@ export function AuthProvider({ children }) {
     if (!role) return false
     // Strict routes — admin/manager bypass does not apply.
     if (path.startsWith('/instagram')) return role === 'admin' || role === 'respa'
+    // Kyselyt ja ohjeet lives under /employees but should remain open to all roles.
+    if (path.startsWith('/employees/kyselyt-ja-ohjeet')) return true
     if (isAdmin) return true
     const entry = Object.entries(ROUTE_PERMISSIONS).find(([prefix]) => path.startsWith(prefix))
     if (!entry) return true

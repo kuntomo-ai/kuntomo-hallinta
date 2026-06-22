@@ -29,6 +29,8 @@ const PAGE_TITLES = {
   '/finance/raportointi/lahjakortit': 'Lahjakortit – Raportti',
   '/customers/yritykset': 'Yritykset',
   '/customers/sport-hockey': 'Sport & Hockey',
+  '/employees/kausityontekijat': 'Kausityöntekijät',
+  '/employees/kyselyt-ja-ohjeet': 'Kyselyt ja ohjeet',
   '/instagram': 'Instagram',
   '/settings': 'Omat tiedot',
 }

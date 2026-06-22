@@ -44,9 +44,10 @@ const NAV = [
   { label: 'Instagram',      href: '/instagram',                icon: Camera,        exactRoles: ['admin', 'respa'] },
 
   { section: 'Hallinto' },
+  // Admin/manager: one Henkilöstö link (sub-nav inside covers Kausityöntekijät + Kyselyt).
   { label: 'Henkilöstö',         href: '/employees',                        icon: Users2,        roles: HENK },
-  { label: 'Kausityöntekijät',  href: '/employees/kausityontekijat',       icon: Users2,        roles: HENK },
-  { label: 'Kyselyt ja ohjeet', href: '/surveys',               icon: ClipboardList },
+  // Non-admin: same slot becomes Kyselyt ja ohjeet (their only accessible sub-page).
+  { label: 'Kyselyt ja ohjeet',  href: '/employees/kyselyt-ja-ohjeet',      icon: ClipboardList, adminHide: true },
   { label: 'Inventaario',    href: '/inventory',                icon: Package,       roles: VARASTO },
   { label: 'Laiteluettelo',  href: '/laiteluettelo',            icon: Wrench,        roles: LAITE },
   { label: 'Dokumentit',     href: '/documents',                icon: FileText },
