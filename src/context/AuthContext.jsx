@@ -14,7 +14,6 @@ const ROUTE_PERMISSIONS = {
   '/finance/kirjanpito':       ['hallitus'],
   '/finance/raportointi/oma':  ['myynti', 'terapia_valmennus', 'sport'],
   '/finance/raportointi':      ['hallitus'],
-  '/finance/investoinnit':    ['hallitus'],
   '/customers/yritykset':      ['terapia_valmennus', 'respa'],
   '/customers/sport-hockey':   ['sport'],
 }

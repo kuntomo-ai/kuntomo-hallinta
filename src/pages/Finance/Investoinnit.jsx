@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { supabaseAdmin } from '../../lib/supabase'
+import KirjanpitoNav from '../../components/KirjanpitoNav'
 import {
   ComposedChart, BarChart, Bar, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -490,13 +491,17 @@ export default function Investoinnit() {
   const savingM1    = savings.reduce((s, r) => s + itemAmount(r, 0), 0)
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text3)' }}>
-      Ladataan…
+    <div>
+      <KirjanpitoNav />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--text3)' }}>
+        Ladataan…
+      </div>
     </div>
   )
 
   return (
     <div className="page-wrapper">
+      <KirjanpitoNav />
 
       {/* Header */}
       <div className="page-header">

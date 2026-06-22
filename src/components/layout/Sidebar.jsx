@@ -39,7 +39,6 @@ const NAV = [
   { section: 'Talous' },
   { label: 'Kirjanpito',     href: '/finance/kirjanpito',       icon: BookOpen,      roles: TALOUS },
   { label: 'Raportointi',    href: '/finance/raportointi',      icon: TrendingUp,    roles: TALOUS },
-  { label: 'Investoinnit',  href: '/finance/investoinnit',     icon: Calculator,    roles: TALOUS },
   { label: 'Raportointi',    href: '/finance/raportointi/oma',  icon: TrendingUp,    exactRoles: OMA_RAPORTI },
   { label: 'Instagram',      href: '/instagram',                icon: Camera,        exactRoles: ['admin', 'respa'] },
 

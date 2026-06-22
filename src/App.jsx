@@ -115,7 +115,8 @@ function AppRoutes() {
               <Route path="/finance/kirjanpito/raportit" element={<Navigate to="/finance/kirjanpito" replace />} />
               <Route path="/finance/kirjanpito/tilinpaatos" element={<RoleRoute><Tilinpaatos /></RoleRoute>} />
               <Route path="/finance/kirjanpito/ennuste" element={<RoleRoute><Ennuste /></RoleRoute>} />
-              <Route path="/finance/investoinnit" element={<RoleRoute><Investoinnit /></RoleRoute>} />
+              <Route path="/finance/kirjanpito/investoinnit" element={<RoleRoute><Investoinnit /></RoleRoute>} />
+              <Route path="/finance/investoinnit" element={<Navigate to="/finance/kirjanpito/investoinnit" replace />} />
               <Route path="/finance/kirjanpito/tuonti" element={<RoleRoute><KirjanpitoTuonti /></RoleRoute>} />
 
               <Route path="/finance/raportointi/oma" element={<RoleRoute><RaportointiOma /></RoleRoute>} />

@@ -21,6 +21,7 @@ const PAGE_TITLES = {
   '/finance/kirjanpito/tase': 'Tase',
   '/finance/kirjanpito/tulos': 'Tuloslaskelma',
   '/finance/kirjanpito/kassavirta': 'Kassavirta',
+  '/finance/kirjanpito/investoinnit': 'Investoinnit',
   '/finance/kirjanpito/raportit': 'Raportit',
   '/finance/raportointi': 'Raportointi',
   '/finance/raportointi/terapiamyynti': 'Terapia – Raportti',
