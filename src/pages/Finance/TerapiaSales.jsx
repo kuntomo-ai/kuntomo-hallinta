@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Trash2, Receipt, ExternalLink } from 'lucide-react'
+import { Plus, Search, Trash2, Receipt } from 'lucide-react'
 import { supabase, supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/ui/Modal'
+import ReceiptModal from '../../components/ReceiptModal'
 
 const PALVELUT = [
   'Fysioterapia 45min', 'Fysioterapia 60min',
@@ -223,35 +224,7 @@ export default function TerapiaSales() {
         </div>
       )}
 
-      {receiptModal && (
-        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setReceiptModal(null) }}>
-          <div className="modal" style={{ maxWidth: 720 }}>
-            <div className="modal-header">
-              <span className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                <Receipt size={16} /> Kuitti
-              </span>
-              <a
-                href={receiptModal}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'var(--violet)', fontSize: '.82rem', display: 'flex', alignItems: 'center', gap: '.25rem', textDecoration: 'none' }}
-              >
-                Avaa <ExternalLink size={13} />
-              </a>
-            </div>
-            <div className="modal-body" style={{ textAlign: 'center', padding: '1rem' }}>
-              <img
-                src={receiptModal}
-                alt="Kuitti"
-                style={{ maxWidth: '100%', maxHeight: '72vh', objectFit: 'contain', borderRadius: 6, boxShadow: '0 2px 16px rgba(0,0,0,.12)' }}
-              />
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setReceiptModal(null)}>Sulje</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReceiptModal stored={receiptModal} onClose={() => setReceiptModal(null)} />
     </div>
   )
 }

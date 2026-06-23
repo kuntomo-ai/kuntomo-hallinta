@@ -4,6 +4,7 @@ import { supabase, supabaseAdmin } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
 import Modal from '../../components/ui/Modal'
+import ReceiptModal from '../../components/ReceiptModal'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -179,15 +180,14 @@ function TerapiaForm({ onSaved }) {
     setSaveError('')
     setSaving(true)
 
+    // Store the storage object path (not a URL); display generates short-lived
+    // signed URLs server-side via /api/storage/signed-url.
     let receipt_url = null
     if (receipt) {
       const blob = await compressImg(receipt)
       const path = `terapia/${Date.now()}.jpg`
       const { data: upData } = await supabaseAdmin.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
-      if (upData) {
-        const { data: urlData } = supabaseAdmin.storage.from('receipts').getPublicUrl(path)
-        receipt_url = urlData.publicUrl
-      }
+      if (upData) receipt_url = path
     }
 
     const paymentStr = form.payment_methods.map(m => {
@@ -1383,28 +1383,7 @@ export default function Sales() {
         </Modal>
       )}
 
-      {receiptModal && (
-        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setReceiptModal(null) }}>
-          <div className="modal" style={{ maxWidth: 720 }}>
-            <div className="modal-header">
-              <span className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                <Receipt size={16} /> Kuitti
-              </span>
-              <a href={receiptModal} target="_blank" rel="noopener noreferrer"
-                style={{ color: 'var(--violet)', fontSize: '.82rem', display: 'flex', alignItems: 'center', gap: '.25rem', textDecoration: 'none' }}>
-                Avaa <ExternalLink size={13} />
-              </a>
-            </div>
-            <div className="modal-body" style={{ textAlign: 'center', padding: '1rem' }}>
-              <img src={receiptModal} alt="Kuitti"
-                style={{ maxWidth: '100%', maxHeight: '72vh', objectFit: 'contain', borderRadius: 6, boxShadow: '0 2px 16px rgba(0,0,0,.12)' }} />
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setReceiptModal(null)}>Sulje</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReceiptModal stored={receiptModal} onClose={() => setReceiptModal(null)} />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { Plus, FileText, Download, Trash2, Upload, Lock, FileIcon, Eye, X } from
 import { supabase, supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
+import { useSignedUrl, getSignedUrl } from '../lib/signedUrl'
 
 const DOC_TYPES = ['Tuloslaskelma', 'Tase', 'Sopimus', 'Ohje', 'Tiedote', 'Kokouspöytäkirja', 'Muu']
 const FILTER_TYPES = ['Kaikki', ...DOC_TYPES]
@@ -30,6 +31,7 @@ function PreviewOverlay({ doc, onClose }) {
   const ext = doc.file_name ? doc.file_name.split('.').pop().toLowerCase() : ''
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)
   const isPdf = ext === 'pdf'
+  const fileUrl = useSignedUrl('documents', doc.file_url)
 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
@@ -61,33 +63,36 @@ function PreviewOverlay({ doc, onClose }) {
             {doc.file_name && <span style={{ marginLeft: '.5rem', fontSize: '.78rem', color: 'var(--text3)' }}>{doc.file_name}</span>}
           </div>
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+            <a href={fileUrl || '#'} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" aria-disabled={!fileUrl}>
               <Download size={13} /> Lataa
             </a>
             <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ padding: '.3rem' }}><X size={16} /></button>
           </div>
         </div>
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg2)' }}>
-          {isPdf && (
+          {!fileUrl && (
+            <div style={{ color: 'var(--text3)', padding: '3rem' }}>Ladataan…</div>
+          )}
+          {fileUrl && isPdf && (
             <iframe
-              src={doc.file_url}
+              src={fileUrl}
               title={doc.title}
               style={{ width: '100%', height: '75vh', border: 'none', display: 'block' }}
             />
           )}
-          {isImage && (
+          {fileUrl && isImage && (
             <img
-              src={doc.file_url}
+              src={fileUrl}
               alt={doc.title}
               style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', display: 'block' }}
             />
           )}
-          {!isPdf && !isImage && (
+          {fileUrl && !isPdf && !isImage && (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text3)' }}>
               <FileIcon size={48} style={{ marginBottom: '1rem', color: 'var(--violet)' }} />
               <div style={{ fontWeight: 600, marginBottom: '.5rem' }}>{doc.file_name}</div>
               <div style={{ fontSize: '.82rem', marginBottom: '1.25rem' }}>Tiedostotyyppiä ei voi esikatsella suoraan.</div>
-              <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+              <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
                 <Download size={14} /> Lataa tiedosto
               </a>
             </div>
@@ -159,6 +164,8 @@ export default function Documents() {
     setUploading(true)
     setSaveError('')
 
+    // file_url/file_path now store the storage object key (e.g. "1780..._foo.pdf").
+    // Signed URLs are generated server-side at view time via /api/storage/signed-url.
     let file_url = null
     let file_name = null
 
@@ -171,8 +178,7 @@ export default function Documents() {
         setUploading(false)
         return
       }
-      const { data: urlData } = supabaseAdmin.storage.from('documents').getPublicUrl(path)
-      file_url = urlData.publicUrl
+      file_url = path
       file_name = file.name
     }
 
@@ -281,9 +287,16 @@ export default function Documents() {
                   </button>
                 )}
                 {r.file_url && (
-                  <a href={r.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    title="Lataa"
+                    onClick={async () => {
+                      const u = await getSignedUrl('documents', r.file_url)
+                      if (u) window.open(u, '_blank', 'noopener,noreferrer')
+                    }}
+                  >
                     <Download size={13} />
-                  </a>
+                  </button>
                 )}
                 {isAdmin && (
                   <button className="btn btn-danger btn-sm" onClick={() => handleDelete(r.id)}>
