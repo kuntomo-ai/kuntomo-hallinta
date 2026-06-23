@@ -5,16 +5,9 @@
 -- time via /api/storage/signed-url.
 --
 -- Idempotent: only rewrites rows that still match the legacy URL prefix.
+-- valmennusmyynti has no receipt_url column, so only terapiamyynti needs the rewrite.
 
 update terapiamyynti
-   set receipt_url = regexp_replace(
-         receipt_url,
-         '^https?://[^/]+/storage/v1/object/(?:public|sign|authenticated)/receipts/',
-         ''
-       )
- where receipt_url ~ '/storage/v1/object/(public|sign|authenticated)/receipts/';
-
-update valmennusmyynti
    set receipt_url = regexp_replace(
          receipt_url,
          '^https?://[^/]+/storage/v1/object/(?:public|sign|authenticated)/receipts/',

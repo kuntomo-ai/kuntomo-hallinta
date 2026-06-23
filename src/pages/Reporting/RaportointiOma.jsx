@@ -180,7 +180,7 @@ export default function RaportointiOma() {
       supabaseAdmin.from('terapiamyynti').select('id, price, service, visit_date, created_at, payment_method, receipt_url')
         .eq('employee_name', empName).or(visitFilter(from, to))
         .order('visit_date', { ascending: true, nullsFirst: true }).order('created_at', { ascending: true }),
-      supabaseAdmin.from('valmennusmyynti').select('id, price, service, visit_date, created_at, payment_method, receipt_url')
+      supabaseAdmin.from('valmennusmyynti').select('id, price, service, visit_date, created_at, payment_method')
         .eq('employee_name', empName).or(visitFilter(from, to))
         .order('visit_date', { ascending: true, nullsFirst: true }).order('created_at', { ascending: true }),
     ])
