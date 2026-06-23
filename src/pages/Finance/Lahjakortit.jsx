@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Trash2, Edit2, ShoppingCart } from 'lucide-react'
+import { Plus, Search, Trash2, Edit2, ShoppingCart, Camera, Receipt } from 'lucide-react'
 import { supabaseAdmin } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
+import ReceiptModal from '../../components/ReceiptModal'
 import { useAuth } from '../../context/AuthContext'
+import { useSignedUrl } from '../../lib/signedUrl'
+import { compressImg } from '../../lib/imageCompress'
 
 const SERVICES = [
   { label: 'Valitse palvelu...', value: '', price: '' },
@@ -44,12 +47,18 @@ export default function Lahjakortit() {
   // Uusi lahjakortti
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(empty)
+  const [receiptFile, setReceiptFile] = useState(null)
   const [saving, setSaving] = useState(false)
 
   // Muokkaus
   const [editRow, setEditRow] = useState(null)
   const [editForm, setEditForm] = useState(empty)
+  const [editReceiptFile, setEditReceiptFile] = useState(null)
+  const [editReceiptPath, setEditReceiptPath] = useState(null) // existing path; null = remove
   const [editSaving, setEditSaving] = useState(false)
+
+  // Kuitti-modaali (listanäkymä)
+  const [receiptModal, setReceiptModal] = useState(null)
 
   // Kirjaa käyttö
   const [saleRow, setSaleRow] = useState(null)
@@ -74,6 +83,9 @@ export default function Lahjakortit() {
   function handleChange(e) {
     const { name, value } = e.target
     setForm(f => ({ ...f, [name]: value }))
+    // Receipt slot only makes sense for Maksupääte — drop a picked file if the
+    // payment method changes away from it.
+    if (name === 'payment_method' && value !== 'Maksupääte') setReceiptFile(null)
   }
 
   function handleServiceChange(e) {
@@ -85,6 +97,7 @@ export default function Lahjakortit() {
   function handleEditChange(e) {
     const { name, value } = e.target
     setEditForm(f => ({ ...f, [name]: value }))
+    if (name === 'payment_method' && value !== 'Maksupääte') setEditReceiptFile(null)
   }
 
   function handleEditServiceChange(e) {
@@ -103,6 +116,8 @@ export default function Lahjakortit() {
       sale_date: r.sale_date || TODAY,
       notes: r.notes || '',
     })
+    setEditReceiptFile(null)
+    setEditReceiptPath(r.receipt_url || null)
   }
 
   function openSale(r) {
@@ -115,9 +130,23 @@ export default function Lahjakortit() {
 
   const canSave = form.code.trim() && form.payment_method
 
+  // Compress + upload an image to receipts/lahjakortti/, return the object path.
+  async function uploadReceipt(file) {
+    if (!file) return null
+    const blob = await compressImg(file)
+    const path = `lahjakortti/${Date.now()}.jpg`
+    const { error } = await supabaseAdmin.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
+    if (error) {
+      alert('Kuitin lataus epäonnistui: ' + error.message)
+      return null
+    }
+    return path
+  }
+
   async function handleSave() {
     if (!canSave) return
     setSaving(true)
+    const receipt_url = form.payment_method === 'Maksupääte' ? await uploadReceipt(receiptFile) : null
     const { error } = await supabaseAdmin.from('lahjakortit').insert({
       code: form.code.trim(),
       service: form.service || null,
@@ -125,18 +154,28 @@ export default function Lahjakortit() {
       payment_method: form.payment_method || null,
       sale_date: form.sale_date || TODAY,
       notes: form.notes.trim() || null,
+      receipt_url,
       created_by: profile?.id || null,
     })
     setSaving(false)
     if (error) { alert('Tallennus epäonnistui: ' + error.message); return }
     setShowModal(false)
     setForm(empty)
+    setReceiptFile(null)
     await fetchData()
   }
 
   async function handleEditSave() {
     if (!editRow) return
     setEditSaving(true)
+    // Edit-mode rules:
+    //  - new file picked → upload + replace
+    //  - cleared via "Poista" → editReceiptPath is null → wipe
+    //  - otherwise → keep existing path untouched
+    let receipt_url = editReceiptPath
+    if (editReceiptFile) {
+      receipt_url = await uploadReceipt(editReceiptFile)
+    }
     const { error } = await supabaseAdmin.from('lahjakortit').update({
       code: editForm.code.trim(),
       service: editForm.service || null,
@@ -144,10 +183,13 @@ export default function Lahjakortit() {
       payment_method: editForm.payment_method || null,
       sale_date: editForm.sale_date || TODAY,
       notes: editForm.notes.trim() || null,
+      receipt_url,
     }).eq('id', editRow.id)
     setEditSaving(false)
     if (error) { alert('Tallennus epäonnistui: ' + error.message); return }
     setEditRow(null)
+    setEditReceiptFile(null)
+    setEditReceiptPath(null)
     await fetchData()
   }
 
@@ -349,6 +391,11 @@ export default function Lahjakortit() {
                           <ShoppingCart size={13} />
                         </button>
                       )}
+                      {r.receipt_url && (
+                        <button className="btn btn-ghost btn-sm" title="Näytä kuitti" style={{ color: 'var(--violet)' }} onClick={() => setReceiptModal(r.receipt_url)}>
+                          <Receipt size={13} />
+                        </button>
+                      )}
                       <button className="btn btn-ghost btn-sm" title="Muokkaa" onClick={() => openEdit(r)}>
                         <Edit2 size={13} />
                       </button>
@@ -374,7 +421,15 @@ export default function Lahjakortit() {
             </button>
           </>
         }>
-          <LahjakorttiForms form={form} onChange={handleChange} onServiceChange={handleServiceChange} />
+          <LahjakorttiForms
+            form={form}
+            onChange={handleChange}
+            onServiceChange={handleServiceChange}
+            receiptFile={receiptFile}
+            onReceiptFile={setReceiptFile}
+            existingReceiptPath={null}
+            onRemoveExistingReceipt={() => {}}
+          />
         </Modal>
       )}
 
@@ -388,9 +443,19 @@ export default function Lahjakortit() {
             </button>
           </>
         }>
-          <LahjakorttiForms form={editForm} onChange={handleEditChange} onServiceChange={handleEditServiceChange} />
+          <LahjakorttiForms
+            form={editForm}
+            onChange={handleEditChange}
+            onServiceChange={handleEditServiceChange}
+            receiptFile={editReceiptFile}
+            onReceiptFile={setEditReceiptFile}
+            existingReceiptPath={editReceiptPath}
+            onRemoveExistingReceipt={() => setEditReceiptPath(null)}
+          />
         </Modal>
       )}
+
+      <ReceiptModal stored={receiptModal} onClose={() => setReceiptModal(null)} />
 
       {/* Kirjaa käyttö */}
       {saleRow && (
@@ -446,7 +511,12 @@ export default function Lahjakortit() {
   )
 }
 
-function LahjakorttiForms({ form, onChange, onServiceChange }) {
+function LahjakorttiForms({
+  form, onChange, onServiceChange,
+  receiptFile, onReceiptFile,
+  existingReceiptPath, onRemoveExistingReceipt,
+}) {
+  const showReceipt = form.payment_method === 'Maksupääte'
   return (
     <div className="form-grid">
       <div className="input-group">
@@ -470,6 +540,14 @@ function LahjakorttiForms({ form, onChange, onServiceChange }) {
           {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
       </div>
+      {showReceipt && (
+        <LahjakorttiReceiptPicker
+          file={receiptFile}
+          onFile={onReceiptFile}
+          existingPath={existingReceiptPath}
+          onRemoveExisting={onRemoveExistingReceipt}
+        />
+      )}
       <div className="input-group">
         <label className="input-label">Myyntipäivä</label>
         <input className="input-field" name="sale_date" type="date" value={form.sale_date} onChange={onChange} />
@@ -478,6 +556,44 @@ function LahjakorttiForms({ form, onChange, onServiceChange }) {
         <label className="input-label">Muistiinpanot</label>
         <textarea className="input-field" name="notes" rows={2} value={form.notes} onChange={onChange} style={{ resize: 'vertical' }} />
       </div>
+    </div>
+  )
+}
+
+function LahjakorttiReceiptPicker({ file, onFile, existingPath, onRemoveExisting }) {
+  const existingUrl = useSignedUrl('receipts', existingPath)
+  const hasExisting = Boolean(existingPath)
+  return (
+    <div className="input-group">
+      <label className="input-label">Kuitti (maksupääte)</label>
+      {hasExisting && !file && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', padding: '.55rem .75rem', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', marginBottom: '.4rem' }}>
+          {existingUrl ? (
+            <a href={existingUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: 'var(--violet)', textDecoration: 'none' }}>
+              <Receipt size={14} /> Nykyinen kuitti
+            </a>
+          ) : (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: 'var(--text3)' }}>
+              <Receipt size={14} /> Ladataan…
+            </span>
+          )}
+          <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', color: 'var(--red)' }} onClick={onRemoveExisting}>
+            Poista
+          </button>
+        </div>
+      )}
+      <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', background: 'var(--bg2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.85rem', color: 'var(--text2)' }}>
+        <Camera size={15} />
+        {file ? file.name : (hasExisting ? 'Vaihda kuitti' : 'Ota kuva tai valitse tiedosto')}
+        <input type="file" accept="image/*" style={{ display: 'none' }}
+          onChange={e => onFile(e.target.files?.[0] || null)} />
+      </label>
+      {file && (
+        <div style={{ marginTop: '.35rem', fontSize: '.72rem', color: 'var(--text3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{(file.size / 1024).toFixed(0)} KB → pakataan automaattisesti</span>
+          <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red)', fontSize: '.72rem', padding: 0 }} onClick={() => onFile(null)}>Poista</button>
+        </div>
+      )}
     </div>
   )
 }
