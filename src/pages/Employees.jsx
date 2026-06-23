@@ -65,16 +65,26 @@ export default function Employees() {
     const empByEmail = {}
     employees.forEach(e => { if (e.email) empByEmail[e.email.toLowerCase()] = e })
 
+    // Build a roles array for a row: prefer profiles.roles[], fall back to
+    // splitting the comma-separated employees.role string for legacy data.
+    const rolesFor = (p, emp) => {
+      if (Array.isArray(p?.roles) && p.roles.length) return p.roles
+      const src = p?.role || emp?.role || ''
+      return src ? String(src).split(',').map(r => r.trim()).filter(Boolean) : []
+    }
+
     // Merge: every profile gets shown, supplemented with employees HR data if it exists
     const merged = profiles.map(p => {
       const emp = empByEmail[p.email?.toLowerCase()] || {}
+      const rolesArr = rolesFor(p, emp)
       return {
         // Identity from profile
         profile_id: p.id,
         first_name: p.first_name || emp.first_name || '',
         last_name: p.last_name || emp.last_name || '',
         email: p.email || emp.email || '',
-        role: p.role || emp.role || '',
+        role: rolesArr.join(', '),
+        roles: rolesArr,
         // HR data from employees (may be empty)
         employee_id: emp.id || null,
         title: emp.title || '',
@@ -90,13 +100,15 @@ export default function Employees() {
     // Also show employees that have no matching profile (legacy records)
     employees.forEach(e => {
       if (!e.email || !profiles.find(p => p.email?.toLowerCase() === e.email?.toLowerCase())) {
+        const rolesArr = rolesFor(null, e)
         merged.push({
           profile_id: null,
           employee_id: e.id,
           first_name: e.first_name || '',
           last_name: e.last_name || '',
           email: e.email || '',
-          role: e.role || '',
+          role: rolesArr.join(', '),
+          roles: rolesArr,
           title: e.title || '',
           employment_type: e.employment_type || '',
           employment_start: e.employment_start || '',
@@ -137,7 +149,9 @@ export default function Employees() {
       first_name: row.first_name || '',
       last_name: row.last_name || '',
       email: row.email || '',
-      roles: row.role ? row.role.split(',').map(r => r.trim()).filter(Boolean) : [],
+      roles: Array.isArray(row.roles) && row.roles.length
+        ? row.roles
+        : (row.role ? String(row.role).split(',').map(r => r.trim()).filter(Boolean) : []),
       title: row.title || '',
       employment_type: row.employment_type || EMPLOYMENT_TYPES[0],
       employment_start: row.employment_start || '',
@@ -177,8 +191,8 @@ export default function Employees() {
             await supabaseAdmin.from('profiles').update({
               first_name: payload.first_name,
               last_name: payload.last_name,
-              role: form.roles[0] || payload.role || null,  // primary role for back-compat
-              roles: form.roles,                            // full multi-role list
+              role: form.roles[0] || null,  // primary role (app_role enum — single value)
+              roles: form.roles,            // full multi-role list (text[])
             }).eq('id', prof.id)
           }
         }
@@ -342,7 +356,9 @@ export default function Employees() {
             ) : filtered.length === 0 ? (
               <tr><td colSpan={isAdmin ? 8 : 7} className="table-empty">Ei henkilöstöä.</td></tr>
             ) : filtered.map(r => {
-              const roleList = r.role ? r.role.split(',').map(s => s.trim()).filter(Boolean) : []
+              const roleList = Array.isArray(r.roles) && r.roles.length
+                ? r.roles
+                : (r.role ? r.role.split(',').map(s => s.trim()).filter(Boolean) : [])
               return (
                 <tr key={r.employee_id || r.profile_id}>
                   <td>
