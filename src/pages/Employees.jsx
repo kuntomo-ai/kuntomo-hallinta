@@ -177,7 +177,8 @@ export default function Employees() {
             await supabaseAdmin.from('profiles').update({
               first_name: payload.first_name,
               last_name: payload.last_name,
-              role: form.roles[0] || payload.role || null,
+              role: form.roles[0] || payload.role || null,  // primary role for back-compat
+              roles: form.roles,                            // full multi-role list
             }).eq('id', prof.id)
           }
         }
@@ -204,6 +205,7 @@ export default function Employees() {
               last_name: payload.last_name,
               email: form.email.trim(),
               role: form.roles[0] || null,
+              roles: form.roles,
             })
 
             // Send password reset so user can set their own password

@@ -53,18 +53,17 @@ const NAV = [
 ]
 
 export default function Sidebar({ mobOpen, onClose }) {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, roles, hasRole, hasAnyRole, isAdmin } = useAuth()
 
-  const role = profile?.role
-  const isPrivileged = role === 'admin' || role === 'manager'
+  const isPrivileged = isAdmin
 
   function canSee(item) {
-    if (item.exactRoles) return item.exactRoles.includes(role)  // strict: no admin bypass
+    if (item.exactRoles) return item.exactRoles.some(r => roles.includes(r))  // strict: any matching role
     if (item.adminHide && isPrivileged) return false
     if (isPrivileged) return true
-    if (!item.roles) return true           // no restriction → everyone
+    if (!item.roles) return true               // no restriction → everyone
     if (item.roles.length === 0) return false  // empty array → admin-only
-    return item.roles.includes(role)
+    return hasAnyRole(item.roles)
   }
 
   // Build visible nav, suppressing section headers with no visible items
@@ -121,7 +120,7 @@ export default function Sidebar({ mobOpen, onClose }) {
           <div className="user-avatar">{initials}</div>
           <div className="user-info">
             <div className="user-name">{profile?.first_name} {profile?.last_name}</div>
-            <div className="user-role">{profile?.role}</div>
+            <div className="user-role">{roles.join(', ') || profile?.role}</div>
           </div>
         </NavLink>
         <button className="signout-btn" title="Kirjaudu ulos" onClick={signOut}>

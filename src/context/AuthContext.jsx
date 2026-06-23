@@ -45,14 +45,21 @@ export function AuthProvider({ children }) {
 
   const signOut = () => supabase.auth.signOut()
 
-  const role = profile?.role ?? null
-  const isAdmin = role === 'admin' || role === 'manager'
-  const isHallitus = role === 'hallitus'
+  // Multi-role: prefer the roles array, fall back to the singular role
+  // for profiles that pre-date the migration.
+  const roles = Array.isArray(profile?.roles) && profile.roles.length > 0
+    ? profile.roles
+    : (profile?.role ? [profile.role] : [])
+  const role = roles[0] ?? null
+  const hasRole = r => roles.includes(r)
+  const hasAnyRole = rs => rs.some(r => roles.includes(r))
+  const isAdmin = hasRole('admin') || hasRole('manager')
+  const isHallitus = hasRole('hallitus')
 
   function canAccess(path) {
-    if (!role) return false
+    if (roles.length === 0) return false
     // Strict routes — admin/manager bypass does not apply.
-    if (path.startsWith('/instagram')) return role === 'admin' || role === 'respa'
+    if (path.startsWith('/instagram')) return hasRole('admin') || hasRole('respa')
     // Kyselyt ja ohjeet lives under /employees but should remain open to all roles.
     if (path.startsWith('/employees/kyselyt-ja-ohjeet')) return true
     if (isAdmin) return true
@@ -60,11 +67,11 @@ export function AuthProvider({ children }) {
     if (!entry) return true
     const [, allowed] = entry
     if (allowed.length === 0) return false
-    return allowed.includes(role)
+    return hasAnyRole(allowed)
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, role, isAdmin, isHallitus, canAccess }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, role, roles, hasRole, hasAnyRole, isAdmin, isHallitus, canAccess }}>
       {children}
     </AuthContext.Provider>
   )
