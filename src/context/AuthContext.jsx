@@ -62,6 +62,8 @@ export function AuthProvider({ children }) {
     if (path.startsWith('/instagram')) return hasRole('admin') || hasRole('respa')
     // Kyselyt ja ohjeet lives under /employees but should remain open to all roles.
     if (path.startsWith('/employees/kyselyt-ja-ohjeet')) return true
+    // Kausityöntekijät — admin/manager + respa (otherwise /employees is admin-only).
+    if (path.startsWith('/employees/kausityontekijat')) return isAdmin || hasRole('respa')
     if (isAdmin) return true
     const entry = Object.entries(ROUTE_PERMISSIONS).find(([prefix]) => path.startsWith(prefix))
     if (!entry) return true

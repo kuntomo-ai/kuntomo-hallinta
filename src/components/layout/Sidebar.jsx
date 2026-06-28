@@ -45,7 +45,9 @@ const NAV = [
   { section: 'Hallinto' },
   // Admin/manager: one Henkilöstö link (sub-nav inside covers Kausityöntekijät + Kyselyt).
   { label: 'Henkilöstö',         href: '/employees',                        icon: Users2,        roles: HENK },
-  // Non-admin: same slot becomes Kyselyt ja ohjeet (their only accessible sub-page).
+  // Respa also needs direct access to Kausityöntekijät (one of the few /employees pages they can see).
+  { label: 'Kausityöntekijät',   href: '/employees/kausityontekijat',       icon: Users2,        exactRoles: ['respa'] },
+  // Everyone else: Kyselyt ja ohjeet is the only accessible sub-page in this group.
   { label: 'Kyselyt ja ohjeet',  href: '/employees/kyselyt-ja-ohjeet',      icon: ClipboardList, adminHide: true },
   { label: 'Inventaario',    href: '/inventory',                icon: Package,       roles: VARASTO },
   { label: 'Laiteluettelo',  href: '/laiteluettelo',            icon: Wrench,        roles: LAITE },
