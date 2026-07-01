@@ -20,7 +20,7 @@ const MAKSUTAVAT_TERAPIA = [
 ]
 const COMPANY_METHODS = ['Yrityslaskutus', 'Yrityskäynti']
 
-const VALMENNUS_PALVELUT = ['Jatkuva valmennus', 'Fysiikkavalmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Muu']
+const VALMENNUS_PALVELUT = ['Jatkuva valmennus', 'Fysiikkavalmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Inbody mittaus', 'Muu']
 const VALMENNUS_MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Edenred', 'SmartumPay', 'ePassi']
 const JASENYYSTUOTTEET = [
   { name: 'Kuntosali', price: 30 },
