@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabaseAdmin } from '../../lib/supabase'
 
 const REPORT_NAV = [
   { label: 'Terapiamyynti', to: '/finance/raportointi/terapiamyynti' },
@@ -48,11 +48,11 @@ function getRange(period, customFrom, customTo) {
   return { from: customFrom, to: customTo }
 }
 
-function statusBadge(status) {
-  if (status === 'aktiivinen') return <span className="badge badge-green">Aktiivinen</span>
-  if (status === 'käytetty') return <span className="badge badge-gray">Käytetty</span>
-  if (status === 'vanhentunut') return <span className="badge badge-red">Vanhentunut</span>
-  return <span className="badge badge-gray">{status || '—'}</span>
+function usageBadge(price, used) {
+  const remaining = (price || 0) - (used || 0)
+  if (remaining <= 0) return <span className="badge badge-gray">Käytetty</span>
+  if ((used || 0) > 0) return <span className="badge badge-yellow">Osittain käytetty</span>
+  return <span className="badge badge-green">Käyttämättä</span>
 }
 
 export default function RaportointiLahjakortit() {
@@ -68,15 +68,26 @@ export default function RaportointiLahjakortit() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    const { data } = await supabaseAdmin.from('lahjakortit').select('*').gte('sold_at', from).lte('sold_at', to + 'T23:59:59').order('sold_at', { ascending: false })
+    const { data } = await supabaseAdmin
+      .from('lahjakortit')
+      .select('*')
+      .gte('sale_date', from)
+      .lte('sale_date', to)
+      .order('sale_date', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
 
-  const total = rows.reduce((s, r) => s + (r.value || 0), 0)
+  const total = rows.reduce((s, r) => s + (r.price || 0), 0)
+  const totalUsed = rows.reduce((s, r) => s + (r.used_amount || 0), 0)
+  const totalRemaining = total - totalUsed
   const avg = rows.length ? total / rows.length : 0
-  const byStatus = {}
-  rows.forEach(r => { byStatus[r.status || 'tuntematon'] = (byStatus[r.status || 'tuntematon'] || 0) + 1 })
+
+  const byPaymentMethod = {}
+  rows.forEach(r => {
+    const k = r.payment_method || 'Tuntematon'
+    byPaymentMethod[k] = (byPaymentMethod[k] || 0) + (r.price || 0)
+  })
 
   return (
     <div>
@@ -102,8 +113,10 @@ export default function RaportointiLahjakortit() {
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card"><div className="stat-label">Arvo yhteensä</div><div className="stat-value gold">{total.toFixed(2)} €</div></div>
+        <div className="stat-card"><div className="stat-label">Myyty yhteensä</div><div className="stat-value gold">{total.toFixed(2)} €</div></div>
         <div className="stat-card"><div className="stat-label">Kortteja</div><div className="stat-value">{rows.length}</div></div>
+        <div className="stat-card"><div className="stat-label">Käytetty</div><div className="stat-value">{totalUsed.toFixed(2)} €</div></div>
+        <div className="stat-card"><div className="stat-label">Jäljellä</div><div className="stat-value">{totalRemaining.toFixed(2)} €</div></div>
         <div className="stat-card"><div className="stat-label">Keskiarvo / kortti</div><div className="stat-value">{avg.toFixed(2)} €</div></div>
       </div>
 
@@ -111,21 +124,22 @@ export default function RaportointiLahjakortit() {
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>Myyty</th><th>Tunnus</th><th>Arvo</th><th>Saaja</th><th>Voimassa asti</th><th>Tila</th></tr>
+              <tr><th>Myyty</th><th>Tunnus</th><th>Palvelu</th><th>Arvo</th><th>Käytetty</th><th>Maksutapa</th><th>Tila</th></tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="table-empty">Ladataan...</td></tr>
+                <tr><td colSpan={7} className="table-empty">Ladataan...</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="table-empty">Ei kortteja valitulla aikavälillä.</td></tr>
+                <tr><td colSpan={7} className="table-empty">Ei kortteja valitulla aikavälillä.</td></tr>
               ) : rows.map(r => (
                 <tr key={r.id}>
-                  <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{r.sold_at ? new Date(r.sold_at).toLocaleDateString('fi-FI') : '—'}</td>
+                  <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{r.sale_date ? new Date(r.sale_date).toLocaleDateString('fi-FI') : '—'}</td>
                   <td style={{ fontWeight: 700, fontFamily: 'monospace' }}>{r.code}</td>
-                  <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{r.value != null ? r.value.toFixed(2) + ' €' : '—'}</td>
-                  <td>{r.recipient_name || '—'}</td>
-                  <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.expires_at ? new Date(r.expires_at).toLocaleDateString('fi-FI') : '—'}</td>
-                  <td>{statusBadge(r.status)}</td>
+                  <td style={{ color: 'var(--text2)', fontSize: '.83rem' }}>{r.service || '—'}</td>
+                  <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{r.price != null ? r.price.toFixed(2) + ' €' : '—'}</td>
+                  <td style={{ color: 'var(--text2)' }}>{(r.used_amount || 0).toFixed(2)} €</td>
+                  <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.payment_method || '—'}</td>
+                  <td>{usageBadge(r.price, r.used_amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -133,14 +147,14 @@ export default function RaportointiLahjakortit() {
         </div>
 
         <div className="card">
-          <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>Tiloittain</h3>
-          {Object.entries(byStatus).map(([status, count]) => (
-            <div key={status} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.4rem 0', borderBottom: '1px solid var(--border)', fontSize: '.83rem' }}>
-              <span style={{ color: 'var(--text2)' }}>{status}</span>
-              <strong>{count} kpl</strong>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1rem' }}>Maksutavoittain</h3>
+          {Object.entries(byPaymentMethod).sort((a, b) => b[1] - a[1]).map(([method, sum]) => (
+            <div key={method} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.4rem 0', borderBottom: '1px solid var(--border)', fontSize: '.83rem' }}>
+              <span style={{ color: 'var(--text2)' }}>{method}</span>
+              <strong>{sum.toFixed(2)} €</strong>
             </div>
           ))}
-          {Object.keys(byStatus).length === 0 && <p style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ei dataa.</p>}
+          {Object.keys(byPaymentMethod).length === 0 && <p style={{ color: 'var(--text3)', fontSize: '.83rem' }}>Ei dataa.</p>}
         </div>
       </div>
     </div>

@@ -126,6 +126,7 @@ export default function Raportointi() {
   const [customTo, setCustomTo]   = useState('')
   const [allRows, setAllRows]     = useState({})
   const [memberTotal, setMemberTotal] = useState(null)
+  const [giftCardTotal, setGiftCardTotal] = useState(0)
   const [loading, setLoading]     = useState(true)
 
   useEffect(() => { fetchData() }, [period, customFrom, customTo, showMembership])
@@ -145,6 +146,11 @@ export default function Raportointi() {
     const rows = {}
     CATEGORIES.forEach((c, i) => { rows[c.key] = results[i].data || [] })
     setAllRows(rows)
+
+    // Lahjakorttimyynnit: filter by sale_date (kauppapäivä), not created_at (kirjaupäivä)
+    const { data: giftRows } = await supabaseAdmin.from('lahjakortit')
+      .select('price').gte('sale_date', from).lte('sale_date', to)
+    setGiftCardTotal((giftRows || []).reduce((s, r) => s + (r.price || 0), 0))
 
     if (showMembership) {
       const { data } = await supabaseAdmin.from('membership_stats')
@@ -206,6 +212,18 @@ export default function Raportointi() {
             </div>
           </Link>
         ))}
+        <Link to="/finance/raportointi/lahjakortit" style={{ textDecoration: 'none' }}>
+          <div className="card" style={{ cursor: 'pointer', borderTop: '3px solid var(--gold, #D4A017)', transition: 'box-shadow .15s', height: '100%' }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow)'}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = ''}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '.5rem' }}>Lahjakorttimyynti</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.9rem', color: 'var(--gold, #D4A017)', lineHeight: 1 }}>
+              {loading ? '...' : fmtEur(giftCardTotal)}
+            </div>
+            <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.4rem' }}>{periodLabel}</div>
+            <div style={{ marginTop: '1rem', fontSize: '.78rem', color: 'var(--gold, #D4A017)', fontWeight: 600 }}>Avaa raportti →</div>
+          </div>
+        </Link>
         {showMembership && (
           <Link to="/finance/raportointi/jasenyydet" style={{ textDecoration: 'none' }}>
             <div className="card" style={{ cursor: 'pointer', borderTop: '3px solid var(--teal, #0D9488)', transition: 'box-shadow .15s', height: '100%' }}
