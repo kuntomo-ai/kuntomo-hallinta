@@ -10,9 +10,10 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
-  { key: 'terapia',   label: 'Terapiamyynti',   table: 'terapiamyynti',   to: '/finance/raportointi/terapiamyynti',   color: 'var(--violet)',            hex: '#7C3AED' },
-  { key: 'valmennus', label: 'Valmennusmyynti', table: 'valmennusmyynti', to: '/finance/raportointi/valmennusmyynti', color: '#3B82F6',                   hex: '#3B82F6' },
-  { key: 'jasen',     label: 'Jäsenmyynti',     table: 'jasenmyynti',     to: '/finance/raportointi/jasenmyynti',     color: 'var(--orange, #F97316)',    hex: '#F97316' },
+  { key: 'terapia',    label: 'Terapiamyynti',     table: 'terapiamyynti',   to: '/finance/raportointi/terapiamyynti',   color: 'var(--violet)',            hex: '#7C3AED', dateField: 'created_at' },
+  { key: 'valmennus',  label: 'Valmennusmyynti',   table: 'valmennusmyynti', to: '/finance/raportointi/valmennusmyynti', color: '#3B82F6',                   hex: '#3B82F6', dateField: 'created_at' },
+  { key: 'jasen',      label: 'Jäsenmyynti',       table: 'jasenmyynti',     to: '/finance/raportointi/jasenmyynti',     color: 'var(--orange, #F97316)',    hex: '#F97316', dateField: 'created_at' },
+  { key: 'lahjakortti',label: 'Lahjakorttimyynti', table: 'lahjakortit',     to: '/finance/raportointi/lahjakortit',     color: 'var(--gold, #D4A017)',      hex: '#D4A017', dateField: 'sale_date' },
 ]
 
 const PERIODS = [
@@ -64,10 +65,10 @@ function buildSlots(period) {
   })
 }
 
-function aggregateRows(rows, period) {
+function aggregateRows(rows, period, dateField = 'created_at') {
   const map = {}
   rows.forEach(r => {
-    const d = (r.created_at || '').slice(0, 10)
+    const d = (r[dateField] || '').slice(0, 10)
     if (!d) return
     let slotKey
     if (period === 'year') {
@@ -83,7 +84,7 @@ function aggregateRows(rows, period) {
 function buildChartData(allRows, period) {
   const slots = buildSlots(period)
   const aggr = {}
-  CATEGORIES.forEach(c => { aggr[c.key] = aggregateRows(allRows[c.key] || [], period) })
+  CATEGORIES.forEach(c => { aggr[c.key] = aggregateRows(allRows[c.key] || [], period, c.dateField) })
   return slots.map(slot => {
     const entry = { label: slot.label }
     CATEGORIES.forEach(c => { entry[c.key] = +(aggr[c.key][slot.key] || 0).toFixed(2) })
@@ -126,7 +127,6 @@ export default function Raportointi() {
   const [customTo, setCustomTo]   = useState('')
   const [allRows, setAllRows]     = useState({})
   const [memberTotal, setMemberTotal] = useState(null)
-  const [giftCardTotal, setGiftCardTotal] = useState(0)
   const [loading, setLoading]     = useState(true)
 
   useEffect(() => { fetchData() }, [period, customFrom, customTo, showMembership])
@@ -136,21 +136,20 @@ export default function Raportointi() {
     if (!from || !to) return
     setLoading(true)
 
+    // Each category may use a different date column (e.g. lahjakortit → sale_date).
+    // Date-only columns don't accept the 'T23:59:59' suffix, so we branch on the type.
     const results = await Promise.all(
-      CATEGORIES.map(c =>
-        supabaseAdmin.from(c.table).select('price, created_at')
-          .gte('created_at', from).lte('created_at', to + 'T23:59:59')
-      )
+      CATEGORIES.map(c => {
+        const isDateOnly = c.dateField !== 'created_at'
+        return supabaseAdmin.from(c.table).select(`price, ${c.dateField}`)
+          .gte(c.dateField, from)
+          .lte(c.dateField, isDateOnly ? to : to + 'T23:59:59')
+      })
     )
 
     const rows = {}
     CATEGORIES.forEach((c, i) => { rows[c.key] = results[i].data || [] })
     setAllRows(rows)
-
-    // Lahjakorttimyynnit: filter by sale_date (kauppapäivä), not created_at (kirjaupäivä)
-    const { data: giftRows } = await supabaseAdmin.from('lahjakortit')
-      .select('price').gte('sale_date', from).lte('sale_date', to)
-    setGiftCardTotal((giftRows || []).reduce((s, r) => s + (r.price || 0), 0))
 
     if (showMembership) {
       const { data } = await supabaseAdmin.from('membership_stats')
@@ -212,18 +211,6 @@ export default function Raportointi() {
             </div>
           </Link>
         ))}
-        <Link to="/finance/raportointi/lahjakortit" style={{ textDecoration: 'none' }}>
-          <div className="card" style={{ cursor: 'pointer', borderTop: '3px solid var(--gold, #D4A017)', transition: 'box-shadow .15s', height: '100%' }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow)'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = ''}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '.5rem' }}>Lahjakorttimyynti</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.9rem', color: 'var(--gold, #D4A017)', lineHeight: 1 }}>
-              {loading ? '...' : fmtEur(giftCardTotal)}
-            </div>
-            <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.4rem' }}>{periodLabel}</div>
-            <div style={{ marginTop: '1rem', fontSize: '.78rem', color: 'var(--gold, #D4A017)', fontWeight: 600 }}>Avaa raportti →</div>
-          </div>
-        </Link>
         {showMembership && (
           <Link to="/finance/raportointi/jasenyydet" style={{ textDecoration: 'none' }}>
             <div className="card" style={{ cursor: 'pointer', borderTop: '3px solid var(--teal, #0D9488)', transition: 'box-shadow .15s', height: '100%' }}
@@ -281,9 +268,9 @@ export default function Raportointi() {
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '.78rem', paddingTop: '.5rem' }} />
-                {CATEGORIES.map(c => (
+                {CATEGORIES.map((c, i) => (
                   <Bar key={c.key} dataKey={c.key} name={c.label} stackId="a" fill={c.hex} maxBarSize={48}
-                    radius={c.key === 'jasen' ? [3,3,0,0] : [0,0,0,0]} />
+                    radius={i === CATEGORIES.length - 1 ? [3,3,0,0] : [0,0,0,0]} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
