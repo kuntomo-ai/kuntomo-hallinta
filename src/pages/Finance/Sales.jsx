@@ -198,11 +198,23 @@ function TerapiaForm({ onSaved }) {
     const customerName = needsYrityskäynti ? form.yritys_name.trim() : (form.company_person_name || form.customer_name_free?.trim() || '—')
 
     const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
+    // Save per-method splits when there are multiple payment methods so
+    // Tilitettävä-summa can apply the discount (−5% HVE, −10% Lahjakortti)
+    // only to that portion, not to the whole sale.
+    const splitsToSave = form.payment_methods.length > 1
+      ? form.payment_methods.reduce((acc, m) => {
+          const label = m === 'Hyvinvointietu' && form.hve_provider ? `Hyvinvointietu (${form.hve_provider})` : m
+          const amt = parseFloat(form.splits[m])
+          if (!isNaN(amt) && amt > 0) acc[label] = amt
+          return acc
+        }, {})
+      : null
     const { error: insertError } = await supabaseAdmin.from('terapiamyynti').insert({
       customer_name: customerName,
       service: form.service,
       price: parseFloat(form.price),
       payment_method: paymentStr,
+      splits: splitsToSave,
       notes: form.notes.trim() || null,
       receipt_url,
       employee_id: user?.id ?? null,
@@ -1215,16 +1227,27 @@ export default function Sales() {
           </div>
 
           {tab === 'terapia' && filtered.length > 0 && (() => {
+            // Apply the discount (−5% Hyvinvointietu, −10% Lahjakortti) only to
+            // the portion paid with that method. Uses splits when available;
+            // falls back to whole-sale discount for older rows without splits.
+            const netForPortion = (method, amount) => {
+              const m = method.toLowerCase()
+              if (m.includes('käteinen')) return 0
+              if (m.includes('lahjakortti')) return amount * 0.90
+              if (m.includes('hyvinvointietu')) return amount * 0.95
+              return amount
+            }
             let brutto = 0, tilitettava = 0
             for (const r of filtered) {
               const price = r.price || 0
               brutto += price
-              const pm = (r.payment_method || '').toLowerCase()
-              if (pm.includes('käteinen')) continue
-              let net = price
-              if (pm.includes('lahjakortti')) net *= 0.90
-              else if (pm.includes('hyvinvointietu')) net *= 0.95
-              tilitettava += net
+              if (r.splits && typeof r.splits === 'object' && !Array.isArray(r.splits)) {
+                for (const [method, amt] of Object.entries(r.splits)) {
+                  tilitettava += netForPortion(method, parseFloat(amt) || 0)
+                }
+                continue
+              }
+              tilitettava += netForPortion(r.payment_method || '', price)
             }
             return (
               <div style={{ marginTop: '.75rem', padding: '.85rem 1.25rem', background: 'var(--violet-subtle)', border: '1px solid var(--violet-border)', borderRadius: 'var(--radius)', display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
