@@ -990,6 +990,21 @@ export default function Sales() {
   function openEdit(r) {
     setEditRow(r)
     if (tab === 'terapia') {
+      // Parse the current payment_method string into method labels for the splits UI.
+      // Strip any trailing amounts and the " — details" tail so we get clean labels.
+      const methodTokens = (r.payment_method || '')
+        .split(/\s+—\s+/)[0]
+        .split(/,\s*/)
+        .map(t => t.replace(/\s+\d+([.,]\d+)?\s*€\s*$/, '').trim())
+        .filter(Boolean)
+      const existingSplits = (r.splits && typeof r.splits === 'object' && !Array.isArray(r.splits))
+        ? { ...r.splits }
+        : {}
+      const splitsInit = {}
+      methodTokens.forEach(m => {
+        const v = existingSplits[m]
+        splitsInit[m] = v != null ? String(v) : ''
+      })
       setEditForm({
         visit_date: (r.entry_date || r.visit_date || r.created_at || '').slice(0, 10),
         customer_name: r.customer_name || '',
@@ -998,6 +1013,8 @@ export default function Sales() {
         payment_method: r.payment_method || '',
         notes: r.notes || '',
         laskutettu: r.laskutettu ?? null,
+        _methods: methodTokens,
+        splits: splitsInit,
       })
     } else if (tab === 'valmennus') {
       setEditForm({
@@ -1027,6 +1044,18 @@ export default function Sales() {
     let table, payload
     if (tab === 'terapia') {
       table = 'terapiamyynti'
+      // Only save splits when there are ≥2 methods and every entered amount > 0.
+      // Single-method rows should have splits=null so the fallback discount rule
+      // applies. Editor is intentionally lenient about sum-vs-price mismatches
+      // — the Tilitettävä calc only uses the ratios per method.
+      const methods = editForm._methods || []
+      const parsedSplits = {}
+      let hasAllSplits = methods.length >= 2
+      for (const m of methods) {
+        const v = parseFloat(editForm.splits?.[m])
+        if (isNaN(v) || v <= 0) { hasAllSplits = false; break }
+        parsedSplits[m] = v
+      }
       payload = {
         entry_date: editForm.visit_date || null,
         visit_date: editForm.visit_date || null,
@@ -1034,6 +1063,7 @@ export default function Sales() {
         service: editForm.service || null,
         price: parseFloat(editForm.price) || 0,
         payment_method: editForm.payment_method || null,
+        splits: hasAllSplits ? parsedSplits : null,
         notes: editForm.notes.trim() || null,
         ...((editForm.payment_method || '').includes('Laskutus') ? { laskutettu: editForm.laskutettu ?? false } : {}),
       }
@@ -1382,6 +1412,37 @@ export default function Sales() {
                 )}
               </div>
             )}
+            {tab === 'terapia' && (editForm._methods?.length || 0) >= 2 && (() => {
+              const methods = editForm._methods
+              const sum = methods.reduce((s, m) => s + (parseFloat(editForm.splits?.[m]) || 0), 0)
+              const price = parseFloat(editForm.price) || 0
+              const diff = Math.abs(sum - price)
+              return (
+                <div className="input-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="input-label">Erittely maksutavoittain (Tilitettävä-summaa varten)</label>
+                  <div style={{ padding: '.75rem', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                    {methods.map(m => (
+                      <div key={m} style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
+                        <span style={{ flex: 1, fontSize: '.87rem', color: 'var(--text2)' }}>{m}</span>
+                        <input className="input-field" type="number" step="0.01" min="0" style={{ width: 110 }}
+                          value={editForm.splits?.[m] ?? ''}
+                          onChange={e => setEditForm(f => ({ ...f, splits: { ...f.splits, [m]: e.target.value } }))} />
+                        <span style={{ color: 'var(--text3)', fontSize: '.83rem' }}>€</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '.5rem', fontSize: '.83rem' }}>
+                      <span style={{ color: 'var(--text3)' }}>Yhteensä syötetty: <strong style={{ color: diff < 0.01 ? 'var(--green)' : 'var(--orange)' }}>{sum.toFixed(2)} €</strong></span>
+                      <span style={{ color: 'var(--text3)' }}>Hinta: {price.toFixed(2)} €</span>
+                    </div>
+                    {diff >= 0.01 && sum > 0 && (
+                      <div style={{ fontSize: '.72rem', color: 'var(--orange)' }}>
+                        Summa ei täsmää hintaan — Tilitettävä-summa käyttää silti syöttämiäsi arvoja per maksutapa.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
             {tab === 'jasen' && isAdmin && (
               <div className="input-group">
                 <label className="input-label">Myyntipäivä</label>
