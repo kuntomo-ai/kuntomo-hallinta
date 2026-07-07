@@ -65,9 +65,9 @@ const DATA = [
   },
   {
     label: '2026', period: '1.5.2025–30.4.2026',
-    liikevaihto: 1_919_009, liikevoitto: 248_301, voitto: 188_594,
-    tase:          642_003, oma:          243_003,
-    pdf: null,
+    liikevaihto: 1_919_009, liikevoitto: 226_365, voitto: 171_045,
+    tase:          642_003, oma:          225_455,
+    pdf: 'https://sign.visma.net/fi/document-check/d7cddf5a-af7b-46c8-adfa-93f5f4578c69',
   },
 ]
 
