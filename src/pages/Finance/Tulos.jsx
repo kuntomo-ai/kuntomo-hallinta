@@ -6,11 +6,21 @@ import {
 import { supabase, supabaseAdmin } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
-const MONTH_LABELS = {
-  '2025-05': 'Touko 25', '2025-06': 'Kesä 25', '2025-07': 'Heinä 25',
-  '2025-08': 'Elo 25',   '2025-09': 'Syys 25', '2025-10': 'Loka 25',
-  '2025-11': 'Marras 25','2025-12': 'Joulu 25','2026-01': 'Tammi 26',
-  '2026-02': 'Helmi 26', '2026-03': 'Maalis 26','2026-04': 'Huhti 26',
+const MONTHS_FI = ['Tammi', 'Helmi', 'Maalis', 'Huhti', 'Touko', 'Kesä',
+                   'Heinä', 'Elo', 'Syys', 'Loka', 'Marras', 'Joulu']
+
+// 'YYYY-MM' → esim. 'Kesä 26'
+function monthLabel(period) {
+  if (!period) return '—'
+  const [y, m] = period.split('-').map(Number)
+  return `${MONTHS_FI[m - 1]} ${String(y).slice(2)}`
+}
+
+// Tilikausi alkaa 1.5. — palauta jaksoon kuuluvan tilikauden rajat.
+function fiscalYear(period) {
+  const [y, m] = period.split('-').map(Number)
+  const startYear = m >= 5 ? y : y - 1
+  return { startYear, start: `${startYear}-05`, end: `${startYear + 1}-04` }
 }
 
 function fmt(v, decimals = 0) {
@@ -40,6 +50,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function Tulos() {
   const [rows, setRows] = useState([])
+  const [fy, setFy] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
 
@@ -51,12 +62,21 @@ export default function Tulos() {
       .from('tulos_kuukausiraportti')
       .select('*')
       .order('period')
-    setRows(data || [])
+    const all = data || []
+    if (all.length) {
+      // Näytä uusin tilikausi (touko–huhti) — jaksot ovat nousevassa järjestyksessä.
+      const fyBounds = fiscalYear(all[all.length - 1].period)
+      setFy(fyBounds)
+      setRows(all.filter(r => r.period >= fyBounds.start && r.period <= fyBounds.end))
+    } else {
+      setFy(null)
+      setRows([])
+    }
     setLoading(false)
   }
 
   const chartData = rows.map(r => ({
-    period: MONTH_LABELS[r.period] || r.period,
+    period: monthLabel(r.period),
     'Liikevaihto': Math.round(r.liikevaihto || 0),
     'Muut tuotot': Math.round(r.muut_tuotot || 0),
     'Materiaalit & palvelut': Math.round(Math.abs(r.materiaalit_palvelut || 0)),
@@ -101,7 +121,9 @@ export default function Tulos() {
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Tuloslaskelma</h1>
-          <p className="page-subtitle">{rows[0]?.period} – {rows[rows.length - 1]?.period} · {rows.length} kuukautta</p>
+          <p className="page-subtitle">
+            {fy ? `Tilikausi 1.5.${fy.startYear} – 30.4.${fy.startYear + 1}` : ''} · {rows.length} kuukautta
+          </p>
         </div>
       </div>
 
@@ -122,7 +144,7 @@ export default function Tulos() {
         <div className="stat-card">
           <div className="stat-label">Paras kuukausi</div>
           <div className="stat-value" style={{ fontSize: '1.1rem' }}>
-            {bestMonth ? (MONTH_LABELS[bestMonth.period] || bestMonth.period) : '—'}
+            {bestMonth ? monthLabel(bestMonth.period) : '—'}
           </div>
           <div style={{ fontSize: '.75rem', color: 'var(--text3)', marginTop: '.2rem' }}>
             {bestMonth ? `LV: ${fmt(bestMonth.liikevaihto)}` : ''}
@@ -222,7 +244,7 @@ export default function Tulos() {
                   onMouseEnter={e => { if (selected !== r.period) e.currentTarget.style.background = 'var(--bg2)' }}
                   onMouseLeave={e => { if (selected !== r.period) e.currentTarget.style.background = '' }}
                 >
-                  <td style={{ padding: '9px 12px', fontWeight: 700 }}>{MONTH_LABELS[r.period] || r.period}</td>
+                  <td style={{ padding: '9px 12px', fontWeight: 700 }}>{monthLabel(r.period)}</td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 600 }}>{fmt(r.liikevaihto)}</td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--red)' }}>{fmt(r.materiaalit_palvelut)}</td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', color: 'var(--red)' }}>{fmt(r.henkilostokulut)}</td>
@@ -253,7 +275,7 @@ export default function Tulos() {
       {sel && (
         <div className="card" style={{ marginBottom: '2rem' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', marginBottom: '1.25rem' }}>
-            {MONTH_LABELS[sel.period] || sel.period} – Erittely
+            {monthLabel(sel.period)} – Erittely
           </div>
           <div className="grid-cols-2" style={{ gap: '1.5rem' }}>
             <div>
