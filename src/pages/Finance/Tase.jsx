@@ -222,17 +222,20 @@ export default function Tase() {
     const { data } = await supabaseAdmin.from('tase_snapshot').select('*').order('side').order('section').order('sub_section').order('account_code')
     const items = data || []
     setRows(items)
-    if (items.length) setPeriod(items[0].period)
+    // Näytä vain uusin jakso — kannassa voi olla useita jaksoja (mm. tilikohtaisia
+    // rivejä lainaominaisuutta varten), joita ei saa summata keskenään.
+    if (items.length) setPeriod(items.map(r => r.period).sort().at(-1))
     setLoading(false)
   }
 
-  const vastaavaaRows   = rows.filter(r => r.side === 'vastaavaa')
-  const vastattavaaRows = rows.filter(r => r.side === 'vastattavaa')
+  const periodRows      = rows.filter(r => r.period === period)
+  const vastaavaaRows   = periodRows.filter(r => r.side === 'vastaavaa')
+  const vastattavaaRows = periodRows.filter(r => r.side === 'vastattavaa')
   const vastaavaaTotal  = vastaavaaRows.reduce((s, r) => s + (r.loppusaldo || 0), 0)
   const vastattavaaTotal = vastattavaaRows.reduce((s, r) => s + (r.loppusaldo || 0), 0)
   const balanced = Math.abs(vastaavaaTotal - vastattavaaTotal) < 0.1
 
-  const subTotal = (key) => rows.filter(r => r.sub_section === key).reduce((s, r) => s + (r.loppusaldo || 0), 0)
+  const subTotal = (key) => periodRows.filter(r => r.sub_section === key).reduce((s, r) => s + (r.loppusaldo || 0), 0)
 
   const assetData = [
     { name: 'Aineettomat hyödykkeet', value: subTotal('aineettomat'), fill: ASSET_COLORS.aineettomat },
