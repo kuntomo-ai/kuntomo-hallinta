@@ -51,9 +51,15 @@ function itemAmount(item, monthIdx) {
   return 0
 }
 
-// Jäsenmäärä tiettynä vuonna: käytä vuosikohtaista arvoa jos annettu,
-// muuten peruskäyttäjämäärä kasvatettuna kasvuprosentilla.
-function memberCount(m, year = 0) {
+// Jäsenmäärä tiettynä kuukautena. Prioriteetti:
+//   1. kuukausikohtainen arvo (countsByMonth[monthIdx])
+//   2. vuosikohtainen arvo (countsByYear[year]) – vanha data
+//   3. peruskäyttäjämäärä kasvatettuna kasvuprosentilla
+function memberCount(m, monthIdx = 0) {
+  const year = Math.floor(monthIdx / 12)
+  const byMonth = m.countsByMonth
+  if (byMonth && byMonth[monthIdx] != null && byMonth[monthIdx] !== '')
+    return Number(byMonth[monthIdx])
   const byYear = m.countsByYear
   if (byYear && byYear[year] != null && byYear[year] !== '')
     return Number(byYear[year])
@@ -61,8 +67,8 @@ function memberCount(m, year = 0) {
 }
 
 // 4-week billing → monthly: price × 13/12
-function memberMonthly(m, year = 0) {
-  const count = memberCount(m, year)
+function memberMonthly(m, monthIdx = 0) {
+  const count = memberCount(m, monthIdx)
   if (m.periodWeeks) return count * m.price * (52 / m.periodWeeks / 12)
   return count * m.price
 }
@@ -71,7 +77,7 @@ function calcMonths(expenses, memberships, otherRevs, savings, horisontti) {
   let cum = 0
   return Array.from({ length: horisontti }, (_, i) => {
     const menot      = expenses.reduce((s, e) => s + itemAmount(e, i), 0)
-    const jasenTulot = memberships.reduce((s, m) => s + memberMonthly(m, Math.floor(i / 12)), 0)
+    const jasenTulot = memberships.reduce((s, m) => s + memberMonthly(m, i), 0)
     const muutTulot  = otherRevs.reduce((s, r) => s + itemAmount(r, i), 0)
     const saastot    = savings.reduce((s, r) => s + itemAmount(r, i), 0)
     const tulot      = jasenTulot + muutTulot + saastot
@@ -382,22 +388,25 @@ function ItemRow({ item, onUpdate, onDelete, maxMonth }) {
 // ── Membership row (with expandable per-year member counts) ───────────────────
 const MEMBER_GRID = '1fr 58px 52px 50px 52px'
 
-function MembershipRow({ m, years, onUpdate, onUpdateYearCount }) {
+const MONTH_ABBR = ['Tam', 'Hel', 'Maa', 'Huh', 'Tou', 'Kes', 'Hei', 'Elo', 'Syy', 'Lok', 'Mar', 'Jou']
+
+function MembershipRow({ m, horisontti, onUpdate, onUpdateMonthCount, onFillYear }) {
   const [open, setOpen] = useState(false)
-  const hasYearCounts = Array.isArray(m.countsByYear) && m.countsByYear.some(c => c != null && c !== '')
+  const years = Math.ceil(horisontti / 12)
+  const hasMonthCounts = Array.isArray(m.countsByMonth) && m.countsByMonth.some(c => c != null && c !== '')
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: MEMBER_GRID, gap: '.3rem', alignItems: 'center' }}>
-        <div onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer' }} title="Näytä jäsenmäärä vuosittain">
+        <div onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer' }} title="Näytä jäsenmäärä kuukausittain">
           <div style={{ fontSize: '.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '.28rem' }}>
-            <span style={{ fontSize: '.58rem', color: hasYearCounts ? 'var(--violet, #7c5cbf)' : 'var(--text3)' }}>
+            <span style={{ fontSize: '.58rem', color: hasMonthCounts ? 'var(--violet, #7c5cbf)' : 'var(--text3)' }}>
               {open ? '▾' : '▸'}
             </span>
             {m.label}
           </div>
           <div style={{ fontSize: '.65rem', color: 'var(--text3)', paddingLeft: '.86rem' }}>
             {m.periodWeeks ? `/${m.periodWeeks} vko` : '/käynti'}
-            {hasYearCounts && <span style={{ color: 'var(--violet, #7c5cbf)', marginLeft: '.3rem' }}>· vuosimäärät</span>}
+            {hasMonthCounts && <span style={{ color: 'var(--violet, #7c5cbf)', marginLeft: '.3rem' }}>· kk-määrät</span>}
           </div>
         </div>
         <NumInput value={m.price} step={0.10} min={0} onChange={v => onUpdate('price', v)} />
@@ -410,29 +419,48 @@ function MembershipRow({ m, years, onUpdate, onUpdateYearCount }) {
 
       {open && (
         <div style={{ margin: '.5rem 0 .3rem', padding: '.55rem .6rem', background: 'var(--bg2)', borderRadius: 6 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.4rem' }}>
-            <span style={{ fontSize: '.66rem', fontWeight: 700, color: 'var(--text2)' }}>Jäsenmäärä / vuosi</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.5rem' }}>
+            <span style={{ fontSize: '.66rem', fontWeight: 700, color: 'var(--text2)' }}>Jäsenmäärä / kuukausi</span>
             <span style={{ fontSize: '.62rem', color: 'var(--text3)' }}>tyhjä = auto (kasvu%)</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${years}, 1fr)`, gap: '.35rem' }}>
-            {Array.from({ length: years }, (_, y) => {
-              const auto = Math.round((m.count || 0) * Math.pow(1 + (m.growthPct ?? 0) / 100, y))
-              const val  = m.countsByYear?.[y]
-              return (
-                <div key={y}>
-                  <div style={{ fontSize: '.6rem', color: 'var(--text3)', textAlign: 'center', marginBottom: '.15rem' }}>
-                    Vuosi {y + 1}
-                  </div>
-                  <input
-                    className="input-field" type="number" min={0}
-                    value={val ?? ''} placeholder={String(auto)}
-                    onChange={e => onUpdateYearCount(y, e.target.value)}
-                    style={{ fontSize: '.78rem', padding: '.26rem .3rem', height: 'auto', textAlign: 'center', width: '100%' }}
-                  />
+          {Array.from({ length: years }, (_, y) => {
+            const startM = y * 12
+            const endM   = Math.min((y + 1) * 12, horisontti)
+            const autoY  = Math.round((m.count || 0) * Math.pow(1 + (m.growthPct ?? 0) / 100, y))
+            return (
+              <div key={y} style={{ marginBottom: '.55rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem' }}>
+                  <span style={{ fontSize: '.62rem', fontWeight: 700, color: 'var(--text3)' }}>Vuosi {y + 1}</span>
+                  <button
+                    onClick={() => onFillYear(y, autoY)}
+                    title={`Täytä vuoden ${y + 1} kaikki kuukaudet arvolla ${autoY}`}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--violet, #7c5cbf)',
+                      fontSize: '.6rem', padding: 0 }}>
+                    täytä {autoY} →
+                  </button>
                 </div>
-              )
-            })}
-          </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '.3rem' }}>
+                  {Array.from({ length: endM - startM }, (_, k) => {
+                    const monthIdx = startM + k
+                    const val = m.countsByMonth?.[monthIdx]
+                    return (
+                      <div key={monthIdx}>
+                        <div style={{ fontSize: '.57rem', color: 'var(--text3)', textAlign: 'center', marginBottom: '.1rem' }}>
+                          {MONTH_ABBR[monthIdx % 12]} {monthIdx + 1}
+                        </div>
+                        <input
+                          className="input-field" type="number" min={0}
+                          value={val ?? ''} placeholder={String(autoY)}
+                          onChange={e => onUpdateMonthCount(monthIdx, e.target.value)}
+                          style={{ fontSize: '.74rem', padding: '.22rem .2rem', height: 'auto', textAlign: 'center', width: '100%' }}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -506,12 +534,20 @@ export default function Investoinnit() {
 
   const updateMembership = (id, field, val) =>
     patch({ memberships: inv.memberships.map(m => m.id === id ? { ...m, [field]: val } : m) })
-  const updateMemberYearCount = (id, year, val) =>
+  const updateMemberMonthCount = (id, monthIdx, val) =>
     patch({ memberships: inv.memberships.map(m => {
       if (m.id !== id) return m
-      const arr = Array.isArray(m.countsByYear) ? [...m.countsByYear] : []
-      arr[year] = (val === '' || val == null) ? null : Number(val)
-      return { ...m, countsByYear: arr }
+      const arr = Array.isArray(m.countsByMonth) ? [...m.countsByMonth] : []
+      arr[monthIdx] = (val === '' || val == null) ? null : Number(val)
+      return { ...m, countsByMonth: arr }
+    }) })
+  // Täytä yhden vuoden kaikki kuukaudet samalla jäsenmäärällä
+  const fillMemberYear = (id, year, value) =>
+    patch({ memberships: inv.memberships.map(m => {
+      if (m.id !== id) return m
+      const arr = Array.isArray(m.countsByMonth) ? [...m.countsByMonth] : []
+      for (let k = year * 12; k < Math.min((year + 1) * 12, inv.horisontti); k++) arr[k] = value
+      return { ...m, countsByMonth: arr }
     }) })
 
   const updateOtherRev = (id, field, val) =>
@@ -684,13 +720,14 @@ export default function Investoinnit() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
               {inv.memberships.map(m => (
-                <MembershipRow key={m.id} m={m} years={Math.ceil(inv.horisontti / 12)}
+                <MembershipRow key={m.id} m={m} horisontti={inv.horisontti}
                   onUpdate={(f, v) => updateMembership(m.id, f, v)}
-                  onUpdateYearCount={(y, v) => updateMemberYearCount(m.id, y, v)} />
+                  onUpdateMonthCount={(mi, v) => updateMemberMonthCount(m.id, mi, v)}
+                  onFillYear={(y, v) => fillMemberYear(m.id, y, v)} />
               ))}
             </div>
             <div style={{ marginTop: '.6rem', fontSize: '.66rem', color: 'var(--text3)', lineHeight: 1.4 }}>
-              Avaa tuote (▸) syöttääksesi jäsenmäärän erikseen jokaiselle vuodelle. Tyhjä kenttä käyttää automaattista kasvua.
+              Avaa tuote (▸) syöttääksesi jäsenmäärän erikseen jokaiselle kuukaudelle. Tyhjä kenttä käyttää automaattista kasvua. "Täytä" asettaa koko vuoden kerralla.
             </div>
             <RowTotal label="Yhteensä kk 1" value={fmt(memberM1)} />
           </div>
