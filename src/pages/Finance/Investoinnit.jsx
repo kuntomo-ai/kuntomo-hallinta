@@ -51,21 +51,27 @@ function itemAmount(item, monthIdx) {
   return 0
 }
 
-// 4-week billing → monthly: price × 13/12
-function memberMonthly(m) {
-  if (m.periodWeeks) return m.count * m.price * (52 / m.periodWeeks / 12)
-  return m.count * m.price
+// Jäsenmäärä tiettynä vuonna: käytä vuosikohtaista arvoa jos annettu,
+// muuten peruskäyttäjämäärä kasvatettuna kasvuprosentilla.
+function memberCount(m, year = 0) {
+  const byYear = m.countsByYear
+  if (byYear && byYear[year] != null && byYear[year] !== '')
+    return Number(byYear[year])
+  return (m.count || 0) * Math.pow(1 + (m.growthPct ?? 0) / 100, year)
 }
 
-function withGrowth(base, pct, monthIdx) {
-  return base * Math.pow(1 + pct / 100, Math.floor(monthIdx / 12))
+// 4-week billing → monthly: price × 13/12
+function memberMonthly(m, year = 0) {
+  const count = memberCount(m, year)
+  if (m.periodWeeks) return count * m.price * (52 / m.periodWeeks / 12)
+  return count * m.price
 }
 
 function calcMonths(expenses, memberships, otherRevs, savings, horisontti) {
   let cum = 0
   return Array.from({ length: horisontti }, (_, i) => {
     const menot      = expenses.reduce((s, e) => s + itemAmount(e, i), 0)
-    const jasenTulot = memberships.reduce((s, m) => s + withGrowth(memberMonthly(m), m.growthPct, i), 0)
+    const jasenTulot = memberships.reduce((s, m) => s + memberMonthly(m, Math.floor(i / 12)), 0)
     const muutTulot  = otherRevs.reduce((s, r) => s + itemAmount(r, i), 0)
     const saastot    = savings.reduce((s, r) => s + itemAmount(r, i), 0)
     const tulot      = jasenTulot + muutTulot + saastot
@@ -373,6 +379,66 @@ function ItemRow({ item, onUpdate, onDelete, maxMonth }) {
   )
 }
 
+// ── Membership row (with expandable per-year member counts) ───────────────────
+const MEMBER_GRID = '1fr 58px 52px 50px 52px'
+
+function MembershipRow({ m, years, onUpdate, onUpdateYearCount }) {
+  const [open, setOpen] = useState(false)
+  const hasYearCounts = Array.isArray(m.countsByYear) && m.countsByYear.some(c => c != null && c !== '')
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: MEMBER_GRID, gap: '.3rem', alignItems: 'center' }}>
+        <div onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer' }} title="Näytä jäsenmäärä vuosittain">
+          <div style={{ fontSize: '.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '.28rem' }}>
+            <span style={{ fontSize: '.58rem', color: hasYearCounts ? 'var(--violet, #7c5cbf)' : 'var(--text3)' }}>
+              {open ? '▾' : '▸'}
+            </span>
+            {m.label}
+          </div>
+          <div style={{ fontSize: '.65rem', color: 'var(--text3)', paddingLeft: '.86rem' }}>
+            {m.periodWeeks ? `/${m.periodWeeks} vko` : '/käynti'}
+            {hasYearCounts && <span style={{ color: 'var(--violet, #7c5cbf)', marginLeft: '.3rem' }}>· vuosimäärät</span>}
+          </div>
+        </div>
+        <NumInput value={m.price} step={0.10} min={0} onChange={v => onUpdate('price', v)} />
+        <NumInput value={m.count} step={1}    min={0} onChange={v => onUpdate('count', v)} />
+        <NumInput value={m.growthPct} step={1}       onChange={v => onUpdate('growthPct', v)} />
+        <span style={{ fontSize: '.8rem', fontWeight: 600, textAlign: 'right' }}>
+          {fmt(memberMonthly(m))}
+        </span>
+      </div>
+
+      {open && (
+        <div style={{ margin: '.5rem 0 .3rem', padding: '.55rem .6rem', background: 'var(--bg2)', borderRadius: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.4rem' }}>
+            <span style={{ fontSize: '.66rem', fontWeight: 700, color: 'var(--text2)' }}>Jäsenmäärä / vuosi</span>
+            <span style={{ fontSize: '.62rem', color: 'var(--text3)' }}>tyhjä = auto (kasvu%)</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${years}, 1fr)`, gap: '.35rem' }}>
+            {Array.from({ length: years }, (_, y) => {
+              const auto = Math.round((m.count || 0) * Math.pow(1 + (m.growthPct ?? 0) / 100, y))
+              const val  = m.countsByYear?.[y]
+              return (
+                <div key={y}>
+                  <div style={{ fontSize: '.6rem', color: 'var(--text3)', textAlign: 'center', marginBottom: '.15rem' }}>
+                    Vuosi {y + 1}
+                  </div>
+                  <input
+                    className="input-field" type="number" min={0}
+                    value={val ?? ''} placeholder={String(auto)}
+                    onChange={e => onUpdateYearCount(y, e.target.value)}
+                    style={{ fontSize: '.78rem', padding: '.26rem .3rem', height: 'auto', textAlign: 'center', width: '100%' }}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Investoinnit() {
   const [investments, setInvestments] = useState(() => [makeInvestment(1)])
@@ -440,6 +506,13 @@ export default function Investoinnit() {
 
   const updateMembership = (id, field, val) =>
     patch({ memberships: inv.memberships.map(m => m.id === id ? { ...m, [field]: val } : m) })
+  const updateMemberYearCount = (id, year, val) =>
+    patch({ memberships: inv.memberships.map(m => {
+      if (m.id !== id) return m
+      const arr = Array.isArray(m.countsByYear) ? [...m.countsByYear] : []
+      arr[year] = (val === '' || val == null) ? null : Number(val)
+      return { ...m, countsByYear: arr }
+    }) })
 
   const updateOtherRev = (id, field, val) =>
     patch({ otherRevs: inv.otherRevs.map(r => r.id === id ? { ...r, [field]: val } : r) })
@@ -602,7 +675,7 @@ export default function Investoinnit() {
           {/* Jäsenyysmyynti */}
           <div className="card" style={{ padding: '1rem' }}>
             <SectionLabel>Jäsenyysmyynti</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 58px 52px 50px 52px', gap: '.3rem', marginBottom: '.3rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: MEMBER_GRID, gap: '.3rem', marginBottom: '.3rem' }}>
               <ColHeader>Tuote</ColHeader>
               <ColHeader right>Hinta €</ColHeader>
               <ColHeader right>Asiak.</ColHeader>
@@ -611,21 +684,13 @@ export default function Investoinnit() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
               {inv.memberships.map(m => (
-                <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '1fr 58px 52px 50px 52px', gap: '.3rem', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '.8rem', fontWeight: 500 }}>{m.label}</div>
-                    <div style={{ fontSize: '.65rem', color: 'var(--text3)' }}>
-                      {m.periodWeeks ? `/${m.periodWeeks} vko` : '/käynti'}
-                    </div>
-                  </div>
-                  <NumInput value={m.price} step={0.10} min={0} onChange={v => updateMembership(m.id, 'price', v)} />
-                  <NumInput value={m.count} step={1}    min={0} onChange={v => updateMembership(m.id, 'count', v)} />
-                  <NumInput value={m.growthPct} step={1}       onChange={v => updateMembership(m.id, 'growthPct', v)} />
-                  <span style={{ fontSize: '.8rem', fontWeight: 600, textAlign: 'right' }}>
-                    {fmt(memberMonthly(m))}
-                  </span>
-                </div>
+                <MembershipRow key={m.id} m={m} years={Math.ceil(inv.horisontti / 12)}
+                  onUpdate={(f, v) => updateMembership(m.id, f, v)}
+                  onUpdateYearCount={(y, v) => updateMemberYearCount(m.id, y, v)} />
               ))}
+            </div>
+            <div style={{ marginTop: '.6rem', fontSize: '.66rem', color: 'var(--text3)', lineHeight: 1.4 }}>
+              Avaa tuote (▸) syöttääksesi jäsenmäärän erikseen jokaiselle vuodelle. Tyhjä kenttä käyttää automaattista kasvua.
             </div>
             <RowTotal label="Yhteensä kk 1" value={fmt(memberM1)} />
           </div>
