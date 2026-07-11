@@ -48,7 +48,7 @@ function itemAmount(item, monthIdx) {
       ? item.amount * Math.pow(1 + (item.growthPct ?? 0) / 100, year)
       : 0
   if (type === 'kerta')
-    return monthIdx === (item.startMonth ?? 1) - 1 ? item.amount : 0
+    return monthIdx === Math.max(1, item.startMonth ?? 1) - 1 ? item.amount : 0
   return 0
 }
 
@@ -381,8 +381,8 @@ function ItemRow({ item, onUpdate, onDelete, maxMonth }) {
         onChange={v => onUpdate('amount', v)} />
       <TypeSelect value={type} onChange={v => onUpdate('type', v)} />
       {isKerta ? (
-        <NumInput value={item.startMonth ?? 1} step={1} min={1} max={maxMonth}
-          onChange={v => onUpdate('startMonth', v)} />
+        <NumInput value={Math.max(1, item.startMonth ?? 1)} step={1} min={1} max={maxMonth}
+          onChange={v => onUpdate('startMonth', Math.max(1, v || 1))} />
       ) : (
         <NumInput value={item.growthPct ?? 0} step={0.5}
           onChange={v => onUpdate('growthPct', v)} />
