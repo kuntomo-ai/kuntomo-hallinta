@@ -19,6 +19,7 @@ function syncIdCounter(data) {
     inv.memberships?.forEach(m => { if (m.id  > _id) _id = m.id  })
     inv.otherRevs?.forEach(r   => { if (r.id  > _id) _id = r.id  })
     inv.savings?.forEach(s     => { if (s.id  > _id) _id = s.id  })
+    inv.deviceInvestments?.forEach(d => { if (d.id > _id) _id = d.id })
   })
 }
 
@@ -73,10 +74,12 @@ function memberMonthly(m, monthIdx = 0) {
   return count * m.price
 }
 
-function calcMonths(expenses, memberships, otherRevs, savings, horisontti) {
+function calcMonths(expenses, memberships, otherRevs, savings, deviceInvestments, horisontti) {
   let cum = 0
   return Array.from({ length: horisontti }, (_, i) => {
-    const menot      = expenses.reduce((s, e) => s + itemAmount(e, i), 0)
+    const kulut      = expenses.reduce((s, e) => s + itemAmount(e, i), 0)
+    const laitteet   = deviceInvestments.reduce((s, d) => s + itemAmount(d, i), 0)
+    const menot      = kulut + laitteet
     const jasenTulot = memberships.reduce((s, m) => s + memberMonthly(m, i), 0)
     const muutTulot  = otherRevs.reduce((s, r) => s + itemAmount(r, i), 0)
     const saastot    = savings.reduce((s, r) => s + itemAmount(r, i), 0)
@@ -88,6 +91,7 @@ function calcMonths(expenses, memberships, otherRevs, savings, horisontti) {
       label: `Kk ${i + 1}`,
       tulot:          Math.round(tulot),
       menot:          Math.round(menot),
+      laitteet:       Math.round(laitteet),
       netto:          Math.round(netto),
       kumulatiivinen: Math.round(cum),
       saastot:        Math.round(saastot),
@@ -121,15 +125,21 @@ const DEF_SAVINGS = [
   { label: 'Laitteiden tuottoarvo',       amount: 300, growthPct: 2, type: 'kk', startMonth: 1 },
 ]
 
+const DEF_DEVICE_INVESTMENTS = [
+  { label: 'Kuntosalilaitteet', amount: 40000, growthPct: 0, type: 'kerta', startMonth: 1 },
+  { label: 'Huoltolaitteet',    amount:  8000, growthPct: 0, type: 'kerta', startMonth: 1 },
+]
+
 function makeInvestment(n) {
   return {
     id:          nid(),
     name:        `Toimipiste ${n}`,
     horisontti:  36,
-    expenses:    DEF_EXPENSES.map(e => ({ ...e, id: nid() })),
-    memberships: DEF_MEMBERSHIPS.map(m => ({ ...m, id: nid() })),
-    otherRevs:   DEF_OTHER_REVS.map(r => ({ ...r, id: nid() })),
-    savings:     DEF_SAVINGS.map(s => ({ ...s, id: nid() })),
+    expenses:          DEF_EXPENSES.map(e => ({ ...e, id: nid() })),
+    memberships:       DEF_MEMBERSHIPS.map(m => ({ ...m, id: nid() })),
+    otherRevs:         DEF_OTHER_REVS.map(r => ({ ...r, id: nid() })),
+    savings:           DEF_SAVINGS.map(s => ({ ...s, id: nid() })),
+    deviceInvestments: DEF_DEVICE_INVESTMENTS.map(d => ({ ...d, id: nid() })),
   }
 }
 
@@ -565,9 +575,17 @@ export default function Investoinnit() {
   const removeSaving = id =>
     patch({ savings: savings.filter(s => s.id !== id) })
 
+  const deviceInvestments = inv.deviceInvestments ?? []
+  const updateDevice = (id, field, val) =>
+    patch({ deviceInvestments: deviceInvestments.map(d => d.id === id ? { ...d, [field]: val } : d) })
+  const addDevice = () =>
+    patch({ deviceInvestments: [...deviceInvestments, { id: nid(), label: 'Uusi laiteinvestointi', amount: 0, growthPct: 0, type: 'kerta', startMonth: 1 }] })
+  const removeDevice = id =>
+    patch({ deviceInvestments: deviceInvestments.filter(d => d.id !== id) })
+
   // ── Projections ──────────────────────────────────────────────────────────
   const months = useMemo(
-    () => calcMonths(inv.expenses, inv.memberships, inv.otherRevs, inv.savings ?? [], inv.horisontti),
+    () => calcMonths(inv.expenses, inv.memberships, inv.otherRevs, inv.savings ?? [], inv.deviceInvestments ?? [], inv.horisontti),
     [inv],
   )
 
@@ -598,6 +616,8 @@ export default function Investoinnit() {
   const memberM1    = inv.memberships.reduce((s, m) => s + memberMonthly(m), 0)
   const otherRevM1  = inv.otherRevs.reduce((s, r) => s + itemAmount(r, 0), 0)
   const savingM1    = savings.reduce((s, r) => s + itemAmount(r, 0), 0)
+  // Laiteinvestointien kokonaissumma koko horisontin ajalta
+  const deviceTotal = months.reduce((s, m) => s + m.laitteet, 0)
 
   if (loading) return (
     <div>
@@ -706,6 +726,7 @@ export default function Investoinnit() {
               <span><b>kerta</b> = kertaluonteinen, Kk# = milloin</span>
             </div>
             <RowTotal label="Menot kk 1 yhteensä" value={fmt(expenseM1)} />
+            <RowTotal label="Laiteinvestoinnit (yhteensä)" value={fmt(deviceTotal)} />
           </div>
 
           {/* Jäsenyysmyynti */}
@@ -769,6 +790,27 @@ export default function Investoinnit() {
               <Plus size={13} /> Lisää säästö / tuotto
             </button>
             <RowTotal label="Säästöt / tuotot kk 1 yhteensä" value={fmt(savingM1)} />
+          </div>
+
+          {/* Laiteinvestoinnit */}
+          <div className="card" style={{ padding: '1rem', borderLeft: '3px solid #d63031' }}>
+            <SectionLabel>Laiteinvestoinnit</SectionLabel>
+            <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginBottom: '.65rem', lineHeight: 1.45 }}>
+              Kirjaa laitehankinnat rivikohtaisesti (kuten menot). Kokonaissumma lasketaan mukaan menoihin nimellä "Laiteinvestoinnit".
+            </div>
+            <ItemRowHeader />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+              {deviceInvestments.map(d => (
+                <ItemRow key={d.id} item={d} maxMonth={inv.horisontti}
+                  onUpdate={(f, v) => updateDevice(d.id, f, v)}
+                  onDelete={() => removeDevice(d.id)} />
+              ))}
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={addDevice}
+              style={{ marginTop: '.6rem', width: '100%', justifyContent: 'center', gap: '.3rem', color: '#d63031', borderColor: '#d6303140' }}>
+              <Plus size={13} /> Lisää laiteinvestointi
+            </button>
+            <RowTotal label="Laiteinvestoinnit yhteensä" value={fmt(deviceTotal)} />
           </div>
 
         </div>
