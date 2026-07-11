@@ -77,9 +77,9 @@ function memberMonthly(m, monthIdx = 0) {
 function calcMonths(expenses, memberships, otherRevs, savings, deviceInvestments, horisontti) {
   let cum = 0
   return Array.from({ length: horisontti }, (_, i) => {
-    const kulut      = expenses.reduce((s, e) => s + itemAmount(e, i), 0)
     const laitteet   = deviceInvestments.reduce((s, d) => s + itemAmount(d, i), 0)
-    const menot      = kulut + laitteet
+    // Laiteinvestointeja EI lasketa menoihin — ne lisätään käsin Leasingkuluina.
+    const menot      = expenses.reduce((s, e) => s + itemAmount(e, i), 0)
     const jasenTulot = memberships.reduce((s, m) => s + memberMonthly(m, i), 0)
     const muutTulot  = otherRevs.reduce((s, r) => s + itemAmount(r, i), 0)
     const saastot    = savings.reduce((s, r) => s + itemAmount(r, i), 0)
@@ -191,17 +191,14 @@ function ColHeader({ children, right }) {
   )
 }
 
-function RowTotal({ label, value, strong, tight }) {
+function RowTotal({ label, value }) {
   return (
     <div style={{
-      marginTop: tight ? '.35rem' : '.7rem',
-      paddingTop: tight ? 0 : '.55rem',
-      borderTop: tight ? 'none' : '1px solid var(--border)',
-      display: 'flex', justifyContent: 'space-between',
-      fontSize: strong ? '.88rem' : '.8rem',
+      marginTop: '.7rem', paddingTop: '.55rem', borderTop: '1px solid var(--border)',
+      display: 'flex', justifyContent: 'space-between', fontSize: '.8rem',
     }}>
-      <span style={{ color: strong ? 'var(--text)' : 'var(--text2)', fontWeight: strong ? 700 : 400 }}>{label}</span>
-      <span style={{ fontWeight: strong ? 800 : 700, color: strong ? '#d63031' : 'inherit' }}>{value}</span>
+      <span style={{ color: 'var(--text2)' }}>{label}</span>
+      <span style={{ fontWeight: 700 }}>{value}</span>
     </div>
   )
 }
@@ -619,10 +616,8 @@ export default function Investoinnit() {
   const memberM1    = inv.memberships.reduce((s, m) => s + memberMonthly(m), 0)
   const otherRevM1  = inv.otherRevs.reduce((s, r) => s + itemAmount(r, 0), 0)
   const savingM1    = savings.reduce((s, r) => s + itemAmount(r, 0), 0)
-  // Laiteinvestointien kokonaissumma koko horisontin ajalta
+  // Laiteinvestointien kokonaissumma koko horisontin ajalta (vain viitteeksi)
   const deviceTotal = months.reduce((s, m) => s + m.laitteet, 0)
-  // Kaikkien menojen kokonaissumma horisontilta (kulut + laiteinvestoinnit)
-  const menotTotal  = months.reduce((s, m) => s + m.menot, 0)
 
   if (loading) return (
     <div>
@@ -730,9 +725,7 @@ export default function Investoinnit() {
               <span><b>vuosi</b> = kerran vuodessa</span>
               <span><b>kerta</b> = kertaluonteinen, Kk# = milloin</span>
             </div>
-            <RowTotal label="Kuukausikulut kk 1" value={fmt(expenseM1)} />
-            <RowTotal label="+ Laiteinvestoinnit (koko jakso)" value={fmt(deviceTotal)} tight />
-            <RowTotal label="Menot yhteensä (koko jakso)" value={fmt(menotTotal)} strong />
+            <RowTotal label="Menot kk 1 yhteensä" value={fmt(expenseM1)} />
           </div>
 
           {/* Jäsenyysmyynti */}
@@ -802,7 +795,7 @@ export default function Investoinnit() {
           <div className="card" style={{ padding: '1rem', borderLeft: '3px solid #d63031' }}>
             <SectionLabel>Laiteinvestoinnit</SectionLabel>
             <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginBottom: '.65rem', lineHeight: 1.45 }}>
-              Kirjaa laitehankinnat rivikohtaisesti (kuten menot). Kokonaissumma lasketaan mukaan menoihin nimellä "Laiteinvestoinnit".
+              Kirjaa laitehankinnat rivikohtaisesti nähdäksesi kokonaissumman. <b>Ei lasketa mukaan menoihin</b> — lisää haluamasi summa itse Menot-osioon Leasingkuluina.
             </div>
             <ItemRowHeader />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
