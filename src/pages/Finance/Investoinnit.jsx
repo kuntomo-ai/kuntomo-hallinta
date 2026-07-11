@@ -191,14 +191,17 @@ function ColHeader({ children, right }) {
   )
 }
 
-function RowTotal({ label, value }) {
+function RowTotal({ label, value, strong, tight }) {
   return (
     <div style={{
-      marginTop: '.7rem', paddingTop: '.55rem', borderTop: '1px solid var(--border)',
-      display: 'flex', justifyContent: 'space-between', fontSize: '.8rem',
+      marginTop: tight ? '.35rem' : '.7rem',
+      paddingTop: tight ? 0 : '.55rem',
+      borderTop: tight ? 'none' : '1px solid var(--border)',
+      display: 'flex', justifyContent: 'space-between',
+      fontSize: strong ? '.88rem' : '.8rem',
     }}>
-      <span style={{ color: 'var(--text2)' }}>{label}</span>
-      <span style={{ fontWeight: 700 }}>{value}</span>
+      <span style={{ color: strong ? 'var(--text)' : 'var(--text2)', fontWeight: strong ? 700 : 400 }}>{label}</span>
+      <span style={{ fontWeight: strong ? 800 : 700, color: strong ? '#d63031' : 'inherit' }}>{value}</span>
     </div>
   )
 }
@@ -618,6 +621,8 @@ export default function Investoinnit() {
   const savingM1    = savings.reduce((s, r) => s + itemAmount(r, 0), 0)
   // Laiteinvestointien kokonaissumma koko horisontin ajalta
   const deviceTotal = months.reduce((s, m) => s + m.laitteet, 0)
+  // Kaikkien menojen kokonaissumma horisontilta (kulut + laiteinvestoinnit)
+  const menotTotal  = months.reduce((s, m) => s + m.menot, 0)
 
   if (loading) return (
     <div>
@@ -725,8 +730,9 @@ export default function Investoinnit() {
               <span><b>vuosi</b> = kerran vuodessa</span>
               <span><b>kerta</b> = kertaluonteinen, Kk# = milloin</span>
             </div>
-            <RowTotal label="Menot kk 1 yhteensä" value={fmt(expenseM1)} />
-            <RowTotal label="Laiteinvestoinnit (yhteensä)" value={fmt(deviceTotal)} />
+            <RowTotal label="Kuukausikulut kk 1" value={fmt(expenseM1)} />
+            <RowTotal label="+ Laiteinvestoinnit (koko jakso)" value={fmt(deviceTotal)} tight />
+            <RowTotal label="Menot yhteensä (koko jakso)" value={fmt(menotTotal)} strong />
           </div>
 
           {/* Jäsenyysmyynti */}
