@@ -22,22 +22,35 @@ function TasksWidget({ tasks, loading }) {
       {loading ? <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Ladataan...</p> :
         tasks.length === 0 ? <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Ei avoimia tehtäviä.</p> : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-            {tasks.map(t => (
-              <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', paddingBottom: '.5rem', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                    {t.priority === 'kiireellinen' && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', flexShrink: 0 }} />}
-                    {t.title}
+            {tasks.map(t => {
+              const urgent = t.priority === 'high'
+              const inner = (
+                <>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '.4rem', color: urgent ? 'var(--red)' : 'inherit' }}>
+                      {urgent && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', display: 'inline-block', flexShrink: 0 }} />}
+                      {t.title}
+                      {t.link && <span style={{ fontSize: '.7rem', color: 'var(--violet)', flexShrink: 0 }}>→</span>}
+                    </div>
+                    {t.assigned_to && <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.1rem' }}>{t.assigned_to}</div>}
                   </div>
-                  {t.assigned_to && <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.1rem' }}>{t.assigned_to}</div>}
-                </div>
-                {t.due_date && (
-                  <div style={{ fontSize: '.72rem', color: new Date(t.due_date) < new Date() ? 'var(--red)' : 'var(--text3)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    {new Date(t.due_date).toLocaleDateString('fi-FI')}
-                  </div>
-                )}
-              </div>
-            ))}
+                  {t.due_date && (
+                    <div style={{ fontSize: '.72rem', color: new Date(t.due_date) < new Date() ? 'var(--red)' : 'var(--text3)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      {new Date(t.due_date).toLocaleDateString('fi-FI')}
+                    </div>
+                  )}
+                </>
+              )
+              const rowStyle = {
+                display: 'flex', alignItems: 'flex-start', gap: '.6rem',
+                paddingBottom: '.5rem', borderBottom: '1px solid var(--border)',
+                textDecoration: 'none', color: 'inherit',
+                ...(urgent ? { background: 'color-mix(in srgb, var(--red) 6%, transparent)', borderRadius: 6, padding: '.4rem .5rem' } : {}),
+              }
+              return t.link
+                ? <Link key={t.id} to={t.link} style={{ ...rowStyle, cursor: 'pointer' }}>{inner}</Link>
+                : <div key={t.id} style={rowStyle}>{inner}</div>
+            })}
           </div>
         )}
     </div>
@@ -460,7 +473,7 @@ export default function Dashboard() {
         .not('status', 'in', '("done","valmis")')
         .or('completed.is.null,completed.eq.false')
         .order('due_date', { ascending: true, nullsFirst: false })
-        .limit(5),
+        .limit(40),
       supabaseAdmin.from('calendar_events').select('*').gte('event_start', today)
         .order('event_start', { ascending: true }).limit(3),
     ]
@@ -490,18 +503,27 @@ export default function Dashboard() {
 
     const results = await Promise.all(baseFetches)
     const rawTasks = results[0].data || []
-    if (isAdmin) {
-      setTasks(rawTasks)
-    } else {
-      const myEmail = profile?.email || ''
-      const myRole  = role || ''
-      setTasks(rawTasks.filter(r => {
-        const at = (r.assigned_to || '').trim()
-        if (!at) return true
-        const parts = at.split(',').map(s => s.trim())
-        return at === myEmail || at === empName || parts.some(p => p === myRole)
-      }))
-    }
+    const visibleTasks = isAdmin
+      ? rawTasks
+      : rawTasks.filter(r => {
+          const myEmail = profile?.email || ''
+          const myRole  = role || ''
+          const at = (r.assigned_to || '').trim()
+          if (!at) return true
+          const parts = at.split(',').map(s => s.trim())
+          return at === myEmail || at === empName || parts.some(p => p === myRole)
+        })
+    // Kiireelliset (high) ylimmäksi, sitten deadline, sitten uusin
+    const sorted = [...visibleTasks].sort((a, b) => {
+      const ap = a.priority === 'high' ? 0 : 1
+      const bp = b.priority === 'high' ? 0 : 1
+      if (ap !== bp) return ap - bp
+      if (a.due_date && b.due_date) return a.due_date < b.due_date ? -1 : 1
+      if (a.due_date) return -1
+      if (b.due_date) return 1
+      return (b.created_at || '').localeCompare(a.created_at || '')
+    })
+    setTasks(sorted.slice(0, 5))
     const allEvents = results[1].data || []
     setEvents(allEvents.filter(e => {
       if (isAdmin || isHallitus) return true

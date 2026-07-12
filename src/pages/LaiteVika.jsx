@@ -68,11 +68,15 @@ export default function LaiteVika() {
       priority:    'high',
       created_by:  form.nimi.trim(),
     }
-    await Promise.all([
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'huolto' }),
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'admin' }),
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'respa' }),
-    ])
+    // Linkki laitteen tietoihin + vikailmoitukseen (Laiteluettelo avaa modaalin)
+    const link = `/laiteluettelo?device=${id}`
+    const roles = ['huolto', 'admin', 'respa']
+    const withLink = roles.map(r => ({ ...taskBase, assigned_to: r, link }))
+    const { error: taskErr } = await supabaseAdmin.from('tasks').insert(withLink)
+    // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävät ilman sitä
+    if (taskErr) {
+      await supabaseAdmin.from('tasks').insert(roles.map(r => ({ ...taskBase, assigned_to: r })))
+    }
 
     setView('success')
     setSubmitting(false)

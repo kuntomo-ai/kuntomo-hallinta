@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Edit2, Trash2, Wrench, CheckCircle, QrCode, Copy, Check } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -26,6 +26,7 @@ export default function Laiteluettelo() {
   const [saveError, setSaveError] = useState('')
 
   const [copiedUrl, setCopiedUrl] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [serviceHistory, setServiceHistory] = useState([])
   const [serviceRequest, setServiceRequest] = useState(false)
@@ -34,6 +35,17 @@ export default function Laiteluettelo() {
   const [serviceError, setServiceError] = useState('')
 
   useEffect(() => { fetchData() }, [])
+
+  // Avaa laitteen modaali suoraan, kun tullaan tehtävälinkistä (?device=<id>)
+  useEffect(() => {
+    const deviceId = searchParams.get('device')
+    if (!deviceId || loading || !rows.length) return
+    const device = rows.find(r => r.id === deviceId)
+    if (device) openEdit(device)
+    // Poista parametri, ettei modaali avaudu uudelleen sulkemisen jälkeen
+    searchParams.delete('device')
+    setSearchParams(searchParams, { replace: true })
+  }, [loading, rows, searchParams])
 
   async function fetchData() {
     setLoading(true)
@@ -158,14 +170,17 @@ export default function Laiteluettelo() {
       due_date: null,
       created_by: myName || null,
     }
-    const taskResults = await Promise.all([
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'huolto' }),
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'admin' }),
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'respa' }),
-    ])
-    const taskErr = taskResults.find(r => r.error)
+    // Linkki laitteen tietoihin + vikailmoitukseen
+    const link = `/laiteluettelo?device=${editing}`
+    const roles = ['huolto', 'admin', 'respa']
+    let { error: taskErr } = await supabaseAdmin.from('tasks').insert(roles.map(r => ({ ...taskBase, assigned_to: r, link })))
+    // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävät ilman sitä
     if (taskErr) {
-      setServiceError('Tehtävän luonti epäonnistui: ' + taskErr.error.message)
+      const retry = await supabaseAdmin.from('tasks').insert(roles.map(r => ({ ...taskBase, assigned_to: r })))
+      taskErr = retry.error
+    }
+    if (taskErr) {
+      setServiceError('Tehtävän luonti epäonnistui: ' + taskErr.message)
       setSavingService(false)
       return
     }
