@@ -59,23 +59,25 @@ export default function LaiteVika() {
       .update({ service_requested: true })
       .eq('id', id)
 
-    const taskBase = {
-      title:       `Laitehuolto: ${device.name}`,
-      description: `Vikailmoitus (QR): ${form.kuvaus.trim()}\nIlmoittaja: ${form.nimi.trim()}` +
+    const deviceLabel = device.device_number ? `${device.name} (nro ${device.device_number})` : device.name
+    const task = {
+      title:       `Laitehuolto: ${deviceLabel}`,
+      description: `Vikailmoitus (QR): ${form.kuvaus.trim()}\n` +
+                   `Laite: ${deviceLabel}${device.sijainti ? ` · ${device.sijainti}` : ''}\n` +
+                   `Ilmoittaja: ${form.nimi.trim()}` +
                    (form.puhelin ? ` · ${form.puhelin.trim()}` : '') +
                    (form.email   ? ` · ${form.email.trim()}`   : ''),
       status:      'avoin',
       priority:    'high',
       created_by:  form.nimi.trim(),
+      assigned_to: 'huolto, admin, respa',
     }
     // Linkki laitteen tietoihin + vikailmoitukseen (Laiteluettelo avaa modaalin)
     const link = `/laiteluettelo?device=${id}`
-    const roles = ['huolto', 'admin', 'respa']
-    const withLink = roles.map(r => ({ ...taskBase, assigned_to: r, link }))
-    const { error: taskErr } = await supabaseAdmin.from('tasks').insert(withLink)
-    // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävät ilman sitä
+    const { error: taskErr } = await supabaseAdmin.from('tasks').insert({ ...task, link })
+    // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävä ilman sitä
     if (taskErr) {
-      await supabaseAdmin.from('tasks').insert(roles.map(r => ({ ...taskBase, assigned_to: r })))
+      await supabaseAdmin.from('tasks').insert(task)
     }
 
     setView('success')

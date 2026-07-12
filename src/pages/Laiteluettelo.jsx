@@ -162,21 +162,23 @@ export default function Laiteluettelo() {
 
     await supabaseAdmin.from('laiteluettelo_items').update({ service_requested: true }).eq('id', editing)
 
-    const taskBase = {
-      title: `Laitehuolto: ${editingDeviceName}`,
-      description: serviceNote.trim(),
+    const deviceNumber = rows.find(r => r.id === editing)?.device_number
+    const deviceLabel = deviceNumber ? `${editingDeviceName} (nro ${deviceNumber})` : editingDeviceName
+    const task = {
+      title: `Laitehuolto: ${deviceLabel}`,
+      description: `${serviceNote.trim()}\nLaite: ${deviceLabel}`,
       status: 'avoin',
       priority: 'high',
       due_date: null,
       created_by: myName || null,
+      assigned_to: 'huolto, admin, respa',
     }
     // Linkki laitteen tietoihin + vikailmoitukseen
     const link = `/laiteluettelo?device=${editing}`
-    const roles = ['huolto', 'admin', 'respa']
-    let { error: taskErr } = await supabaseAdmin.from('tasks').insert(roles.map(r => ({ ...taskBase, assigned_to: r, link })))
-    // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävät ilman sitä
+    let { error: taskErr } = await supabaseAdmin.from('tasks').insert({ ...task, link })
+    // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävä ilman sitä
     if (taskErr) {
-      const retry = await supabaseAdmin.from('tasks').insert(roles.map(r => ({ ...taskBase, assigned_to: r })))
+      const retry = await supabaseAdmin.from('tasks').insert(task)
       taskErr = retry.error
     }
     if (taskErr) {
@@ -210,6 +212,21 @@ export default function Laiteluettelo() {
     fetchServiceHistory(editing)
   }
 
+  // Merkitse laitteen avoimet tehtävät valmiiksi, kun huolto on kuitattu
+  async function completeDeviceTasks(deviceId, deviceName) {
+    const { error } = await supabaseAdmin.from('tasks')
+      .update({ completed: true, status: 'done' })
+      .eq('link', `/laiteluettelo?device=${deviceId}`)
+      .eq('completed', false)
+    // Varmuus: jos link-saraketta ei ole, kuittaa laitteen nimen perusteella
+    if (error) {
+      await supabaseAdmin.from('tasks')
+        .update({ completed: true, status: 'done' })
+        .ilike('title', `Laitehuolto: ${deviceName}%`)
+        .eq('completed', false)
+    }
+  }
+
   async function markServiceDone(historyId) {
     const myName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : profile?.email || 'Tuntematon'
     await supabaseAdmin.from('laite_huoltohistoria').update({
@@ -223,6 +240,7 @@ export default function Laiteluettelo() {
 
     if (!remaining || remaining.length === 0) {
       await supabaseAdmin.from('laiteluettelo_items').update({ service_requested: false }).eq('id', editing)
+      await completeDeviceTasks(editing, editingDeviceName)
     }
 
     fetchServiceHistory(editing)
@@ -240,6 +258,7 @@ export default function Laiteluettelo() {
       }).eq('id', req.id)
     }
     await supabaseAdmin.from('laiteluettelo_items').update({ service_requested: false }).eq('id', deviceId)
+    await completeDeviceTasks(deviceId, deviceName)
     fetchData()
   }
 
