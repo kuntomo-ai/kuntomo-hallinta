@@ -282,15 +282,24 @@ export default function RaportointiMobilePay() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    const { data, error } = await supabaseAdmin
-      .from('mobilepay_transactions')
-      .select('*')
-      .gte('booking_date', from)
-      .lte('booking_date', to)
-      .order('transaction_time', { ascending: false })
-      .limit(10000)
-    if (error) console.error(error)
-    setRows(data || [])
+    // Supabase palauttaa oletuksena max 1000 riviä per kysely,
+    // joten sivutetaan .range()-avulla kunnes kaikki rivit on haettu.
+    const PAGE = 1000
+    const all = []
+    for (let offset = 0; ; offset += PAGE) {
+      const { data, error } = await supabaseAdmin
+        .from('mobilepay_transactions')
+        .select('*')
+        .gte('booking_date', from)
+        .lte('booking_date', to)
+        .order('transaction_time', { ascending: false })
+        .range(offset, offset + PAGE - 1)
+      if (error) { console.error(error); break }
+      if (!data || data.length === 0) break
+      all.push(...data)
+      if (data.length < PAGE) break
+    }
+    setRows(all)
     setLoading(false)
   }
 
