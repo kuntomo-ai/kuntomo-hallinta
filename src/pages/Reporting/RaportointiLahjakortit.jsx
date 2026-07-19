@@ -7,6 +7,7 @@ const REPORT_NAV = [
   { label: 'Valmennusmyynti', to: '/finance/raportointi/valmennusmyynti' },
   { label: 'Jäsenmyynti', to: '/finance/raportointi/jasenmyynti' },
   { label: 'Lahjakortit', to: '/finance/raportointi/lahjakortit' },
+  { label: 'MobilePay', to: '/finance/raportointi/mobilepay' },
 ]
 
 function ReportNav() {

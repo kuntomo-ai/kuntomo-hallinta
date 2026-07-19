@@ -211,6 +211,18 @@ export default function Raportointi() {
             </div>
           </Link>
         ))}
+        <Link to="/finance/raportointi/mobilepay" style={{ textDecoration: 'none' }}>
+          <div className="card" style={{ cursor: 'pointer', borderTop: '3px solid #5E17EB', transition: 'box-shadow .15s', height: '100%' }}
+            onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow)'}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = ''}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '.5rem' }}>MobilePay</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.4rem', color: '#5E17EB', lineHeight: 1.1 }}>
+              Tilitysraportti
+            </div>
+            <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.4rem' }}>Lataa viikoittain CSV</div>
+            <div style={{ marginTop: '1rem', fontSize: '.78rem', color: '#5E17EB', fontWeight: 600 }}>Avaa raportti →</div>
+          </div>
+        </Link>
         {showMembership && (
           <Link to="/finance/raportointi/jasenyydet" style={{ textDecoration: 'none' }}>
             <div className="card" style={{ cursor: 'pointer', borderTop: '3px solid var(--teal, #0D9488)', transition: 'box-shadow .15s', height: '100%' }}
