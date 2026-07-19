@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { Upload, CheckCircle, AlertCircle } from 'lucide-react'
 import { supabaseAdmin } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
@@ -266,6 +267,8 @@ function UploadCard({ onImported }) {
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function RaportointiMobilePay() {
+  const { canAccess } = useAuth()
+  const showReportNav = canAccess('/finance/raportointi')
   const [period, setPeriod]         = useState('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo]     = useState('')
@@ -327,7 +330,7 @@ export default function RaportointiMobilePay() {
 
   return (
     <div>
-      <ReportNav />
+      {showReportNav && <ReportNav />}
 
       <div className="page-header">
         <div className="page-header-left">

@@ -12,8 +12,9 @@ const ROUTE_PERMISSIONS = {
   '/finance/myynti':           ['myynti', 'terapia_valmennus', 'sport', 'respa'],
   '/finance/lahjakortit':      ['terapia_valmennus', 'respa'],
   '/finance/kirjanpito':       ['hallitus'],
-  '/finance/raportointi/oma':  ['myynti', 'terapia_valmennus', 'sport'],
-  '/finance/raportointi':      ['hallitus'],
+  '/finance/raportointi/oma':       ['myynti', 'terapia_valmennus', 'sport'],
+  '/finance/raportointi/mobilepay': ['hallitus', 'respa'],
+  '/finance/raportointi':           ['hallitus'],
   '/customers/yritykset':      ['terapia_valmennus', 'respa'],
   '/customers/sport-hockey':   ['sport'],
 }
