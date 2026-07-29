@@ -643,7 +643,6 @@ function SalesView({ tab }) {
             <tr>
               <th>Tilaus</th>
               <th>Päivämäärä</th>
-              <th>Henkilö</th>
               <th style={{ textAlign: 'right' }}>Määrä</th>
               <th style={{ textAlign: 'right' }}>Hinta</th>
               <th>Tila</th>
@@ -651,14 +650,13 @@ function SalesView({ tab }) {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="table-empty">Ladataan...</td></tr>
+              <tr><td colSpan={5} className="table-empty">Ladataan...</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="table-empty">Ei tilauksia.</td></tr>
+              <tr><td colSpan={5} className="table-empty">Ei tilauksia.</td></tr>
             ) : [...rows].reverse().slice(0, 100).map(r => (
               <tr key={r.order}>
                 <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '.8rem' }}>#{r.order}</td>
                 <td>{r.date.toLocaleDateString('fi-FI')}</td>
-                <td style={{ fontWeight: 500 }}>{r.person}</td>
                 <td style={{ textAlign: 'right' }}>{r.qty}</td>
                 <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmtEur(r.total)}</td>
                 <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.status}</td>
