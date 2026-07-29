@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip,
+  Bar, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend, ComposedChart, Area, AreaChart,
 } from 'recharts'
 import { Plus, Edit2, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -10,6 +10,14 @@ import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/ui/Modal'
 
 const TODAY = new Date().toISOString().slice(0, 10)
+
+const FI_MONTHS_SHORT = ['Tammi','Helmi','Maalis','Huhti','Touko','Kesä','Heinä','Elo','Syys','Loka','Marras','Joulu']
+
+const SALES_TABS = [
+  { key: 'kuntosali',    label: 'Kuntosali',     file: '/data/kuntosali.csv',    color: '#3B82F6', productLabel: 'Kuntosalijäsenyys' },
+  { key: 'paivajasenyys', label: 'Päiväjäsenyys', file: '/data/paivajasenyys.csv', color: '#F97316', productLabel: 'Päiväjäsenyys' },
+  { key: 'kertamaksu',   label: 'Kertamaksu',    file: '/data/kertamaksu.csv',   color: '#0D9488', productLabel: 'Kertamaksu' },
+]
 
 function getMondayOf(dateStr) {
   const d = new Date(dateStr)
@@ -29,18 +37,100 @@ function fmtMonth(m) {
   return new Date(+y, +mo - 1, 1).toLocaleDateString('fi-FI', { month: 'short', year: '2-digit' })
 }
 
+function fmtEur(v) {
+  return Number(v || 0).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
 const empty = { week_start: getMondayOf(TODAY), new_members: '', ended_members: '', total_members: '', notes: '' }
 
-export default function RaportointiJasenyydet() {
+// ─── CSV parsing (WooCommerce export format) ─────────────────────────────────
+
+function splitCsvLine(line) {
+  const out = []
+  let cur = '', inQuote = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQuote) {
+      if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++ }
+      else if (ch === '"') inQuote = false
+      else cur += ch
+    } else {
+      if (ch === '"') inQuote = true
+      else if (ch === ',') { out.push(cur); cur = '' }
+      else cur += ch
+    }
+  }
+  out.push(cur)
+  return out
+}
+
+// "25.6.2026 10:53:49" → Date
+function parseFiDate(str) {
+  if (!str) return null
+  const [datePart, timePart = '00:00:00'] = str.trim().split(' ')
+  const [d, m, y] = datePart.split('.').map(Number)
+  if (!d || !m || !y) return null
+  const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map(Number)
+  return new Date(y, m - 1, d, hh, mm, ss)
+}
+
+// "35.80  €" → 35.8
+function parseEur(str) {
+  if (!str) return 0
+  const cleaned = String(str).replace(/[^\d,.-]/g, '').replace(',', '.')
+  const n = parseFloat(cleaned)
+  return isNaN(n) ? 0 : n
+}
+
+// "1 kpl" → 1
+function parseQty(str) {
+  if (!str) return 0
+  const m = String(str).match(/(\d+)/)
+  return m ? parseInt(m[1], 10) : 0
+}
+
+function parseWooCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
+  if (lines.length < 2) return []
+  const header = splitCsvLine(lines[0]).map(h => h.trim())
+  const idx = {
+    order: header.indexOf('Tilaus'),
+    person: header.indexOf('Henkilö'),
+    date: header.indexOf('Päivämäärä'),
+    qty: header.indexOf('Määrä'),
+    total: header.indexOf('Hinta yhteensä'),
+    status: header.indexOf('Tila'),
+  }
+  const rows = []
+  for (let i = 1; i < lines.length; i++) {
+    const cells = splitCsvLine(lines[i])
+    const date = parseFiDate(cells[idx.date])
+    if (!date) continue
+    const status = (cells[idx.status] || '').trim()
+    // Include Maksettu, Käsitelty, Laskutettu — anything not a cancellation
+    if (!status || /^(peruttu|peruutus|hylätty|palautettu)$/i.test(status)) continue
+    rows.push({
+      order: cells[idx.order],
+      person: cells[idx.person],
+      date,
+      qty: parseQty(cells[idx.qty]),
+      total: parseEur(cells[idx.total]),
+      status,
+    })
+  }
+  return rows
+}
+
+// ─── Weekly membership tracking (existing feature) ───────────────────────────
+
+function WeeklyView() {
   const { profile } = useAuth()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
-
   const [showModal, setShowModal] = useState(false)
   const [editRow, setEditRow] = useState(null)
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
-
   const [chartView, setChartView] = useState('month')
   const [chartDate, setChartDate] = useState(new Date())
 
@@ -105,7 +195,6 @@ export default function RaportointiJasenyydet() {
     return String(chartDate.getFullYear())
   }
 
-  // Monthly chart: weeks in selected month
   const monthlyData = (() => {
     const y = chartDate.getFullYear()
     const m = chartDate.getMonth()
@@ -122,7 +211,6 @@ export default function RaportointiJasenyydet() {
       }))
   })()
 
-  // Yearly chart: aggregate per month
   const yearlyData = (() => {
     const y = chartDate.getFullYear()
     const map = {}
@@ -144,7 +232,6 @@ export default function RaportointiJasenyydet() {
     }))
   })()
 
-  // Latest stats
   const latest = rows.length > 0 ? rows[rows.length - 1] : null
   const last4 = rows.slice(-4)
   const thisMonthNew = last4.reduce((s, r) => s + (r.new_members || 0), 0)
@@ -154,24 +241,15 @@ export default function RaportointiJasenyydet() {
   const xKey = chartView === 'month' ? 'viikko' : 'kk'
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <NavLink to="/finance/raportointi" end style={{ textDecoration: 'none' }}>
-          <button className="sub-tab">← Yhteenveto</button>
-        </NavLink>
-        <span style={{ color: 'var(--text4)', margin: '0 .2rem' }}>|</span>
-        <button className="sub-tab active">Jäsenyydet</button>
-      </div>
-
+    <>
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">Jäsenyydet</h1>
-          <p className="page-subtitle">Viikkoseuranta jäsenmääristä</p>
+          <h1 className="page-title">Viikkoseuranta</h1>
+          <p className="page-subtitle">Viikoittainen jäsenmäärän kirjaus</p>
         </div>
         <button className="btn btn-primary" onClick={openNew}><Plus size={16} /> Lisää viikko</button>
       </div>
 
-      {/* Tilastokortit */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', marginBottom: '1.5rem' }}>
         <div className="stat-card">
           <div className="stat-label">Jäseniä nyt</div>
@@ -193,7 +271,6 @@ export default function RaportointiJasenyydet() {
         </div>
       </div>
 
-      {/* Jäsenmäärän kehitys — koko historia */}
       {rows.filter(r => r.total_members != null).length > 1 && (
         <div className="card" style={{ marginBottom: '1.5rem' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1.25rem' }}>
@@ -223,7 +300,6 @@ export default function RaportointiJasenyydet() {
         </div>
       )}
 
-      {/* Uudet / päättyneet graafi */}
       <div className="card" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '.4rem' }}>
@@ -261,7 +337,6 @@ export default function RaportointiJasenyydet() {
         )}
       </div>
 
-      {/* Taulukko */}
       <div className="table-wrap">
         <table>
           <thead>
@@ -349,6 +424,280 @@ export default function RaportointiJasenyydet() {
           </div>
         </Modal>
       )}
+    </>
+  )
+}
+
+// ─── Sales view (Kuntosali / Päiväjäsenyys / Kertamaksu) ────────────────────
+
+function SalesView({ tab }) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [chartView, setChartView] = useState('year')
+  const [chartDate, setChartDate] = useState(new Date())
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(tab.file)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.text()
+      })
+      .then(text => {
+        if (cancelled) return
+        const parsed = parseWooCsv(text)
+        parsed.sort((a, b) => a.date - b.date)
+        setRows(parsed)
+        setLoading(false)
+      })
+      .catch(err => {
+        if (cancelled) return
+        setError(err.message || 'Virhe ladattaessa dataa')
+        setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [tab.file])
+
+  // Aggregate: revenue + count per month across all data
+  const monthlyAll = useMemo(() => {
+    const map = new Map()
+    rows.forEach(r => {
+      const key = `${r.date.getFullYear()}-${String(r.date.getMonth() + 1).padStart(2, '0')}`
+      const entry = map.get(key) || { key, revenue: 0, count: 0 }
+      entry.revenue += r.total
+      entry.count += 1
+      map.set(key, entry)
+    })
+    return [...map.values()].sort((a, b) => a.key.localeCompare(b.key))
+  }, [rows])
+
+  // Aggregate: revenue + count per year
+  const yearlyAll = useMemo(() => {
+    const map = new Map()
+    rows.forEach(r => {
+      const y = r.date.getFullYear()
+      const entry = map.get(y) || { year: y, revenue: 0, count: 0 }
+      entry.revenue += r.total
+      entry.count += 1
+      map.set(y, entry)
+    })
+    return [...map.values()].sort((a, b) => a.year - b.year)
+  }, [rows])
+
+  const chartData = useMemo(() => {
+    if (chartView === 'year') {
+      // Months of selected year (fill blanks with 0)
+      const y = chartDate.getFullYear()
+      return FI_MONTHS_SHORT.map((label, i) => {
+        const key = `${y}-${String(i + 1).padStart(2, '0')}`
+        const entry = monthlyAll.find(m => m.key === key)
+        return {
+          label,
+          Myynti: entry ? +entry.revenue.toFixed(2) : 0,
+          Kappaleet: entry ? entry.count : 0,
+        }
+      })
+    }
+    // 'all' — every month
+    return monthlyAll.map(m => ({
+      label: fmtMonth(m.key),
+      Myynti: +m.revenue.toFixed(2),
+      Kappaleet: m.count,
+    }))
+  }, [chartView, chartDate, monthlyAll])
+
+  function navigateChart(dir) {
+    if (chartView !== 'year') return
+    const d = new Date(chartDate); d.setFullYear(d.getFullYear() + dir); setChartDate(d)
+  }
+
+  const availableYears = useMemo(() => [...new Set(yearlyAll.map(y => y.year))], [yearlyAll])
+
+  // Stats: current month, current year, all time
+  const now = new Date()
+  const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const curMonth = monthlyAll.find(m => m.key === curKey)
+  const curYear = yearlyAll.find(y => y.year === now.getFullYear())
+  const totals = rows.reduce((a, r) => ({ revenue: a.revenue + r.total, count: a.count + 1 }), { revenue: 0, count: 0 })
+
+  return (
+    <>
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1 className="page-title">{tab.label}</h1>
+          <p className="page-subtitle">{tab.productLabel} — verkkokaupan myyntitilaukset</p>
+        </div>
+      </div>
+
+      {error && (
+        <div className="card" style={{ borderColor: 'var(--red)', color: 'var(--red)', marginBottom: '1.5rem' }}>
+          Virhe: {error}
+        </div>
+      )}
+
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', marginBottom: '1.5rem' }}>
+        <div className="stat-card">
+          <div className="stat-label">Tämä kuukausi</div>
+          <div className="stat-value" style={{ color: tab.color }}>{loading ? '...' : fmtEur(curMonth?.revenue || 0)}</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.25rem' }}>
+            {loading ? '' : `${curMonth?.count || 0} tilausta`}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Tämä vuosi</div>
+          <div className="stat-value" style={{ color: tab.color }}>{loading ? '...' : fmtEur(curYear?.revenue || 0)}</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.25rem' }}>
+            {loading ? '' : `${curYear?.count || 0} tilausta`}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Yhteensä</div>
+          <div className="stat-value">{loading ? '...' : fmtEur(totals.revenue)}</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.25rem' }}>
+            {loading ? '' : `${totals.count} tilausta`}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Keskikauppa</div>
+          <div className="stat-value">{loading || !totals.count ? '—' : fmtEur(totals.revenue / totals.count)}</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem' }}>
+            Myynti kuukausittain
+          </div>
+          <div style={{ display: 'flex', gap: '.4rem', marginLeft: 'auto' }}>
+            {['year', 'all'].map(v => (
+              <button key={v} className={`sub-tab${chartView === v ? ' active' : ''}`}
+                style={{ fontSize: '.8rem', padding: '.3rem .7rem' }}
+                onClick={() => { setChartView(v); if (v === 'year') setChartDate(new Date()) }}>
+                {v === 'year' ? 'Vuosi' : 'Koko historia'}
+              </button>
+            ))}
+          </div>
+          {chartView === 'year' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <button onClick={() => navigateChart(-1)} className="btn btn-ghost btn-sm"><ChevronLeft size={14} /></button>
+              <span style={{ fontWeight: 600, minWidth: 60, textAlign: 'center', fontSize: '.9rem' }}>{chartDate.getFullYear()}</span>
+              <button onClick={() => navigateChart(1)} className="btn btn-ghost btn-sm"><ChevronRight size={14} /></button>
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: '.85rem' }}>Ladataan...</div>
+        ) : chartData.length === 0 || chartData.every(d => !d.Myynti) ? (
+          <p style={{ color: 'var(--text3)', fontSize: '.85rem', textAlign: 'center', padding: '2rem 0' }}>Ei myyntiä valitulle jaksolle.</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={280}>
+            <ComposedChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false}
+                interval={chartView === 'all' && chartData.length > 24 ? Math.ceil(chartData.length / 12) : 0} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false}
+                tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} width={40} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} width={30} />
+              <Tooltip
+                contentStyle={{ fontSize: '.78rem', border: '1px solid var(--border)', background: 'var(--bg)' }}
+                formatter={(value, name) => name === 'Myynti' ? fmtEur(value) : `${value} kpl`}
+              />
+              <Legend wrapperStyle={{ fontSize: '.78rem', paddingTop: '0.5rem' }} />
+              <Bar yAxisId="left" dataKey="Myynti" fill={tab.color} radius={[3, 3, 0, 0]} maxBarSize={48} />
+              <Line yAxisId="right" type="monotone" dataKey="Kappaleet" stroke="var(--violet)" strokeWidth={2} dot={{ r: 3, fill: 'var(--violet)' }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {availableYears.length > 1 && (
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '1.25rem' }}>
+            Vuositason yhteenveto
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Vuosi</th><th style={{ textAlign: 'right' }}>Tilauksia</th><th style={{ textAlign: 'right' }}>Myynti</th><th style={{ textAlign: 'right' }}>Keskikauppa</th></tr>
+              </thead>
+              <tbody>
+                {[...yearlyAll].reverse().map(y => (
+                  <tr key={y.year}>
+                    <td style={{ fontWeight: 600 }}>{y.year}</td>
+                    <td style={{ textAlign: 'right' }}>{y.count}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: tab.color }}>{fmtEur(y.revenue)}</td>
+                    <td style={{ textAlign: 'right', color: 'var(--text3)' }}>{fmtEur(y.revenue / y.count)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tilaus</th>
+              <th>Päivämäärä</th>
+              <th>Henkilö</th>
+              <th style={{ textAlign: 'right' }}>Määrä</th>
+              <th style={{ textAlign: 'right' }}>Hinta</th>
+              <th>Tila</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="table-empty">Ladataan...</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={6} className="table-empty">Ei tilauksia.</td></tr>
+            ) : [...rows].reverse().slice(0, 100).map(r => (
+              <tr key={r.order}>
+                <td style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '.8rem' }}>#{r.order}</td>
+                <td>{r.date.toLocaleDateString('fi-FI')}</td>
+                <td style={{ fontWeight: 500 }}>{r.person}</td>
+                <td style={{ textAlign: 'right' }}>{r.qty}</td>
+                <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmtEur(r.total)}</td>
+                <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!loading && rows.length > 100 && (
+          <div style={{ padding: '.75rem', textAlign: 'center', fontSize: '.78rem', color: 'var(--text3)' }}>
+            Näytetään uusimmat 100 / {rows.length} tilausta
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+// ─── Main page with tabs ────────────────────────────────────────────────────
+
+export default function RaportointiJasenyydet() {
+  const [tab, setTab] = useState('viikko')
+  const activeSalesTab = SALES_TABS.find(t => t.key === tab)
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <NavLink to="/finance/raportointi" end style={{ textDecoration: 'none' }}>
+          <button className="sub-tab">← Yhteenveto</button>
+        </NavLink>
+        <span style={{ color: 'var(--text4)', margin: '0 .2rem' }}>|</span>
+        <button className={`sub-tab${tab === 'viikko' ? ' active' : ''}`} onClick={() => setTab('viikko')}>Viikkoseuranta</button>
+        {SALES_TABS.map(t => (
+          <button key={t.key} className={`sub-tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'viikko' ? <WeeklyView /> : activeSalesTab && <SalesView key={activeSalesTab.key} tab={activeSalesTab} />}
     </div>
   )
 }
