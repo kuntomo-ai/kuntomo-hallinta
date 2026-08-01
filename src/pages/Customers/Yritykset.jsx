@@ -286,7 +286,11 @@ export default function Yritykset() {
   visits.forEach(v => {
     if (!visitGrid[v.company_person_id]) visitGrid[v.company_person_id] = {}
     const m = new Date(v.visit_date).getMonth() + 1
-    visitGrid[v.company_person_id][m] = v
+    if (!visitGrid[v.company_person_id][m]) visitGrid[v.company_person_id][m] = []
+    visitGrid[v.company_person_id][m].push(v)
+  })
+  Object.values(visitGrid).forEach(months => {
+    Object.values(months).forEach(arr => arr.sort((a, b) => new Date(a.visit_date) - new Date(b.visit_date)))
   })
 
   const invoicedTotal = visits.filter(v => v.invoiced).reduce((s, v) => s + (v.price || 0), 0)
@@ -448,40 +452,41 @@ export default function Yritykset() {
                       </td>
                       {Array.from({ length: 12 }, (_, mi) => {
                         const m = mi + 1
-                        const visit = visitGrid[p.id]?.[m]
+                        const cellVisits = visitGrid[p.id]?.[m] || []
                         return (
                           <td key={mi} style={{ padding: '.35rem .4rem', textAlign: 'center', verticalAlign: 'top', borderLeft: '1px solid var(--border)' }}>
-                            {visit ? (
-                              <div
-                                onClick={() => isAdmin && toggleInvoiced(visit)}
-                                style={{ position: 'relative', background: visit.invoiced ? 'var(--green-subtle)' : 'var(--orange-subtle)', borderRadius: 4, padding: '.3rem .45rem', fontSize: '.7rem', lineHeight: 1.45, border: `1px solid ${visit.invoiced ? 'var(--green)' : 'var(--orange)'}`, opacity: visit.invoiced ? 0.8 : 1, textAlign: 'left', cursor: isAdmin ? 'pointer' : 'default' }}>
-                                {isAdmin && (
-                                  <button
-                                    onClick={e => { e.stopPropagation(); deleteVisit(visit.id) }}
-                                    title="Poista käynti"
-                                    style={{ position: 'absolute', top: 2, right: 2, background: 'none', border: 'none', cursor: 'pointer', padding: '1px 3px', color: 'var(--text4)', lineHeight: 1, borderRadius: 3, fontSize: '.65rem' }}>
-                                    <Trash2 size={10} />
-                                  </button>
-                                )}
-                                <div style={{ fontWeight: 700, color: visit.invoiced ? 'var(--green)' : 'var(--text)', marginBottom: 1 }}>
-                                  {visit.company_person_name || visit.payment_type || '—'}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                              {cellVisits.map(visit => (
+                                <div key={visit.id}
+                                  onClick={() => isAdmin && toggleInvoiced(visit)}
+                                  style={{ position: 'relative', background: visit.invoiced ? 'var(--green-subtle)' : 'var(--orange-subtle)', borderRadius: 4, padding: '.3rem .45rem', fontSize: '.7rem', lineHeight: 1.45, border: `1px solid ${visit.invoiced ? 'var(--green)' : 'var(--orange)'}`, opacity: visit.invoiced ? 0.8 : 1, textAlign: 'left', cursor: isAdmin ? 'pointer' : 'default' }}>
+                                  {isAdmin && (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); deleteVisit(visit.id) }}
+                                      title="Poista käynti"
+                                      style={{ position: 'absolute', top: 2, right: 2, background: 'none', border: 'none', cursor: 'pointer', padding: '1px 3px', color: 'var(--text4)', lineHeight: 1, borderRadius: 3, fontSize: '.65rem' }}>
+                                      <Trash2 size={10} />
+                                    </button>
+                                  )}
+                                  <div style={{ fontWeight: 700, color: visit.invoiced ? 'var(--green)' : 'var(--text)', marginBottom: 1 }}>
+                                    {visit.company_person_name || visit.payment_type || '—'}
+                                  </div>
+                                  {visit.employee_name && <div style={{ color: 'var(--text3)', fontSize: '.65rem' }}>{visit.employee_name}</div>}
+                                  <div style={{ color: 'var(--text3)' }}>{new Date(visit.visit_date).toLocaleDateString('fi-FI')}</div>
+                                  <div style={{ color: 'var(--text2)' }}>{visit.service}</div>
+                                  <div style={{ fontWeight: 700, color: 'var(--violet)' }}>{(visit.price || 0).toFixed(2)} €</div>
+                                  {visit.invoiced && <div style={{ color: 'var(--green)', fontSize: '.62rem', fontWeight: 700, marginTop: 1 }}>✓ Laskutettu</div>}
                                 </div>
-                                {visit.employee_name && <div style={{ color: 'var(--text3)', fontSize: '.65rem' }}>{visit.employee_name}</div>}
-                                <div style={{ color: 'var(--text3)' }}>{new Date(visit.visit_date).toLocaleDateString('fi-FI')}</div>
-                                <div style={{ color: 'var(--text2)' }}>{visit.service}</div>
-                                <div style={{ fontWeight: 700, color: 'var(--violet)' }}>{(visit.price || 0).toFixed(2)} €</div>
-                                {visit.invoiced && <div style={{ color: 'var(--green)', fontSize: '.62rem', fontWeight: 700, marginTop: 1 }}>✓ Laskutettu</div>}
-                              </div>
-                            ) : (
+                              ))}
                               <button
                                 onClick={() => openAddVisit(p, m)}
-                                title="Lisää käynti"
-                                style={{ background: 'none', border: '1px dashed transparent', color: 'var(--text4)', fontSize: '.75rem', cursor: 'pointer', padding: '.35rem .5rem', borderRadius: 4, width: '100%', minHeight: 28, transition: 'all .15s' }}
+                                title={cellVisits.length ? 'Lisää toinen käynti' : 'Lisää käynti'}
+                                style={{ background: 'none', border: '1px dashed transparent', color: 'var(--text4)', fontSize: cellVisits.length ? '.65rem' : '.75rem', cursor: 'pointer', padding: cellVisits.length ? '.15rem .3rem' : '.35rem .5rem', borderRadius: 4, width: '100%', minHeight: cellVisits.length ? 20 : 28, transition: 'all .15s' }}
                                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.color = 'var(--violet)' }}
                                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text4)' }}>
-                                +
+                                +{cellVisits.length ? ' lisää' : ''}
                               </button>
-                            )}
+                            </div>
                           </td>
                         )
                       })}
