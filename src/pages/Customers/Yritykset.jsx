@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Trash2, ChevronLeft, ChevronRight, Upload } from 'lucide-react'
+import { Plus, Search, Trash2, ChevronLeft, ChevronRight, Upload, FileText } from 'lucide-react'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { supabase, supabaseAdmin } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/AuthContext'
 
 const empty = { name: '', contact_person: '', email: '', phone: '', city: '', notes: '' }
+const emptyVisit = { service: '', price: '', visit_date: '', employee_name: '' }
 
 const MONTH_SHORT = ['Tammi', 'Helmi', 'Maalis', 'Huhti', 'Touko', 'Kesä', 'Heinä', 'Elo', 'Syys', 'Loka', 'Marras', 'Joulu']
+const MONTH_LONG = ['Tammikuu', 'Helmikuu', 'Maaliskuu', 'Huhtikuu', 'Toukokuu', 'Kesäkuu', 'Heinäkuu', 'Elokuu', 'Syyskuu', 'Lokakuu', 'Marraskuu', 'Joulukuu']
 
 export default function Yritykset() {
   const { profile } = useAuth()
@@ -34,7 +38,20 @@ export default function Yritykset() {
   const [addingPerson, setAddingPerson] = useState(false)
   const [csvImporting, setCsvImporting] = useState(false)
 
+  const [employees, setEmployees] = useState([])
+  const [showVisitModal, setShowVisitModal] = useState(false)
+  const [visitForm, setVisitForm] = useState(emptyVisit)
+  const [visitTarget, setVisitTarget] = useState(null)
+  const [addingVisit, setAddingVisit] = useState(false)
+
   useEffect(() => { fetchData() }, [])
+
+  useEffect(() => {
+    supabaseAdmin.from('employees').select('first_name, last_name').eq('status', 'active').order('last_name').then(({ data }) => {
+      const names = (data || []).map(e => `${e.first_name || ''} ${e.last_name || ''}`.trim()).filter(Boolean)
+      setEmployees(names)
+    })
+  }, [])
 
   async function fetchData() {
     setLoading(true)
@@ -143,6 +160,101 @@ export default function Yritykset() {
     if (!isAdmin) return
     await supabaseAdmin.from('company_visits').update({ invoiced: !visit.invoiced }).eq('id', visit.id)
     fetchCompanyData(selected.id, viewYear)
+  }
+
+  function openAddVisit(person, month) {
+    const defaultDate = `${viewYear}-${String(month).padStart(2, '0')}-15`
+    const defaultEmp = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : ''
+    setVisitTarget({ person, month })
+    setVisitForm({ service: '', price: '', visit_date: defaultDate, employee_name: defaultEmp })
+    setShowVisitModal(true)
+  }
+
+  async function saveVisit() {
+    if (!visitTarget || !selected) return
+    const price = parseFloat(visitForm.price)
+    if (!visitForm.service.trim() || isNaN(price) || !visitForm.visit_date) return
+    setAddingVisit(true)
+    await supabaseAdmin.from('company_visits').insert({
+      company_id: selected.id,
+      company_person_id: visitTarget.person.id,
+      company_person_name: visitTarget.person.name,
+      visit_date: visitForm.visit_date,
+      service: visitForm.service.trim(),
+      price,
+      payment_type: 'Yrityslaskutus',
+      invoiced: false,
+      employee_name: visitForm.employee_name.trim() || null,
+    })
+    setAddingVisit(false)
+    setShowVisitModal(false)
+    setVisitForm(emptyVisit)
+    setVisitTarget(null)
+    fetchCompanyData(selected.id, viewYear)
+  }
+
+  function exportPDF() {
+    if (!selected) return
+    const doc = new jsPDF()
+    doc.setFontSize(15)
+    doc.text(`${selected.name} — käyntiraportti ${viewYear}`, 14, 16)
+    doc.setFontSize(9)
+    let y = 24
+    if (selected.contact_person) { doc.text(`Yhteyshenkilö: ${selected.contact_person}`, 14, y); y += 5 }
+    if (selected.email)          { doc.text(`Sähköposti: ${selected.email}`, 14, y); y += 5 }
+    if (selected.phone)          { doc.text(`Puhelin: ${selected.phone}`, 14, y); y += 5 }
+    doc.text(`Laskutettu yhteensä: ${invoicedTotal.toFixed(2)} €    Avoinna: ${openTotal.toFixed(2)} €`, 14, y + 2)
+
+    const detailBody = [...visits]
+      .sort((a, b) => new Date(a.visit_date) - new Date(b.visit_date))
+      .map(v => [
+        new Date(v.visit_date).toLocaleDateString('fi-FI'),
+        v.company_person_name || '—',
+        v.service || '—',
+        v.employee_name || '—',
+        (v.price || 0).toFixed(2) + ' €',
+        v.invoiced ? 'Laskutettu' : 'Avoinna',
+      ])
+
+    autoTable(doc, {
+      startY: y + 8,
+      head: [['Pvm', 'Henkilö', 'Palvelu', 'Hieroja', 'Hinta', 'Tila']],
+      body: detailBody.length ? detailBody : [['—', '—', 'Ei käyntejä valittuna vuonna', '—', '—', '—']],
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [124, 58, 237] },
+      alternateRowStyles: { fillColor: [245, 243, 255] },
+    })
+
+    const monthTotals = Array.from({ length: 12 }, () => ({ count: 0, total: 0, invoiced: 0, open: 0 }))
+    visits.forEach(v => {
+      const mi = new Date(v.visit_date).getMonth()
+      monthTotals[mi].count += 1
+      monthTotals[mi].total += v.price || 0
+      if (v.invoiced) monthTotals[mi].invoiced += v.price || 0
+      else monthTotals[mi].open += v.price || 0
+    })
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 8,
+      head: [['Kuukausi', 'Käyntejä', 'Yhteensä', 'Laskutettu', 'Avoinna']],
+      body: monthTotals.map((m, i) => [
+        MONTH_LONG[i],
+        m.count,
+        m.total.toFixed(2) + ' €',
+        m.invoiced.toFixed(2) + ' €',
+        m.open.toFixed(2) + ' €',
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [124, 58, 237] },
+      alternateRowStyles: { fillColor: [245, 243, 255] },
+    })
+
+    if (notes) {
+      const finalY = doc.lastAutoTable.finalY + 8
+      doc.setFontSize(10); doc.text('Muistiinpanot:', 14, finalY)
+      doc.setFontSize(9); doc.text(doc.splitTextToSize(notes, 180), 14, finalY + 5)
+    }
+
+    doc.save(`${selected.name.replace(/[^a-zA-Z0-9]/g, '_')}_kaynnit_${viewYear}.pdf`)
   }
 
   async function deleteVisit(id) {
@@ -256,6 +368,9 @@ export default function Yritykset() {
               <button className="btn btn-primary btn-sm" onClick={() => setShowPersonModal(true)}>
                 <Plus size={14} /> Työntekijä
               </button>
+              <button className="btn btn-ghost btn-sm" onClick={exportPDF} title="Lataa PDF-raportti">
+                <FileText size={14} /> PDF
+              </button>
               <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', background: 'var(--bg)' }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => setViewYear(y => y - 1)} style={{ borderRadius: 0, border: 'none', borderRight: '1px solid var(--border)' }}><ChevronLeft size={14} /></button>
                 <span style={{ fontWeight: 700, fontSize: '.88rem', padding: '0 .6rem', minWidth: 44, textAlign: 'center' }}>{viewYear}</span>
@@ -270,7 +385,9 @@ export default function Yritykset() {
             <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '2rem' }}>
               Avoinna: <strong style={{ color: openTotal > 0 ? 'var(--orange)' : 'inherit' }}>{openTotal.toFixed(2)} €</strong>
             </span>
-            {isAdmin && <span style={{ marginLeft: 'auto', fontSize: '.75rem', color: 'var(--text3)' }}>Klikkaa lokeroa merkitäksesi laskutetuksi (admin)</span>}
+            <span style={{ marginLeft: 'auto', fontSize: '.75rem', color: 'var(--text3)' }}>
+              Klikkaa tyhjää lokeroa lisätäksesi käynnin{isAdmin && ' · käyntiä klikkaamalla merkitset laskutetuksi'}
+            </span>
           </div>
 
           {/* Notes */}
@@ -356,7 +473,14 @@ export default function Yritykset() {
                                 {visit.invoiced && <div style={{ color: 'var(--green)', fontSize: '.62rem', fontWeight: 700, marginTop: 1 }}>✓ Laskutettu</div>}
                               </div>
                             ) : (
-                              <span style={{ color: 'var(--text4)', fontSize: '.75rem' }}>·</span>
+                              <button
+                                onClick={() => openAddVisit(p, m)}
+                                title="Lisää käynti"
+                                style={{ background: 'none', border: '1px dashed transparent', color: 'var(--text4)', fontSize: '.75rem', cursor: 'pointer', padding: '.35rem .5rem', borderRadius: 4, width: '100%', minHeight: 28, transition: 'all .15s' }}
+                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg2)'; e.currentTarget.style.color = 'var(--violet)' }}
+                                onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text4)' }}>
+                                +
+                              </button>
                             )}
                           </td>
                         )
@@ -443,6 +567,57 @@ export default function Yritykset() {
             <div className="input-group">
               <label className="input-label">Muistiinpanot</label>
               <textarea className="input-field" name="notes" rows={3} value={editForm.notes} onChange={handleEditChange} style={{ resize: 'vertical' }} />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Add visit modal ── */}
+      {showVisitModal && visitTarget && (
+        <Modal
+          title={`Lisää käynti — ${visitTarget.person.name} · ${MONTH_LONG[visitTarget.month - 1]} ${viewYear}`}
+          onClose={() => { setShowVisitModal(false); setVisitTarget(null) }}
+          footer={
+            <>
+              <button className="btn btn-ghost" onClick={() => { setShowVisitModal(false); setVisitTarget(null) }}>Peruuta</button>
+              <button className="btn btn-primary" onClick={saveVisit}
+                disabled={addingVisit || !visitForm.service.trim() || !visitForm.price || !visitForm.visit_date}>
+                {addingVisit ? 'Tallennetaan...' : 'Tallenna käynti'}
+              </button>
+            </>
+          }>
+          <div className="form-grid">
+            <div className="input-group">
+              <label className="input-label">Palvelu</label>
+              <input className="input-field" placeholder="esim. Hieronta 45 min"
+                value={visitForm.service}
+                onChange={e => setVisitForm(f => ({ ...f, service: e.target.value }))} autoFocus />
+            </div>
+            <div className="form-grid form-grid-2">
+              <div className="input-group">
+                <label className="input-label">Hinta (€)</label>
+                <input className="input-field" type="number" step="0.01" min="0" placeholder="0.00"
+                  value={visitForm.price}
+                  onChange={e => setVisitForm(f => ({ ...f, price: e.target.value }))} />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Päivämäärä</label>
+                <input className="input-field" type="date"
+                  value={visitForm.visit_date}
+                  onChange={e => setVisitForm(f => ({ ...f, visit_date: e.target.value }))} />
+              </div>
+            </div>
+            <div className="input-group">
+              <label className="input-label">Hieroja</label>
+              <input className="input-field" list="employee-list" placeholder="Etunimi Sukunimi"
+                value={visitForm.employee_name}
+                onChange={e => setVisitForm(f => ({ ...f, employee_name: e.target.value }))} />
+              <datalist id="employee-list">
+                {employees.map(name => <option key={name} value={name} />)}
+              </datalist>
+            </div>
+            <div style={{ fontSize: '.75rem', color: 'var(--text3)', background: 'var(--orange-subtle)', padding: '.5rem .7rem', borderRadius: 6, border: '1px solid var(--orange)' }}>
+              Kirjaus tallentuu <strong>avoimena</strong> (ei laskutettu). Admin voi merkitä laskutetuksi klikkaamalla käyntiä ruudukossa.
             </div>
           </div>
         </Modal>
