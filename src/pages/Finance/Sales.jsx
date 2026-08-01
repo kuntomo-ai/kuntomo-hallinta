@@ -895,8 +895,42 @@ export default function Sales() {
   const [filterUser, setFilterUser] = useState('')
   const [users, setUsers] = useState([])
   const [receiptModal, setReceiptModal] = useState(null)
+  const [companyMap, setCompanyMap] = useState(new Map())
 
   const TABLE_MAP = { valmennus: 'valmennusmyynti', jasen: 'jasenmyynti' }
+
+  useEffect(() => {
+    (async () => {
+      const { data: companies } = await supabaseAdmin.from('companies').select('id, name')
+      const nameById = new Map((companies || []).map(c => [c.id, c.name]))
+      const PAGE = 1000
+      const all = []
+      for (let i = 0; i < 50; i++) {
+        const { data } = await supabaseAdmin
+          .from('company_visits')
+          .select('company_id, company_person_name, visit_date, price')
+          .range(i * PAGE, (i + 1) * PAGE - 1)
+        if (!data || data.length === 0) break
+        all.push(...data)
+        if (data.length < PAGE) break
+      }
+      const map = new Map()
+      all.forEach(v => {
+        if (!v.company_person_name || !v.visit_date) return
+        const key = `${v.visit_date}|${v.company_person_name}|${(v.price ?? 0).toFixed(2)}`
+        const name = nameById.get(v.company_id)
+        if (name) map.set(key, name)
+      })
+      setCompanyMap(map)
+    })()
+  }, [])
+
+  function lookupCompany(r) {
+    if (!(r.payment_method || '').includes('Yrityslaskutus')) return null
+    const date = (r.visit_date || r.entry_date || r.created_at || '').slice(0, 10)
+    const key = `${date}|${r.customer_name}|${(r.price ?? 0).toFixed(2)}`
+    return companyMap.get(key) || null
+  }
 
   useEffect(() => {
     setSearch('')
@@ -1221,7 +1255,13 @@ export default function Sales() {
                         <td style={{ whiteSpace: 'nowrap', color: isUnbilled ? '#DC2626' : 'var(--text3)', fontSize: '.78rem' }}>
                           {new Date(rowDate(r)).toLocaleDateString('fi-FI')}
                         </td>
-                        <td style={{ fontWeight: 600, color: isUnbilled ? '#DC2626' : undefined }}>{r.customer_name}</td>
+                        <td style={{ fontWeight: 600, color: isUnbilled ? '#DC2626' : undefined }}>
+                          {r.customer_name}
+                          {tab === 'terapia' && (() => {
+                            const c = lookupCompany(r)
+                            return c ? <div style={{ fontWeight: 500, color: 'var(--text3)', fontSize: '.72rem' }}>{c}</div> : null
+                          })()}
+                        </td>
                         <td style={{ color: isUnbilled ? '#DC2626' : undefined }}>{tab === 'jasen' ? r.membership_type : r.service}</td>
                         <td style={{ fontWeight: 700, color: isUnbilled ? '#DC2626' : 'var(--violet)' }}>{(r.price || 0).toFixed(2)} €</td>
                         {tab === 'jasen' && <td style={{ color: 'var(--text3)' }}>{r.start_date ? new Date(r.start_date).toLocaleDateString('fi-FI') : '—'}</td>}
