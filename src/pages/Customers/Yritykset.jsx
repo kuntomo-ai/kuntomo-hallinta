@@ -43,6 +43,7 @@ export default function Yritykset() {
   const [visitForm, setVisitForm] = useState(emptyVisit)
   const [visitTarget, setVisitTarget] = useState(null)
   const [addingVisit, setAddingVisit] = useState(false)
+  const [markingAll, setMarkingAll] = useState(false)
 
   useEffect(() => { fetchData() }, [])
 
@@ -159,6 +160,22 @@ export default function Yritykset() {
   async function toggleInvoiced(visit) {
     if (!isAdmin) return
     await supabaseAdmin.from('company_visits').update({ invoiced: !visit.invoiced }).eq('id', visit.id)
+    fetchCompanyData(selected.id, viewYear)
+  }
+
+  async function markAllInvoiced() {
+    if (!isAdmin || !selected) return
+    const openVisits = visits.filter(v => !v.invoiced)
+    if (openVisits.length === 0) return
+    const sum = openVisits.reduce((s, v) => s + (v.price || 0), 0)
+    if (!confirm(`Merkitäänkö kaikki ${openVisits.length} avointa käyntiä (${sum.toFixed(2)} €) laskutetuksi vuodelta ${viewYear}?`)) return
+    setMarkingAll(true)
+    await supabaseAdmin.from('company_visits').update({ invoiced: true })
+      .eq('company_id', selected.id)
+      .eq('invoiced', false)
+      .gte('visit_date', `${viewYear}-01-01`)
+      .lte('visit_date', `${viewYear}-12-31`)
+    setMarkingAll(false)
     fetchCompanyData(selected.id, viewYear)
   }
 
@@ -389,6 +406,12 @@ export default function Yritykset() {
             <span style={{ borderLeft: '1px solid var(--border)', paddingLeft: '2rem' }}>
               Avoinna: <strong style={{ color: openTotal > 0 ? 'var(--orange)' : 'inherit' }}>{openTotal.toFixed(2)} €</strong>
             </span>
+            {isAdmin && openTotal > 0 && (
+              <button className="btn btn-sm" onClick={markAllInvoiced} disabled={markingAll}
+                style={{ background: 'var(--green)', color: 'white', fontSize: '.75rem', padding: '.35rem .7rem' }}>
+                {markingAll ? 'Merkitään...' : `Merkitse kaikki laskutetuiksi (${visits.filter(v => !v.invoiced).length} kpl)`}
+              </button>
+            )}
             <span style={{ marginLeft: 'auto', fontSize: '.75rem', color: 'var(--text3)' }}>
               Klikkaa tyhjää lokeroa lisätäksesi käynnin{isAdmin && ' · käyntiä klikkaamalla merkitset laskutetuksi'}
             </span>
