@@ -1020,6 +1020,7 @@ export default function Sales() {
   const [editRow, setEditRow] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [editSaving, setEditSaving] = useState(false)
+  const [editSplitError, setEditSplitError] = useState('')
 
   function openEdit(r) {
     setEditRow(r)
@@ -1074,34 +1075,45 @@ export default function Sales() {
 
   async function handleEditSave() {
     if (!editRow) return
-    setEditSaving(true)
+    setEditSplitError('')
     let table, payload
     if (tab === 'terapia') {
       table = 'terapiamyynti'
-      // Only save splits when there are ≥2 methods and every entered amount > 0.
-      // Single-method rows should have splits=null so the fallback discount rule
-      // applies. Editor is intentionally lenient about sum-vs-price mismatches
-      // — the Tilitettävä calc only uses the ratios per method.
+      // Multi-method rows MUST have splits summing to price so the Tilitettävä
+      // discount (−5% HVE, −10% Lahjakortti) applies only to that portion.
       const methods = editForm._methods || []
+      const price = parseFloat(editForm.price) || 0
       const parsedSplits = {}
-      let hasAllSplits = methods.length >= 2
-      for (const m of methods) {
-        const v = parseFloat(editForm.splits?.[m])
-        if (isNaN(v) || v <= 0) { hasAllSplits = false; break }
-        parsedSplits[m] = v
+      if (methods.length >= 2) {
+        let sum = 0
+        for (const m of methods) {
+          const v = parseFloat(editForm.splits?.[m])
+          if (isNaN(v) || v < 0) {
+            setEditSplitError(`Anna kaikille maksutavoille summa (${m} puuttuu tai virheellinen).`)
+            return
+          }
+          if (v > 0) parsedSplits[m] = v
+          sum += v
+        }
+        if (Math.abs(sum - price) > 0.01) {
+          setEditSplitError(`Erittelyn summa (${sum.toFixed(2)} €) ei täsmää hintaan (${price.toFixed(2)} €).`)
+          return
+        }
       }
+      setEditSaving(true)
       payload = {
         entry_date: editForm.visit_date || null,
         visit_date: editForm.visit_date || null,
         customer_name: editForm.customer_name.trim() || null,
         service: editForm.service || null,
-        price: parseFloat(editForm.price) || 0,
+        price,
         payment_method: editForm.payment_method || null,
-        splits: hasAllSplits ? parsedSplits : null,
+        splits: methods.length >= 2 ? parsedSplits : null,
         notes: editForm.notes.trim() || null,
         ...((editForm.payment_method || '').includes('Laskutus') ? { laskutettu: editForm.laskutettu ?? false } : {}),
       }
     } else if (tab === 'valmennus') {
+      setEditSaving(true)
       table = 'valmennusmyynti'
       payload = {
         visit_date: editForm.visit_date || null,
@@ -1112,6 +1124,7 @@ export default function Sales() {
         notes: editForm.notes.trim() || null,
       }
     } else {
+      setEditSaving(true)
       table = 'jasenmyynti'
       payload = {
         customer_name: editForm.customer_name.trim() || null,
@@ -1311,13 +1324,23 @@ export default function Sales() {
             for (const r of filtered) {
               const price = r.price || 0
               brutto += price
-              if (r.splits && typeof r.splits === 'object' && !Array.isArray(r.splits)) {
+              if (r.splits && typeof r.splits === 'object' && !Array.isArray(r.splits) && Object.keys(r.splits).length > 0) {
                 for (const [method, amt] of Object.entries(r.splits)) {
                   tilitettava += netForPortion(method, parseFloat(amt) || 0)
                 }
                 continue
               }
-              tilitettava += netForPortion(r.payment_method || '', price)
+              // No splits recorded. If payment_method lists a single method → apply its rule.
+              // If multiple methods (comma-separated) and no split → split evenly as a safer
+              // approximation than penalizing -5%/-10% across the entire sale.
+              const pmStr = r.payment_method || ''
+              const methods = pmStr.split(/\s+—\s+/)[0].split(/,\s*/).map(t => t.trim()).filter(Boolean)
+              if (methods.length <= 1) {
+                tilitettava += netForPortion(pmStr, price)
+              } else {
+                const portion = price / methods.length
+                for (const m of methods) tilitettava += netForPortion(m, portion)
+              }
             }
             return (
               <div style={{ marginTop: '.75rem', padding: '.85rem 1.25rem', background: 'var(--violet-subtle)', border: '1px solid var(--violet-border)', borderRadius: 'var(--radius)', display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
@@ -1474,15 +1497,20 @@ export default function Sales() {
                       <span style={{ color: 'var(--text3)' }}>Yhteensä syötetty: <strong style={{ color: diff < 0.01 ? 'var(--green)' : 'var(--orange)' }}>{sum.toFixed(2)} €</strong></span>
                       <span style={{ color: 'var(--text3)' }}>Hinta: {price.toFixed(2)} €</span>
                     </div>
-                    {diff >= 0.01 && sum > 0 && (
+                    {diff >= 0.01 && (
                       <div style={{ fontSize: '.72rem', color: 'var(--orange)' }}>
-                        Summa ei täsmää hintaan — Tilitettävä-summa käyttää silti syöttämiäsi arvoja per maksutapa.
+                        Summan on täsmättävä hintaan tallennusta varten.
                       </div>
                     )}
                   </div>
                 </div>
               )
             })()}
+            {editSplitError && (
+              <div style={{ gridColumn: '1 / -1', color: 'var(--orange)', background: 'var(--orange-subtle)', border: '1px solid var(--orange)', padding: '.55rem .75rem', borderRadius: 'var(--radius)', fontSize: '.82rem' }}>
+                {editSplitError}
+              </div>
+            )}
             {tab === 'jasen' && isAdmin && (
               <div className="input-group">
                 <label className="input-label">Myyntipäivä</label>
