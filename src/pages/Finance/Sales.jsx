@@ -971,25 +971,43 @@ export default function Sales() {
     }
   }, [isAdmin])
 
+  // Paginate to avoid Supabase's 1000-row default limit — terapiamyynti has
+  // thousands of rows and older months were silently truncated otherwise.
+  async function fetchAllPaginated(baseQueryFactory) {
+    const PAGE = 1000
+    const all = []
+    for (let i = 0; i < 50; i++) {
+      const { data } = await baseQueryFactory().range(i * PAGE, (i + 1) * PAGE - 1)
+      if (!data || data.length === 0) break
+      all.push(...data)
+      if (data.length < PAGE) break
+    }
+    return all
+  }
+
   async function fetchTerapia(activeTab) {
     setLoading(true)
-    let q = supabaseAdmin.from('terapiamyynti').select('*').order('entry_date', { ascending: false })
-    if (!isAdmin) q = q.eq('employee_id', user?.id)
-    const { data } = await q
-    setRows(data || [])
+    const data = await fetchAllPaginated(() => {
+      let q = supabaseAdmin.from('terapiamyynti').select('*').order('entry_date', { ascending: false })
+      if (!isAdmin) q = q.eq('employee_id', user?.id)
+      return q
+    })
+    setRows(data)
     const today = new Date().toISOString().slice(0, 10)
-    setTodayTotal((data || []).filter(r => (r.entry_date || r.created_at || '').slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
+    setTodayTotal(data.filter(r => (r.entry_date || r.created_at || '').slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
     setLoading(false)
   }
 
   async function fetchOther(t) {
     setLoading(true)
-    let q = supabaseAdmin.from(TABLE_MAP[t]).select('*').order('created_at', { ascending: false })
-    if (!isAdmin) q = q.eq('employee_id', user?.id)
-    const { data } = await q
-    setRows(data || [])
+    const data = await fetchAllPaginated(() => {
+      let q = supabaseAdmin.from(TABLE_MAP[t]).select('*').order('created_at', { ascending: false })
+      if (!isAdmin) q = q.eq('employee_id', user?.id)
+      return q
+    })
+    setRows(data)
     const today = new Date().toISOString().slice(0, 10)
-    setTodayTotal((data || []).filter(r => (r.visit_date || r.created_at || '').slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
+    setTodayTotal(data.filter(r => (r.visit_date || r.created_at || '').slice(0, 10) === today).reduce((s, r) => s + (r.price || 0), 0))
     setLoading(false)
   }
 
