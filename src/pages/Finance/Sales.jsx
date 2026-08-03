@@ -231,13 +231,18 @@ function TerapiaForm({ onSaved }) {
     }
 
     if (needsCompany && form.company_id && form.company_person_id) {
+      // Only the Yrityslaskutus portion is invoiced to the company; other
+      // methods (e.g. Maksupääte) are paid at the till and don't belong here.
+      const yritysPortion = splitsToSave && splitsToSave['Yrityslaskutus'] != null
+        ? parseFloat(splitsToSave['Yrityslaskutus'])
+        : parseFloat(form.price)
       await supabaseAdmin.from('company_visits').insert({
         company_id: form.company_id,
         company_person_id: form.company_person_id,
         company_person_name: form.company_person_name,
         visit_date: form.visit_date,
         service: form.service,
-        price: parseFloat(form.price),
+        price: yritysPortion,
         payment_type: 'Yrityslaskutus',
         invoiced: false,
         notes: form.notes.trim() || null,
