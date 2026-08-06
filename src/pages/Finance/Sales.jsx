@@ -176,6 +176,10 @@ function TerapiaForm({ onSaved }) {
     if (needsYrityskäynti && !form.yritys_name.trim()) return
     if (needsSecondPayment) { setSplitError(true); return }
     if (!splitsValid()) { setSplitError(true); return }
+    if (form.payment_methods.includes('Lahjakortti') && !giftCode.trim()) {
+      setSaveError('Syötä lahjakortin numero tai tilausnumero.')
+      return
+    }
     setSplitError(false)
     setSaveError('')
     setSaving(true)
@@ -286,10 +290,10 @@ function TerapiaForm({ onSaved }) {
     try {
       if (form.payment_methods.includes('Lahjakortti') && giftCode.trim()) {
         if (giftNotFound || !giftCard) {
-          // Lahjakorttia ei löydy → luo tehtävä adminille
+          // Lahjakorttia ei löydy → luo tehtävä adminille (viite voi olla myös tilausnumero)
           await supabaseAdmin.from('tasks').insert({
-            title: `Lahjakortti ${giftCode.trim()} ei löydy järjestelmästä`,
-            description: `Hoitomyynnissä käytetty lahjakortti "${giftCode.trim()}" ei löydy järjestelmästä. Palvelu: ${form.service} — ${parseFloat(form.price).toFixed(2)} €. Kirjannut: ${empName || '—'}`,
+            title: `Lahjakortti/tilausnumero ${giftCode.trim()} ei löydy järjestelmästä`,
+            description: `Hoitomyynnissä käytetty lahjakortin numero tai tilausnumero "${giftCode.trim()}" ei löydy järjestelmästä. Palvelu: ${form.service} — ${parseFloat(form.price).toFixed(2)} €. Kirjannut: ${empName || '—'}`,
             status: 'avoin',
             priority: 'high',
             assigned_to: 'admin',
@@ -420,10 +424,10 @@ function TerapiaForm({ onSaved }) {
                 {m === 'Lahjakortti' && form.payment_methods.includes('Lahjakortti') && (
                   <div style={{ marginLeft: '1.65rem', marginTop: '.5rem', padding: '.75rem', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                     <div className="input-group" style={{ margin: 0 }}>
-                      <label className="input-label">Lahjakortin tunnus / nro *</label>
+                      <label className="input-label">Lahjakortin numero tai tilausnumero *</label>
                       <input
                         className="input-field"
-                        placeholder="Syötä lahjakortin tunnus"
+                        placeholder="Lahjakortin numero tai tilausnumero (pakollinen)"
                         value={giftCode}
                         onChange={e => { setGiftCode(e.target.value); setGiftCard(null); setGiftNotFound(false) }}
                         onBlur={() => lookupGiftCard(giftCode)}
@@ -434,8 +438,8 @@ function TerapiaForm({ onSaved }) {
                     )}
                     {giftNotFound && giftCode.trim() && (
                       <div style={{ fontSize: '.78rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, padding: '.45rem .7rem', color: 'var(--red)' }}>
-                        ⚠️ Lahjakorttia <strong>{giftCode.trim()}</strong> ei löydy järjestelmästä.
-                        Tallennuksen yhteydessä luodaan tehtävä Admin-käyttäjälle.
+                        ⚠️ <strong>{giftCode.trim()}</strong> ei löydy järjestelmästä. Tarkista että numero on oikein, tai jätä tilausnumero
+                        (esim. verkkokaupan tilausnro) kenttään — se tallennetaan viitteeksi ja Admin saa tehtävän tarkistettavaksi.
                       </div>
                     )}
                     {giftCard && (() => {
