@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import logo from '../logo.svg'
 
@@ -7,6 +7,13 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (sessionStorage.getItem('kuntomo-inactive-signout') === '1') {
+      setError('Tunnuksesi ei ole aktiivinen. Ota tarvittaessa yhteys esihenkilöön.')
+      sessionStorage.removeItem('kuntomo-inactive-signout')
+    }
+  }, [])
   const [view, setView] = useState('login') // 'login' | 'forgot'
   const [resetEmail, setResetEmail] = useState('')
   const [resetSent, setResetSent] = useState(false)

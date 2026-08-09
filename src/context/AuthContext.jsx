@@ -39,6 +39,18 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function fetchProfile(userId) {
+    // Ei-aktiivinen työntekijä kirjataan välittömästi ulos ennen kuin profiili
+    // ehtii latautua — muuten pääsee näkemään sivut. Ohitetaan tarkistus
+    // jos työntekijärivi ei löydy (esim. ulkopuoliset admin-tunnukset).
+    const { data: emp } = await supabaseAdmin.from('employees').select('status').eq('auth_user_id', userId).maybeSingle()
+    if (emp && emp.status === 'inactive') {
+      await supabase.auth.signOut()
+      sessionStorage.setItem('kuntomo-inactive-signout', '1')
+      setProfile(null)
+      setUser(null)
+      setLoading(false)
+      return
+    }
     const { data } = await supabaseAdmin.from('profiles').select('*').eq('id', userId).single()
     setProfile(data)
     setLoading(false)
