@@ -447,10 +447,10 @@ function AccountingWidget({ loading, data }) {
 
 // ── Main Dashboard ───────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { profile, user, role, isAdmin, isHallitus } = useAuth()
+  const { profile, user, role, roles, isAdmin, isHallitus } = useAuth()
 
   const isSalesRole = ['myynti', 'terapia_valmennus', 'sport'].includes(role)
-  const isHuolto = role === 'huolto'
+  const isHuolto = roles.includes('huolto')
 
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState([])
@@ -507,11 +507,10 @@ export default function Dashboard() {
       ? rawTasks
       : rawTasks.filter(r => {
           const myEmail = profile?.email || ''
-          const myRole  = role || ''
           const at = (r.assigned_to || '').trim()
           if (!at) return true
           const parts = at.split(',').map(s => s.trim())
-          return at === myEmail || at === empName || parts.some(p => p === myRole)
+          return at === myEmail || at === empName || parts.some(p => roles.includes(p))
         })
     // Kiireelliset (high) ylimmäksi, sitten deadline, sitten uusin
     const sorted = [...visibleTasks].sort((a, b) => {
@@ -528,7 +527,7 @@ export default function Dashboard() {
     setEvents(allEvents.filter(e => {
       if (isAdmin || isHallitus) return true
       if (!e.recipient_type || e.recipient_type === 'all') return true
-      if (e.recipient_type === 'role' && e.recipient_role === role) return true
+      if (e.recipient_type === 'role' && roles.includes(e.recipient_role)) return true
       return false
     }))
 
