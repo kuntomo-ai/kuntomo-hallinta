@@ -43,6 +43,8 @@ export default function Employees() {
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [editingAuthUid, setEditingAuthUid] = useState(null)
+  const [editingPrevStatus, setEditingPrevStatus] = useState('active')
   const [form, setForm] = useState(empty)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -145,6 +147,8 @@ export default function Employees() {
   function openEdit(row) {
     // editing = employee_id (null if person has no employees record yet)
     setEditing(row.employee_id || null)
+    setEditingAuthUid(row.profile_id || null)
+    setEditingPrevStatus(row.status || 'active')
     setForm({
       first_name: row.first_name || '',
       last_name: row.last_name || '',
@@ -194,6 +198,15 @@ export default function Employees() {
               role: form.roles[0] || null,  // primary role (app_role enum — single value)
               roles: form.roles,            // full multi-role list (text[])
             }).eq('id', prof.id)
+          }
+        }
+
+        // Status muuttui active↔inactive → aseta/vapauta ban auth-käyttäjälle
+        if (editingAuthUid && form.status !== editingPrevStatus) {
+          if (form.status === 'inactive') {
+            await supabaseAdmin.auth.admin.updateUserById(editingAuthUid, { ban_duration: '876000h' })
+          } else if (editingPrevStatus === 'inactive') {
+            await supabaseAdmin.auth.admin.updateUserById(editingAuthUid, { ban_duration: 'none' })
           }
         }
       } else {
