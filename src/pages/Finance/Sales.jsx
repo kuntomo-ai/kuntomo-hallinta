@@ -821,7 +821,7 @@ function JasenForm({ onSaved }) {
     if (jasenError) { setSaving(false); alert('Tallennus epäonnistui: ' + jasenError.message); return }
 
     // Ilmoita adminille uudesta jäsenmyynnistä
-    await supabaseAdmin.from('tasks').insert({
+    const { error: taskErr } = await supabaseAdmin.from('tasks').insert({
       title: `Uusi jäsenmyynti: ${form.customer_name.trim()} — ${form.service}`,
       description: `Asiakas: ${form.customer_name.trim()}${form.customer_email.trim() ? ` (${form.customer_email.trim()})` : ''}\n` +
                    `Jäsenyys: ${form.service} — ${parseFloat(form.price).toFixed(2)} €\n` +
@@ -830,10 +830,11 @@ function JasenForm({ onSaved }) {
                    (form.discount_info.trim() ? `\nAlennus: ${form.discount_info.trim()}` : '') +
                    (form.notes.trim() ? `\nMuistiinpanot: ${form.notes.trim()}` : ''),
       status: 'avoin',
-      priority: 'normal',
+      priority: 'medium',
       assigned_to: 'admin',
       created_by: empName || 'Järjestelmä',
     })
+    if (taskErr) console.error('Admin-tehtävän luonti epäonnistui:', taskErr.message)
 
     setSaving(false)
     setForm({ customer_name: '', customer_email: '', visit_date: TODAY, service: '', price: '', discount_info: '', start_date: '', notes: '' })
