@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabaseAdmin } from '../lib/supabase'
+import { salivastaavaRole } from '../lib/salivastaava'
 import logo from '../logo.svg'
 
 // view: 'landing' | 'fault-form' | 'success'
@@ -60,6 +61,9 @@ export default function LaiteVika() {
       .eq('id', id)
 
     const deviceLabel = device.device_number ? `${device.name} (nro ${device.device_number})` : device.name
+    const assigned = ['huolto', 'admin', 'respa']
+    const sVastaava = salivastaavaRole(device.sijainti)
+    if (sVastaava) assigned.push(sVastaava)
     const task = {
       title:       `Laitehuolto: ${deviceLabel}`,
       description: `Vikailmoitus (QR): ${form.kuvaus.trim()}\n` +
@@ -70,7 +74,7 @@ export default function LaiteVika() {
       status:      'avoin',
       priority:    'high',
       created_by:  form.nimi.trim(),
-      assigned_to: 'huolto, admin, respa',
+      assigned_to: assigned.join(', '),
     }
     // Linkki laitteen tietoihin + vikailmoitukseen (Laiteluettelo avaa modaalin)
     const link = `/laiteluettelo?device=${id}`

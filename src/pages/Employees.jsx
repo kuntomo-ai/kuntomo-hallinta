@@ -5,7 +5,10 @@ import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 import EmployeesNav from '../components/EmployeesNav'
 
-const ROLES = ['myynti', 'terapia_valmennus', 'huolto', 'sport', 'respa', 'hallitus', 'admin']
+const ROLES = ['myynti', 'terapia_valmennus', 'huolto', 'sport', 'respa', 'hallitus', 'admin', 'salivastaava_kempele', 'salivastaava_etu_lyotty']
+// Vain nämä ovat sallittuja arvoja profiles.role (app_role enum) -sarakkeessa.
+// salivastaava_xxx elää vain profiles.roles-taulukossa.
+const ENUM_ROLES = new Set(['myynti', 'terapia_valmennus', 'huolto', 'sport', 'respa', 'hallitus', 'admin'])
 const EMPLOYMENT_TYPES = ['Työsuhde', 'Yrittäjä', 'Tuntityöntekijä', 'Harjoittelija']
 const STATUSES = ['active', 'inactive', 'vacation', 'sick_leave']
 const STATUS_LABELS = { active: 'Aktiivinen', inactive: 'Ei aktiivinen', vacation: 'Lomalla', sick_leave: 'Sairasloma' }
@@ -195,7 +198,7 @@ export default function Employees() {
             await supabaseAdmin.from('profiles').update({
               first_name: payload.first_name,
               last_name: payload.last_name,
-              role: form.roles[0] || null,  // primary role (app_role enum — single value)
+              role: form.roles.find(r => ENUM_ROLES.has(r)) || null,  // primary role (app_role enum — single value)
               roles: form.roles,            // full multi-role list (text[])
             }).eq('id', prof.id)
           }
@@ -231,7 +234,7 @@ export default function Employees() {
               first_name: payload.first_name,
               last_name: payload.last_name,
               email: form.email.trim(),
-              role: form.roles[0] || null,
+              role: form.roles.find(r => ENUM_ROLES.has(r)) || null,
               roles: form.roles,
             })
 

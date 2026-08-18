@@ -3,6 +3,7 @@ import { Plus, Search, Edit2, Trash2, Wrench, CheckCircle, QrCode, Copy, Check }
 import { Link, useSearchParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, supabaseAdmin } from '../lib/supabase'
+import { salivastaavaRole } from '../lib/salivastaava'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 
@@ -162,8 +163,12 @@ export default function Laiteluettelo() {
 
     await supabaseAdmin.from('laiteluettelo_items').update({ service_requested: true }).eq('id', editing)
 
-    const deviceNumber = rows.find(r => r.id === editing)?.device_number
+    const dev = rows.find(r => r.id === editing)
+    const deviceNumber = dev?.device_number
     const deviceLabel = deviceNumber ? `${editingDeviceName} (nro ${deviceNumber})` : editingDeviceName
+    const assigned = ['huolto', 'admin', 'respa']
+    const sVastaava = salivastaavaRole(dev?.sijainti)
+    if (sVastaava) assigned.push(sVastaava)
     const task = {
       title: `Laitehuolto: ${deviceLabel}`,
       description: `${serviceNote.trim()}\nLaite: ${deviceLabel}`,
@@ -171,7 +176,7 @@ export default function Laiteluettelo() {
       priority: 'high',
       due_date: null,
       created_by: myName || null,
-      assigned_to: 'huolto, admin, respa',
+      assigned_to: assigned.join(', '),
     }
     // Linkki laitteen tietoihin + vikailmoitukseen
     const link = `/laiteluettelo?device=${editing}`
