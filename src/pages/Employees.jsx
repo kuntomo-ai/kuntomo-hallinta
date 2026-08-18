@@ -5,6 +5,22 @@ import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 import EmployeesNav from '../components/EmployeesNav'
 
+// Kutsu palvelinpuolen /api/admin/users -endpointtia. Ei koskaan käytä
+// supabaseAdmin.auth.admin.* -kutsuja selaimessa — service_role pysyy palvelimella.
+async function callAdminUsersApi(action, payload) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
+  if (!token) throw new Error('Ei kirjautumista')
+  const res = await fetch('/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ action, ...payload }),
+  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(json?.error || `API-virhe (${res.status})`)
+  return json
+}
+
 const ROLES = ['myynti', 'terapia_valmennus', 'huolto', 'sport', 'respa', 'hallitus', 'admin', 'salivastaava_kempele', 'salivastaava_etu_lyotty']
 // Vain nämä ovat sallittuja arvoja profiles.role (app_role enum) -sarakkeessa.
 // salivastaava_xxx elää vain profiles.roles-taulukossa.
@@ -207,9 +223,9 @@ export default function Employees() {
         // Status muuttui active↔inactive → aseta/vapauta ban auth-käyttäjälle
         if (editingAuthUid && form.status !== editingPrevStatus) {
           if (form.status === 'inactive') {
-            await supabaseAdmin.auth.admin.updateUserById(editingAuthUid, { ban_duration: '876000h' })
+            await callAdminUsersApi('ban', { uid: editingAuthUid })
           } else if (editingPrevStatus === 'inactive') {
-            await supabaseAdmin.auth.admin.updateUserById(editingAuthUid, { ban_duration: 'none' })
+            await callAdminUsersApi('unban', { uid: editingAuthUid })
           }
         }
       } else {
@@ -218,15 +234,18 @@ export default function Employees() {
         if (error) throw error
 
         if (form.email.trim()) {
-          // Create auth user + profile
-          const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
-            email: form.email.trim(),
-            email_confirm: true,
-            user_metadata: { first_name: payload.first_name, last_name: payload.last_name },
-          })
-          if (authErr) throw new Error(`Käyttäjätunnuksen luonti epäonnistui: ${authErr.message}`)
-
-          const uid = authData?.user?.id
+          // Create auth user via server endpoint (uses service_role safely)
+          let uid = null
+          try {
+            const res = await callAdminUsersApi('create', {
+              email: form.email.trim(),
+              first_name: payload.first_name,
+              last_name: payload.last_name,
+            })
+            uid = res.uid
+          } catch (err) {
+            throw new Error(`Käyttäjätunnuksen luonti epäonnistui: ${err.message}`)
+          }
           if (uid) {
             // Upsert profile
             await supabaseAdmin.from('profiles').upsert({
@@ -239,10 +258,7 @@ export default function Employees() {
             })
 
             // Send password reset so user can set their own password
-            await supabaseAdmin.auth.admin.generateLink({
-              type: 'recovery',
-              email: form.email.trim(),
-            }).catch(() => {})
+            await callAdminUsersApi('recovery', { email: form.email.trim() }).catch(() => {})
           }
         }
       }
@@ -288,15 +304,12 @@ export default function Employees() {
         await supabaseAdmin.from('profiles').delete().eq('id', uid)
       }
 
-      // 4. Delete auth user — if blocked by DB constraints, ban instead (same effect)
+      // 4. Delete auth user via server endpoint. Endpoint itse tekee ban-fallbackin.
       if (uid) {
-        const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(uid)
-        if (authErr) {
-          // Fallback: ban user permanently so they can't log in
-          await supabaseAdmin.auth.admin.updateUserById(uid, {
-            ban_duration: '876000h', // 100 years
-            email: `deleted_${Date.now()}@poistettu.invalid`,
-          })
+        try {
+          await callAdminUsersApi('delete', { uid })
+        } catch (err) {
+          throw new Error(`Käyttäjän poisto epäonnistui: ${err.message}`)
         }
       }
     } catch (err) {
