@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { supabaseAdmin } from '../lib/supabase'
-import { salivastaavaRole } from '../lib/salivastaava'
 import logo from '../logo.svg'
 
 // view: 'landing' | 'fault-form' | 'success'
@@ -19,16 +17,11 @@ export default function LaiteVika() {
   const [form, setForm] = useState({ nimi: '', puhelin: '', email: '', kuvaus: '' })
 
   useEffect(() => {
-    supabaseAdmin
-      .from('laiteluettelo_items')
-      .select('id, name, model, sijainti, device_number, ohjevideo_url')
-      .eq('id', id)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) setNotFound(true)
-        else setDevice(data)
-        setLoading(false)
-      })
+    fetch(`/api/laite/${encodeURIComponent(id)}`)
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then(data => setDevice(data))
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false))
   }, [id])
 
   const set = key => e => setForm(f => ({ ...f, [key]: e.target.value }))
@@ -39,49 +32,22 @@ export default function LaiteVika() {
     setSubmitting(true)
     setSubmitErr('')
 
-    const { error: insErr } = await supabaseAdmin.from('laite_huoltohistoria').insert({
-      laite_id:           id,
-      kuvaus:             form.kuvaus.trim(),
-      ilmoitettu_by:      form.nimi.trim(),
-      ilmoittaja_puhelin: form.puhelin.trim() || null,
-      ilmoittaja_email:   form.email.trim() || null,
-      source:             'qr',
-      tehty:              false,
+    const res = await fetch(`/api/laite/${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nimi: form.nimi.trim(),
+        kuvaus: form.kuvaus.trim(),
+        puhelin: form.puhelin.trim(),
+        email: form.email.trim(),
+      }),
     })
 
-    if (insErr) {
-      setSubmitErr('Lähetys epäonnistui. Yritä uudelleen.')
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      setSubmitErr(err?.error || 'Lähetys epäonnistui. Yritä uudelleen.')
       setSubmitting(false)
       return
-    }
-
-    await supabaseAdmin
-      .from('laiteluettelo_items')
-      .update({ service_requested: true })
-      .eq('id', id)
-
-    const deviceLabel = device.device_number ? `${device.name} (nro ${device.device_number})` : device.name
-    const assigned = ['huolto', 'admin', 'respa']
-    const sVastaava = salivastaavaRole(device.sijainti)
-    if (sVastaava) assigned.push(sVastaava)
-    const task = {
-      title:       `Laitehuolto: ${deviceLabel}`,
-      description: `Vikailmoitus (QR): ${form.kuvaus.trim()}\n` +
-                   `Laite: ${deviceLabel}${device.sijainti ? ` · ${device.sijainti}` : ''}\n` +
-                   `Ilmoittaja: ${form.nimi.trim()}` +
-                   (form.puhelin ? ` · ${form.puhelin.trim()}` : '') +
-                   (form.email   ? ` · ${form.email.trim()}`   : ''),
-      status:      'avoin',
-      priority:    'high',
-      created_by:  form.nimi.trim(),
-      assigned_to: assigned.join(', '),
-    }
-    // Linkki laitteen tietoihin + vikailmoitukseen (Laiteluettelo avaa modaalin)
-    const link = `/laiteluettelo?device=${id}`
-    const { error: taskErr } = await supabaseAdmin.from('tasks').insert({ ...task, link })
-    // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävä ilman sitä
-    if (taskErr) {
-      await supabaseAdmin.from('tasks').insert(task)
     }
 
     setView('success')

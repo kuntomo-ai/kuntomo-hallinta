@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 import EmployeesNav from '../components/EmployeesNav'
 
 // Kutsu palvelinpuolen /api/admin/users -endpointtia. Ei koskaan käytä
-// supabaseAdmin.auth.admin.* -kutsuja selaimessa — service_role pysyy palvelimella.
+// supabase.auth.admin.* -kutsuja selaimessa — service_role pysyy palvelimella.
 async function callAdminUsersApi(action, payload) {
   const { data: { session } } = await supabase.auth.getSession()
   const token = session?.access_token
@@ -76,8 +76,8 @@ export default function Employees() {
     setLoading(true)
     // Fetch both profiles (all system users) and employees (HR data)
     const [profRes, empRes] = await Promise.all([
-      supabaseAdmin.from('profiles').select('*').order('first_name'),
-      supabaseAdmin.from('employees').select('*'),
+      supabase.from('profiles').select('*').order('first_name'),
+      supabase.from('employees').select('*'),
     ])
     const profiles = profRes.data || []
     const employees = empRes.data || []
@@ -204,14 +204,14 @@ export default function Employees() {
     try {
       if (editing) {
         // Update existing employees row
-        const { error } = await supabaseAdmin.from('employees').update(payload).eq('id', editing)
+        const { error } = await supabase.from('employees').update(payload).eq('id', editing)
         if (error) throw error
 
         // Sync name/role to matching profile if exists
         if (payload.email) {
-          const { data: prof } = await supabaseAdmin.from('profiles').select('id').eq('email', payload.email).maybeSingle()
+          const { data: prof } = await supabase.from('profiles').select('id').eq('email', payload.email).maybeSingle()
           if (prof) {
-            await supabaseAdmin.from('profiles').update({
+            await supabase.from('profiles').update({
               first_name: payload.first_name,
               last_name: payload.last_name,
               role: form.roles.find(r => ENUM_ROLES.has(r)) || null,  // primary role (app_role enum — single value)
@@ -230,7 +230,7 @@ export default function Employees() {
         }
       } else {
         // New person — insert employees row
-        const { error } = await supabaseAdmin.from('employees').insert(payload)
+        const { error } = await supabase.from('employees').insert(payload)
         if (error) throw error
 
         if (form.email.trim()) {
@@ -248,7 +248,7 @@ export default function Employees() {
           }
           if (uid) {
             // Upsert profile
-            await supabaseAdmin.from('profiles').upsert({
+            await supabase.from('profiles').upsert({
               id: uid,
               first_name: payload.first_name,
               last_name: payload.last_name,
@@ -284,24 +284,24 @@ export default function Employees() {
       // 1. Null out employee_id in all referencing tables (avoids FK constraint on auth user delete)
       if (uid) {
         await Promise.all([
-          supabaseAdmin.from('terapiamyynti').update({ employee_id: null }).eq('employee_id', uid),
-          supabaseAdmin.from('valmennusmyynti').update({ employee_id: null }).eq('employee_id', uid),
-          supabaseAdmin.from('jasenmyynti').update({ employee_id: null }).eq('employee_id', uid),
-          supabaseAdmin.from('work_logs').update({ employee_id: null }).eq('employee_id', uid),
-          supabaseAdmin.from('work_time_logs').update({ employee_id: null }).eq('employee_id', uid),
-          supabaseAdmin.from('drive_logs').update({ driver_id: null }).eq('driver_id', uid),
+          supabase.from('terapiamyynti').update({ employee_id: null }).eq('employee_id', uid),
+          supabase.from('valmennusmyynti').update({ employee_id: null }).eq('employee_id', uid),
+          supabase.from('jasenmyynti').update({ employee_id: null }).eq('employee_id', uid),
+          supabase.from('work_logs').update({ employee_id: null }).eq('employee_id', uid),
+          supabase.from('work_time_logs').update({ employee_id: null }).eq('employee_id', uid),
+          supabase.from('drive_logs').update({ driver_id: null }).eq('driver_id', uid),
         ])
       }
 
       // 2. Delete employees HR record
       if (row.employee_id) {
-        const { error: empErr } = await supabaseAdmin.from('employees').delete().eq('id', row.employee_id)
+        const { error: empErr } = await supabase.from('employees').delete().eq('id', row.employee_id)
         if (empErr) throw new Error(`HR-tietojen poisto epäonnistui: ${empErr.message}`)
       }
 
       // 3. Delete profile row manually before auth delete
       if (uid) {
-        await supabaseAdmin.from('profiles').delete().eq('id', uid)
+        await supabase.from('profiles').delete().eq('id', uid)
       }
 
       // 4. Delete auth user via server endpoint. Endpoint itse tekee ban-fallbackin.
