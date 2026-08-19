@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2, Edit2, ChevronRight, Lock } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/ui/Modal'
 
@@ -47,7 +47,7 @@ function Pipeline() {
 
   async function fetchData() {
     setLoading(true)
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('sport_hockey_pipeline')
       .select('*')
       .order('created_at', { ascending: false })
@@ -100,10 +100,10 @@ function Pipeline() {
     }
     let saveError = null
     if (editing) {
-      const { error } = await supabaseAdmin.from('sport_hockey_pipeline').update(payload).eq('id', editing)
+      const { error } = await supabase.from('sport_hockey_pipeline').update(payload).eq('id', editing)
       saveError = error
     } else {
-      const { error } = await supabaseAdmin.from('sport_hockey_pipeline').insert(payload)
+      const { error } = await supabase.from('sport_hockey_pipeline').insert(payload)
       saveError = error
     }
     setSaving(false)
@@ -116,7 +116,7 @@ function Pipeline() {
   }
 
   async function handleStageChange(id, stage) {
-    await supabaseAdmin.from('sport_hockey_pipeline').update({ stage }).eq('id', id)
+    await supabase.from('sport_hockey_pipeline').update({ stage }).eq('id', id)
     setRows(r => r.map(row => row.id === id ? { ...row, stage } : row))
   }
 
@@ -129,7 +129,7 @@ function Pipeline() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko?')) return
-    await supabaseAdmin.from('sport_hockey_pipeline').delete().eq('id', id)
+    await supabase.from('sport_hockey_pipeline').delete().eq('id', id)
     fetchData()
   }
 
@@ -340,7 +340,7 @@ function Joukkueet() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('sport_hockey').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('sport_hockey').select('*').order('created_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -348,7 +348,7 @@ function Joukkueet() {
   async function handleSave() {
     if (!form.team_name.trim()) return
     setSaving(true)
-    await supabaseAdmin.from('sport_hockey').insert({
+    await supabase.from('sport_hockey').insert({
       team_name: form.team_name.trim(),
       league: form.league.trim() || null,
       city: form.city.trim() || null,
@@ -365,7 +365,7 @@ function Joukkueet() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko joukkue?')) return
-    await supabaseAdmin.from('sport_hockey').delete().eq('id', id)
+    await supabase.from('sport_hockey').delete().eq('id', id)
     fetchData()
   }
 
@@ -488,7 +488,7 @@ function Kesaryhma() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('sport_jaakiekko_kesaryhma').select('*').order('syntymavuosi').order('nimi')
+    const { data } = await supabase.from('sport_jaakiekko_kesaryhma').select('*').order('syntymavuosi').order('nimi')
     // Compute derived fields for display (viikot from dates, summa from viikot×€/vko)
     setRows((data || []).map(r => {
       const viikot = r.aloitus && r.lopetus ? calcWeeks(r.aloitus, r.lopetus) : (r.viikot ?? null)
@@ -538,9 +538,9 @@ function Kesaryhma() {
       muuta: derived.muuta.trim() || null,
     }
     if (editing) {
-      await supabaseAdmin.from('sport_jaakiekko_kesaryhma').update(payload).eq('id', editing)
+      await supabase.from('sport_jaakiekko_kesaryhma').update(payload).eq('id', editing)
     } else {
-      await supabaseAdmin.from('sport_jaakiekko_kesaryhma').insert(payload)
+      await supabase.from('sport_jaakiekko_kesaryhma').insert(payload)
     }
     setSaving(false)
     setShowModal(false)
@@ -551,7 +551,7 @@ function Kesaryhma() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko pelaaja?')) return
-    await supabaseAdmin.from('sport_jaakiekko_kesaryhma').delete().eq('id', id)
+    await supabase.from('sport_jaakiekko_kesaryhma').delete().eq('id', id)
     fetchData()
   }
 

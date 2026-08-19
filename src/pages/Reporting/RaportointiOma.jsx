@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { ChevronDown, ChevronUp, Receipt } from 'lucide-react'
 import ReceiptModal from '../../components/ReceiptModal'
@@ -177,10 +177,10 @@ export default function RaportointiOma() {
       `and(visit_date.gte.${f},visit_date.lte.${t}),and(visit_date.is.null,created_at.gte.${f},created_at.lte.${t}T23:59:59)`
 
     const [tr, vr] = await Promise.all([
-      supabaseAdmin.from('terapiamyynti').select('id, price, service, visit_date, created_at, payment_method, receipt_url')
+      supabase.from('terapiamyynti').select('id, price, service, visit_date, created_at, payment_method, receipt_url')
         .eq('employee_name', empName).or(visitFilter(from, to))
         .order('visit_date', { ascending: true, nullsFirst: true }).order('created_at', { ascending: true }),
-      supabaseAdmin.from('valmennusmyynti').select('id, price, service, visit_date, created_at, payment_method')
+      supabase.from('valmennusmyynti').select('id, price, service, visit_date, created_at, payment_method')
         .eq('employee_name', empName).or(visitFilter(from, to))
         .order('visit_date', { ascending: true, nullsFirst: true }).order('created_at', { ascending: true }),
     ])
@@ -190,8 +190,8 @@ export default function RaportointiOma() {
     const prev = getPrevRange(period, customFrom, customTo)
     if (prev) {
       const [pt, pv] = await Promise.all([
-        supabaseAdmin.from('terapiamyynti').select('price').eq('employee_name', empName).or(visitFilter(prev.from, prev.to)),
-        supabaseAdmin.from('valmennusmyynti').select('price').eq('employee_name', empName).or(visitFilter(prev.from, prev.to)),
+        supabase.from('terapiamyynti').select('price').eq('employee_name', empName).or(visitFilter(prev.from, prev.to)),
+        supabase.from('valmennusmyynti').select('price').eq('employee_name', empName).or(visitFilter(prev.from, prev.to)),
       ])
       const t = [...(pt.data || []), ...(pv.data || [])].reduce((s, r) => s + (r.price || 0), 0)
       setPrevTotal(t)
@@ -203,7 +203,7 @@ export default function RaportointiOma() {
 
   async function fetchSportData() {
     setSportLoading(true)
-    const { data } = await supabaseAdmin.from('sport_jaakiekko_kesaryhma').select('*').order('syntymavuosi').order('nimi')
+    const { data } = await supabase.from('sport_jaakiekko_kesaryhma').select('*').order('syntymavuosi').order('nimi')
     setSportRows((data || []).map(r => {
       const viikot = r.aloitus && r.lopetus
         ? Math.round(Math.max(0, Math.round((new Date(r.lopetus) - new Date(r.aloitus)) / 86400000)) / 7)

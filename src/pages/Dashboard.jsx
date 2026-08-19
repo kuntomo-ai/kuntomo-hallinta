@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { CheckSquare, Calendar, Wrench, TrendingUp, BookOpen, Car } from 'lucide-react'
 
@@ -104,14 +104,14 @@ function QuickSalesWidget({ profile, user, onSaved }) {
   const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
 
   useEffect(() => {
-    supabaseAdmin.from('hoitotuotteet').select('name, price, category').eq('active', true).order('sort_order').order('name')
+    supabase.from('hoitotuotteet').select('name, price, category').eq('active', true).order('sort_order').order('name')
       .then(({ data }) => setProducts(data || []))
   }, [])
 
   async function saveTerapia() {
     if (!tForm.service || !tForm.price) return
     setSaving(true)
-    await supabaseAdmin.from('terapiamyynti').insert({
+    await supabase.from('terapiamyynti').insert({
       customer_name: '—',
       service: tForm.service,
       price: parseFloat(tForm.price),
@@ -129,7 +129,7 @@ function QuickSalesWidget({ profile, user, onSaved }) {
   async function saveValmennus() {
     if (!vForm.customer_name.trim() || !vForm.service || !vForm.price) return
     setSaving(true)
-    await supabaseAdmin.from('valmennusmyynti').insert({
+    await supabase.from('valmennusmyynti').insert({
       customer_name: vForm.customer_name.trim(),
       service: vForm.service,
       price: parseFloat(vForm.price),
@@ -211,10 +211,10 @@ function OwnSalesWidget({ empName, refreshToken }) {
     const lastEnd = thisStart
 
     Promise.all([
-      supabaseAdmin.from('terapiamyynti').select('price, created_at').eq('employee_name', empName).gte('created_at', thisStart),
-      supabaseAdmin.from('valmennusmyynti').select('price, created_at').eq('employee_name', empName).gte('created_at', thisStart),
-      supabaseAdmin.from('terapiamyynti').select('price').eq('employee_name', empName).gte('created_at', lastStart).lt('created_at', lastEnd),
-      supabaseAdmin.from('valmennusmyynti').select('price').eq('employee_name', empName).gte('created_at', lastStart).lt('created_at', lastEnd),
+      supabase.from('terapiamyynti').select('price, created_at').eq('employee_name', empName).gte('created_at', thisStart),
+      supabase.from('valmennusmyynti').select('price, created_at').eq('employee_name', empName).gte('created_at', thisStart),
+      supabase.from('terapiamyynti').select('price').eq('employee_name', empName).gte('created_at', lastStart).lt('created_at', lastEnd),
+      supabase.from('valmennusmyynti').select('price').eq('employee_name', empName).gte('created_at', lastStart).lt('created_at', lastEnd),
     ]).then(([tr, vr, tlr, vlr]) => {
       const thisRows = [...(tr.data || []), ...(vr.data || [])]
       const thisMonth = thisRows.reduce((s, r) => s + (r.price || 0), 0)
@@ -283,7 +283,7 @@ function QuickTimelogWidget({ profile, user }) {
   async function saveWork() {
     if (!wForm.work_type) return
     setSaving(true)
-    await supabaseAdmin.from('work_logs').insert({
+    await supabase.from('work_logs').insert({
       employee_id: user?.id ?? null, employee_name: empName,
       date: wForm.date, work_type: wForm.work_type,
       start_time: wForm.start_time || null, end_time: wForm.end_time || null,
@@ -295,7 +295,7 @@ function QuickTimelogWidget({ profile, user }) {
   async function saveDrive() {
     if (!dForm.distance_km) return
     setSaving(true)
-    await supabaseAdmin.from('drive_logs').insert({
+    await supabase.from('drive_logs').insert({
       driver_name: empName, driver_id: user?.id ?? null,
       drive_date: dForm.date, distance_km: parseFloat(dForm.distance_km), route: dForm.route || null,
     })
@@ -469,35 +469,35 @@ export default function Dashboard() {
     const today = new Date().toISOString().slice(0, 10)
 
     const baseFetches = [
-      supabaseAdmin.from('tasks').select('*')
+      supabase.from('tasks').select('*')
         .not('status', 'in', '("done","valmis")')
         .or('completed.is.null,completed.eq.false')
         .order('due_date', { ascending: true, nullsFirst: false })
         .limit(40),
-      supabaseAdmin.from('calendar_events').select('*').gte('event_start', today)
+      supabase.from('calendar_events').select('*').gte('event_start', today)
         .order('event_start', { ascending: true }).limit(3),
     ]
 
     if (isHuolto) {
       baseFetches.push(
-        supabaseAdmin.from('laiteluettelo_items').select('id, name, sijainti, category').eq('service_requested', true)
+        supabase.from('laiteluettelo_items').select('id, name, sijainti, category').eq('service_requested', true)
       )
     }
 
     if (isHallitus || isAdmin) {
       const monthStart = new Date().toISOString().slice(0, 7) + '-01'
       baseFetches.push(
-        supabaseAdmin.from('terapiamyynti').select('price').gte('created_at', monthStart),
-        supabaseAdmin.from('valmennusmyynti').select('price').gte('created_at', monthStart),
-        supabaseAdmin.from('jasenmyynti').select('price').gte('created_at', monthStart),
-        supabaseAdmin.from('lahjakortit').select('value').gte('created_at', monthStart),
+        supabase.from('terapiamyynti').select('price').gte('created_at', monthStart),
+        supabase.from('valmennusmyynti').select('price').gte('created_at', monthStart),
+        supabase.from('jasenmyynti').select('price').gte('created_at', monthStart),
+        supabase.from('lahjakortit').select('value').gte('created_at', monthStart),
       )
       const fyYear = new Date().getFullYear()
       baseFetches.push(
-        supabaseAdmin.from('tulos_kuukausiraportti').select('*')
+        supabase.from('tulos_kuukausiraportti').select('*')
           .gte('period', `${fyYear - 1}-05`).lte('period', `${fyYear}-04`)
           .order('period', { ascending: false }).limit(12),
-        supabaseAdmin.from('kassavirta_entries').select('amount, entry_type').limit(200),
+        supabase.from('kassavirta_entries').select('amount, entry_type').limit(200),
       )
     }
 

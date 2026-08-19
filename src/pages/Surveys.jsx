@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, Edit2, X, GripVertical } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 import EmployeesNav from '../components/EmployeesNav'
@@ -107,7 +107,7 @@ export default function Surveys() {
 
   async function fetchConfig() {
     setConfigLoading(true)
-    const { data } = await supabaseAdmin.from('survey_config').select('*').order('updated_at', { ascending: false }).limit(1)
+    const { data } = await supabase.from('survey_config').select('*').order('updated_at', { ascending: false }).limit(1)
     if (data && data.length > 0) {
       const cfg = data[0]
       setConfig({ title: cfg.title, description: cfg.description || '', questions: cfg.questions || [] })
@@ -119,13 +119,13 @@ export default function Surveys() {
 
   async function fetchResponses() {
     setResponsesLoading(true)
-    const { data } = await supabaseAdmin.from('survey_responses').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('survey_responses').select('*').order('created_at', { ascending: false })
     setResponses(data || [])
     setResponsesLoading(false)
   }
 
   async function fetchClothingOrders() {
-    const { data } = await supabaseAdmin.from('vaatetilaukset').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('vaatetilaukset').select('*').order('created_at', { ascending: false })
     setClothingOrders(data || [])
   }
 
@@ -137,7 +137,7 @@ export default function Surveys() {
     const hasAnswer = config.questions.some(q => q.type === 'text' ? answers[q.key]?.trim() : answers[q.key] != null)
     if (!hasAnswer) return
     setSurveySaving(true)
-    await supabaseAdmin.from('survey_responses').insert({ answers })
+    await supabase.from('survey_responses').insert({ answers })
     setSurveySaving(false)
     setSurveySaved(true)
     setAnswers(emptyAnswers())
@@ -208,9 +208,9 @@ export default function Surveys() {
     setEditSaving(true)
     const payload = { title: editConfig.title, description: editConfig.description, questions: editConfig.questions, updated_at: new Date().toISOString() }
     if (configId) {
-      await supabaseAdmin.from('survey_config').update(payload).eq('id', configId)
+      await supabase.from('survey_config').update(payload).eq('id', configId)
     } else {
-      const { data } = await supabaseAdmin.from('survey_config').insert(payload).select().single()
+      const { data } = await supabase.from('survey_config').insert(payload).select().single()
       if (data) setConfigId(data.id)
     }
     setConfig({ title: editConfig.title, description: editConfig.description || '', questions: editConfig.questions })
@@ -227,7 +227,7 @@ export default function Surveys() {
   async function handleClothSave() {
     if (!clothForm.name.trim() || clothForm.products.length === 0) return
     setClothSaving(true)
-    await supabaseAdmin.from('vaatetilaukset').insert({ name: clothForm.name.trim(), products: clothForm.products, size: clothForm.size, notes: clothForm.notes.trim() || null })
+    await supabase.from('vaatetilaukset').insert({ name: clothForm.name.trim(), products: clothForm.products, size: clothForm.size, notes: clothForm.notes.trim() || null })
     setClothSaving(false)
     setClothSaved(true)
     setClothForm(f => ({ ...f, products: [], notes: '' }))

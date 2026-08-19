@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Search, Trash2, Camera, ChevronLeft, ChevronRight, Edit2, CheckCircle, Receipt, ExternalLink } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
 import Modal from '../../components/ui/Modal'
@@ -86,9 +86,9 @@ function TerapiaForm({ onSaved }) {
   })
 
   useEffect(() => {
-    supabaseAdmin.from('hoitotuotteet').select('*').eq('active', true).order('sort_order').order('name')
+    supabase.from('hoitotuotteet').select('*').eq('active', true).order('sort_order').order('name')
       .then(({ data }) => setProducts(data || []))
-    supabaseAdmin.from('companies').select('id, name').order('name')
+    supabase.from('companies').select('id, name').order('name')
       .then(({ data }) => setCompanies(data || []))
   }, [])
 
@@ -124,7 +124,7 @@ function TerapiaForm({ onSaved }) {
   async function lookupGiftCard(code) {
     if (!code.trim()) { setGiftCard(null); setGiftNotFound(false); return }
     setGiftChecking(true)
-    const { data } = await supabaseAdmin.from('lahjakortit').select('*').eq('code', code.trim()).maybeSingle()
+    const { data } = await supabase.from('lahjakortit').select('*').eq('code', code.trim()).maybeSingle()
     setGiftChecking(false)
     if (!data) {
       setGiftCard(null)
@@ -148,7 +148,7 @@ function TerapiaForm({ onSaved }) {
 
   async function selectCompany(id, name) {
     setForm(f => ({ ...f, company_id: id, company_person_id: '', company_person_name: '' }))
-    const { data } = await supabaseAdmin.from('company_persons').select('*').eq('company_id', id).order('name')
+    const { data } = await supabase.from('company_persons').select('*').eq('company_id', id).order('name')
     setPersons(data || [])
   }
 
@@ -190,7 +190,7 @@ function TerapiaForm({ onSaved }) {
     if (receipt) {
       const blob = await compressImg(receipt)
       const path = `terapia/${Date.now()}.jpg`
-      const { data: upData } = await supabaseAdmin.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
+      const { data: upData } = await supabase.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
       if (upData) receipt_url = path
     }
 
@@ -213,7 +213,7 @@ function TerapiaForm({ onSaved }) {
           return acc
         }, {})
       : null
-    const { error: insertError } = await supabaseAdmin.from('terapiamyynti').insert({
+    const { error: insertError } = await supabase.from('terapiamyynti').insert({
       customer_name: customerName,
       service: form.service,
       price: parseFloat(form.price),
@@ -240,7 +240,7 @@ function TerapiaForm({ onSaved }) {
       const yritysPortion = splitsToSave && splitsToSave['Yrityslaskutus'] != null
         ? parseFloat(splitsToSave['Yrityslaskutus'])
         : parseFloat(form.price)
-      await supabaseAdmin.from('company_visits').insert({
+      await supabase.from('company_visits').insert({
         company_id: form.company_id,
         company_person_id: form.company_person_id,
         company_person_name: form.company_person_name,
@@ -255,7 +255,7 @@ function TerapiaForm({ onSaved }) {
     }
 
     if (needsYrityskäynti && form.kuntomo_laskuttaa === 'kylla') {
-      await supabaseAdmin.from('tasks').insert({
+      await supabase.from('tasks').insert({
         title: `Yrityskäyntilasku: ${form.yritys_name.trim()}`,
         description: `Palvelu: ${form.service} — ${parseFloat(form.price).toFixed(2)} €. Kirjannut: ${empName || '—'}`,
         status: 'avoin',
@@ -267,7 +267,7 @@ function TerapiaForm({ onSaved }) {
     }
 
     if (form.notify_admin === 'kylla') {
-      await supabaseAdmin.from('channel_messages').insert({
+      await supabase.from('channel_messages').insert({
         content: `🔔 Hoitomyynti-ilmoitus: ${form.service} — ${parseFloat(form.price).toFixed(2)} € (${paymentStr})${form.notes ? '. ' + form.notes : ''}`,
         sender_name: profile?.full_name || profile?.email || 'Järjestelmä',
         sender_id: user?.id || null,
@@ -277,7 +277,7 @@ function TerapiaForm({ onSaved }) {
     }
 
     if (form.payment_methods.includes('Laskutus') && form.laskutus_laskutettu === 'ei') {
-      await supabaseAdmin.from('channel_messages').insert({
+      await supabase.from('channel_messages').insert({
         content: `🧾 Laskuttamaton hoitomyynti: ${empName || '—'} — ${form.service} — ${parseFloat(form.price).toFixed(2)} € — ${form.visit_date || TODAY}${form.notes ? '. ' + form.notes : ''}`,
         sender_name: profile?.full_name || profile?.email || 'Järjestelmä',
         sender_id: user?.id || null,
@@ -291,7 +291,7 @@ function TerapiaForm({ onSaved }) {
       if (form.payment_methods.includes('Lahjakortti') && giftCode.trim()) {
         if (giftNotFound || !giftCard) {
           // Lahjakorttia ei löydy → luo tehtävä adminille (viite voi olla myös tilausnumero)
-          await supabaseAdmin.from('tasks').insert({
+          await supabase.from('tasks').insert({
             title: `Lahjakortti/tilausnumero ${giftCode.trim()} ei löydy järjestelmästä`,
             description: `Hoitomyynnissä käytetty lahjakortin numero tai tilausnumero "${giftCode.trim()}" ei löydy järjestelmästä. Palvelu: ${form.service} — ${parseFloat(form.price).toFixed(2)} €. Kirjannut: ${empName || '—'}`,
             status: 'avoin',
@@ -308,7 +308,7 @@ function TerapiaForm({ onSaved }) {
           const dateStr = new Date().toLocaleDateString('fi-FI')
           const noteEntry = `${dateStr}: ${deduct.toFixed(2)} € käytetty (${form.service})`
           const newNotes = giftCard.notes ? `${giftCard.notes}\n${noteEntry}` : noteEntry
-          await supabaseAdmin.from('lahjakortit').update({
+          await supabase.from('lahjakortit').update({
             used_amount: newUsed,
             notes: newNotes,
           }).eq('id', giftCard.id)
@@ -705,9 +705,9 @@ function ValmennusForm({ onSaved }) {
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1 + i, 0)
         return { ...base, visit_date: lastDay.toISOString().slice(0, 10) }
       });
-      ({ error } = await supabaseAdmin.from('valmennusmyynti').insert(records))
+      ({ error } = await supabase.from('valmennusmyynti').insert(records))
     } else {
-      ({ error } = await supabaseAdmin.from('valmennusmyynti').insert(base))
+      ({ error } = await supabase.from('valmennusmyynti').insert(base))
     }
 
     setSaving(false)
@@ -804,7 +804,7 @@ function JasenForm({ onSaved }) {
     if (!form.customer_name.trim() || !form.service || !form.price) return
     setSaving(true)
     const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
-    const { error: jasenError } = await supabaseAdmin.from('jasenmyynti').insert({
+    const { error: jasenError } = await supabase.from('jasenmyynti').insert({
       customer_name: form.customer_name.trim(),
       customer_email: form.customer_email.trim() || null,
       visit_date: form.visit_date || null,
@@ -821,7 +821,7 @@ function JasenForm({ onSaved }) {
     if (jasenError) { setSaving(false); alert('Tallennus epäonnistui: ' + jasenError.message); return }
 
     // Ilmoita adminille uudesta jäsenmyynnistä
-    const { error: taskErr } = await supabaseAdmin.from('tasks').insert({
+    const { error: taskErr } = await supabase.from('tasks').insert({
       title: `Uusi jäsenmyynti: ${form.customer_name.trim()} — ${form.service}`,
       description: `Asiakas: ${form.customer_name.trim()}${form.customer_email.trim() ? ` (${form.customer_email.trim()})` : ''}\n` +
                    `Jäsenyys: ${form.service} — ${parseFloat(form.price).toFixed(2)} €\n` +
@@ -927,12 +927,12 @@ export default function Sales() {
 
   useEffect(() => {
     (async () => {
-      const { data: companies } = await supabaseAdmin.from('companies').select('id, name')
+      const { data: companies } = await supabase.from('companies').select('id, name')
       const nameById = new Map((companies || []).map(c => [c.id, c.name]))
       const PAGE = 1000
       const all = []
       for (let i = 0; i < 50; i++) {
-        const { data } = await supabaseAdmin
+        const { data } = await supabase
           .from('company_visits')
           .select('company_id, company_person_name, visit_date, price')
           .range(i * PAGE, (i + 1) * PAGE - 1)
@@ -967,10 +967,10 @@ export default function Sales() {
   useEffect(() => {
     if (isAdmin) {
       Promise.all([
-        supabaseAdmin.from('employees').select('first_name, last_name').eq('status', 'active'),
-        supabaseAdmin.from('terapiamyynti').select('employee_name').not('employee_name', 'is', null),
-        supabaseAdmin.from('valmennusmyynti').select('employee_name').not('employee_name', 'is', null),
-        supabaseAdmin.from('jasenmyynti').select('employee_name').not('employee_name', 'is', null),
+        supabase.from('employees').select('first_name, last_name').eq('status', 'active'),
+        supabase.from('terapiamyynti').select('employee_name').not('employee_name', 'is', null),
+        supabase.from('valmennusmyynti').select('employee_name').not('employee_name', 'is', null),
+        supabase.from('jasenmyynti').select('employee_name').not('employee_name', 'is', null),
       ]).then(([empRes, tRes, vRes, jRes]) => {
         const fromEmp = (empRes.data || []).map(e => ({
           full_name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
@@ -1009,7 +1009,7 @@ export default function Sales() {
   async function fetchTerapia(activeTab) {
     setLoading(true)
     const data = await fetchAllPaginated(() => {
-      let q = supabaseAdmin.from('terapiamyynti').select('*').order('entry_date', { ascending: false })
+      let q = supabase.from('terapiamyynti').select('*').order('entry_date', { ascending: false })
       if (!isAdmin) q = q.eq('employee_id', user?.id)
       return q
     })
@@ -1022,7 +1022,7 @@ export default function Sales() {
   async function fetchOther(t) {
     setLoading(true)
     const data = await fetchAllPaginated(() => {
-      let q = supabaseAdmin.from(TABLE_MAP[t]).select('*').order('created_at', { ascending: false })
+      let q = supabase.from(TABLE_MAP[t]).select('*').order('created_at', { ascending: false })
       if (!isAdmin) q = q.eq('employee_id', user?.id)
       return q
     })
@@ -1052,12 +1052,12 @@ export default function Sales() {
   async function handleDelete(id) {
     if (!confirm('Poistetaanko kirjaus?')) return
     const t = tab === 'terapia' ? 'terapiamyynti' : TABLE_MAP[tab]
-    await supabaseAdmin.from(t).delete().eq('id', id)
+    await supabase.from(t).delete().eq('id', id)
     tab === 'terapia' ? fetchTerapia() : fetchOther(tab)
   }
 
   async function markLaskutettu(id) {
-    await supabaseAdmin.from('terapiamyynti').update({ laskutettu: true }).eq('id', id)
+    await supabase.from('terapiamyynti').update({ laskutettu: true }).eq('id', id)
     fetchTerapia()
   }
 
@@ -1181,7 +1181,7 @@ export default function Sales() {
         notes: editForm.notes.trim() || null,
       }
     }
-    await supabaseAdmin.from(table).update(payload).eq('id', editRow.id)
+    await supabase.from(table).update(payload).eq('id', editRow.id)
     setEditSaving(false)
     setEditRow(null)
     tab === 'terapia' ? fetchTerapia() : fetchOther(tab)

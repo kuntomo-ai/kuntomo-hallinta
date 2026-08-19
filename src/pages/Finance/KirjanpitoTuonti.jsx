@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { Upload, CheckCircle, AlertCircle } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 // ── Netvisor CSV-tunnistus ja jäsennys ──────────────────────────────────────
@@ -123,7 +123,7 @@ export default function KirjanpitoTuonti() {
     if (reportType === 'tulos') {
       const row = mapToTulosRow(dataRows, period)
 
-      const { error } = await supabaseAdmin
+      const { error } = await supabase
         .from('tulos_kuukausiraportti')
         .upsert(row, { onConflict: 'period' })
 

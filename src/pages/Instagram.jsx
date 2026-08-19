@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import ReactMarkdown from 'react-markdown'
 import { ExternalLink, Heart, MessageCircle, Bookmark, Share2, Eye } from 'lucide-react'
-import { supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 const LOOKBACK_DAYS = 30
 
@@ -34,10 +34,10 @@ export default function Instagram() {
     setLoading(true)
     const since = new Date(Date.now() - LOOKBACK_DAYS * 86400e3).toISOString().slice(0, 10)
     const [accRes, snapRes, medRes, anRes] = await Promise.all([
-      supabaseAdmin.from('ig_accounts').select('*').eq('is_active', true).order('label'),
-      supabaseAdmin.from('ig_account_snapshots').select('*').gte('snapshot_date', since).order('snapshot_date', { ascending: true }),
-      supabaseAdmin.from('ig_media').select('*').gte('posted_at', since).order('posted_at', { ascending: false }),
-      supabaseAdmin.from('ig_analyses').select('*').order('period_end', { ascending: false }),
+      supabase.from('ig_accounts').select('*').eq('is_active', true).order('label'),
+      supabase.from('ig_account_snapshots').select('*').gte('snapshot_date', since).order('snapshot_date', { ascending: true }),
+      supabase.from('ig_media').select('*').gte('posted_at', since).order('posted_at', { ascending: false }),
+      supabase.from('ig_analyses').select('*').order('period_end', { ascending: false }),
     ])
     const accs = accRes.data || []
     setAccounts(accs)
@@ -48,7 +48,7 @@ export default function Instagram() {
 
     const mediaIds = (medRes.data || []).map(m => m.id)
     if (mediaIds.length) {
-      const { data: met } = await supabaseAdmin
+      const { data: met } = await supabase
         .from('ig_media_metrics')
         .select('*')
         .in('media_id', mediaIds)

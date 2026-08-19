@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
@@ -42,7 +42,7 @@ export function AuthProvider({ children }) {
     // Ei-aktiivinen työntekijä kirjataan välittömästi ulos ennen kuin profiili
     // ehtii latautua — muuten pääsee näkemään sivut. Ohitetaan tarkistus
     // jos työntekijärivi ei löydy (esim. ulkopuoliset admin-tunnukset).
-    const { data: emp } = await supabaseAdmin.from('employees').select('status').eq('auth_user_id', userId).maybeSingle()
+    const { data: emp } = await supabase.from('employees').select('status').eq('auth_user_id', userId).maybeSingle()
     if (emp && emp.status === 'inactive') {
       await supabase.auth.signOut()
       sessionStorage.setItem('kuntomo-inactive-signout', '1')
@@ -51,7 +51,7 @@ export function AuthProvider({ children }) {
       setLoading(false)
       return
     }
-    const { data } = await supabaseAdmin.from('profiles').select('*').eq('id', userId).single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
     setProfile(data)
     setLoading(false)
   }

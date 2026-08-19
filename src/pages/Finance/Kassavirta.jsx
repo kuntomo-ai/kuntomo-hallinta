@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import { Download, Upload, FileText, FileSpreadsheet, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -182,11 +182,11 @@ export default function Kassavirta() {
   async function loadActuals() {
     setActualsLoading(true)
     const [tulosRes, taseRes] = await Promise.all([
-      supabaseAdmin
+      supabase
         .from('tulos_kuukausiraportti')
         .select('period, liikevaihto, muut_tuotot, materiaalit_palvelut, henkilostokulut, muut_kulut, poistot, tilikauden_voitto')
         .order('period', { ascending: true }),
-      supabaseAdmin
+      supabase
         .from('tase_snapshot')
         .select('sub_section, loppusaldo'),
     ])

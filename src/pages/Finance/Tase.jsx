@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 const SECTIONS = {
@@ -219,7 +219,7 @@ export default function Tase() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('tase_snapshot').select('*').order('side').order('section').order('sub_section').order('account_code')
+    const { data } = await supabase.from('tase_snapshot').select('*').order('side').order('section').order('sub_section').order('account_code')
     const items = data || []
     setRows(items)
     // Näytä vain uusin jakso — kannassa voi olla useita jaksoja (mm. tilikohtaisia

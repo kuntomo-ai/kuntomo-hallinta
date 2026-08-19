@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Search, Edit2, Wrench } from 'lucide-react'
-import { supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 
@@ -39,13 +39,13 @@ export default function Kaapit() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('lockers').select('*').order('location').order('locker_number')
+    const { data } = await supabase.from('lockers').select('*').order('location').order('locker_number')
     setRows(data || [])
     setLoading(false)
   }
 
   async function fetchServiceHistory(lockerId) {
-    const { data } = await supabaseAdmin.from('locker_service_history')
+    const { data } = await supabase.from('locker_service_history')
       .select('*').eq('locker_id', lockerId).order('ilmoitettu_at', { ascending: false })
     setServiceHistory(data || [])
   }
@@ -67,7 +67,7 @@ export default function Kaapit() {
   async function handleSave() {
     if (!editRow) return
     setSaving(true)
-    await supabaseAdmin.from('lockers').update({
+    await supabase.from('lockers').update({
       two_keys: editForm.two_keys,
       lock_works: editForm.lock_works,
       has_keyring: editForm.has_keyring,
@@ -86,14 +86,14 @@ export default function Kaapit() {
     const myName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : profile?.email || 'Tuntematon'
     const lockerLabel = `Pukukaappi ${editRow.location} #${editRow.locker_number}`
 
-    await supabaseAdmin.from('locker_service_history').insert({
+    await supabase.from('locker_service_history').insert({
       locker_id: editRow.id,
       kuvaus: serviceNote.trim(),
       ilmoitettu_by: myName,
       tehty: false,
     })
 
-    await supabaseAdmin.from('lockers').update({ service_requested: true }).eq('id', editRow.id)
+    await supabase.from('lockers').update({ service_requested: true }).eq('id', editRow.id)
 
     const taskBase = {
       title: `Kaappihuolto: ${lockerLabel}`,
@@ -103,9 +103,9 @@ export default function Kaapit() {
       created_by: myName || null,
     }
     await Promise.all([
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'huolto' }),
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'admin' }),
-      supabaseAdmin.from('tasks').insert({ ...taskBase, assigned_to: 'respa' }),
+      supabase.from('tasks').insert({ ...taskBase, assigned_to: 'huolto' }),
+      supabase.from('tasks').insert({ ...taskBase, assigned_to: 'admin' }),
+      supabase.from('tasks').insert({ ...taskBase, assigned_to: 'respa' }),
     ])
 
     const msgBase = {
@@ -115,9 +115,9 @@ export default function Kaapit() {
       recipient_type: 'role',
     }
     await Promise.all([
-      supabaseAdmin.from('channel_messages').insert({ ...msgBase, recipient_role: 'huolto' }),
-      supabaseAdmin.from('channel_messages').insert({ ...msgBase, recipient_role: 'admin' }),
-      supabaseAdmin.from('channel_messages').insert({ ...msgBase, recipient_role: 'respa' }),
+      supabase.from('channel_messages').insert({ ...msgBase, recipient_role: 'huolto' }),
+      supabase.from('channel_messages').insert({ ...msgBase, recipient_role: 'admin' }),
+      supabase.from('channel_messages').insert({ ...msgBase, recipient_role: 'respa' }),
     ])
 
     setServiceRequest(false)
@@ -129,16 +129,16 @@ export default function Kaapit() {
 
   async function markServiceDone(historyId) {
     const myName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : profile?.email || 'Tuntematon'
-    await supabaseAdmin.from('locker_service_history').update({
+    await supabase.from('locker_service_history').update({
       tehty: true,
       tehty_at: new Date().toISOString(),
       tehty_by: myName,
     }).eq('id', historyId)
 
-    const { data: remaining } = await supabaseAdmin.from('locker_service_history')
+    const { data: remaining } = await supabase.from('locker_service_history')
       .select('id').eq('locker_id', editRow.id).eq('tehty', false)
     if (!remaining || remaining.length === 0) {
-      await supabaseAdmin.from('lockers').update({ service_requested: false }).eq('id', editRow.id)
+      await supabase.from('lockers').update({ service_requested: false }).eq('id', editRow.id)
     }
     fetchServiceHistory(editRow.id)
     fetchData()
@@ -146,7 +146,7 @@ export default function Kaapit() {
 
   async function deleteServiceHistory(historyId) {
     if (!confirm('Poistetaanko huoltohistoriamerkintä?')) return
-    await supabaseAdmin.from('locker_service_history').delete().eq('id', historyId)
+    await supabase.from('locker_service_history').delete().eq('id', historyId)
     fetchServiceHistory(editRow.id)
   }
 

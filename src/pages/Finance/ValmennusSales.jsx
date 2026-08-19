@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 
 const PALVELUT = ['Fysiikkavalmennus', 'Jatkuva valmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Pienryhmä', 'Muu']
@@ -21,7 +21,7 @@ export default function ValmennusSales() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('valmennusmyynti').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('valmennusmyynti').select('*').order('created_at', { ascending: false })
     setRows(data || [])
     const today = new Date().toISOString().slice(0, 10)
     const todayRows = (data || []).filter(r => r.created_at?.slice(0, 10) === today)
@@ -60,9 +60,9 @@ export default function ValmennusSales() {
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1 + i, 0)
         return { ...base, visit_date: lastDay.toISOString().slice(0, 10) }
       })
-      await supabaseAdmin.from('valmennusmyynti').insert(records)
+      await supabase.from('valmennusmyynti').insert(records)
     } else {
-      await supabaseAdmin.from('valmennusmyynti').insert(base)
+      await supabase.from('valmennusmyynti').insert(base)
     }
 
     setSaving(false)
@@ -73,7 +73,7 @@ export default function ValmennusSales() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko myyntikirjaus?')) return
-    await supabaseAdmin.from('valmennusmyynti').delete().eq('id', id)
+    await supabase.from('valmennusmyynti').delete().eq('id', id)
     fetchData()
   }
 

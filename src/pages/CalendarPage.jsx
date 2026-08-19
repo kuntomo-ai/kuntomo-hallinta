@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Trash2, Globe, Users, User, Edit2, Copy, Check } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import Modal from '../components/ui/Modal'
 import { useAuth } from '../context/AuthContext'
 
@@ -73,7 +73,7 @@ function KalenteriTab() {
   async function handleDeleteEvent(id) {
     if (!confirm('Poistetaanko tapahtuma?')) return
     setDeleting(true)
-    await supabaseAdmin.from('calendar_events').delete().eq('id', id)
+    await supabase.from('calendar_events').delete().eq('id', id)
     setDeleting(false)
     setSelectedEvent(null)
     fetchData()
@@ -83,7 +83,7 @@ function KalenteriTab() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('calendar_events').select('*').order('event_start', { ascending: true })
+    const { data } = await supabase.from('calendar_events').select('*').order('event_start', { ascending: true })
     setEvents((data || []).filter(e => shouldShow(e)))
     setLoading(false)
   }
@@ -123,9 +123,9 @@ function KalenteriTab() {
     }
     let error
     if (editingEvent) {
-      ;({ error } = await supabaseAdmin.from('calendar_events').update(payload).eq('id', editingEvent.id))
+      ;({ error } = await supabase.from('calendar_events').update(payload).eq('id', editingEvent.id))
     } else {
-      ;({ error } = await supabaseAdmin.from('calendar_events').insert({ ...payload, created_by: user?.id || null }))
+      ;({ error } = await supabase.from('calendar_events').insert({ ...payload, created_by: user?.id || null }))
     }
     setSaving(false)
     if (error) { setSaveError(error.message); return }
@@ -1079,7 +1079,7 @@ function KuukausikirjeetTab() {
 
   const fetchOverrides = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('marketing_newsletters').select('*')
+    const { data } = await supabase.from('marketing_newsletters').select('*')
     const map = {}
     ;(data || []).forEach(r => { map[`${r.alue}-${r.month_idx}`] = r })
     setOverrides(map)
@@ -1101,7 +1101,7 @@ function KuukausikirjeetTab() {
   async function handleEditSave() {
     setSaving(true)
     const payload = { alue, month_idx: month, ...editForm }
-    await supabaseAdmin.from('marketing_newsletters').upsert(payload, { onConflict: 'alue,month_idx' })
+    await supabase.from('marketing_newsletters').upsert(payload, { onConflict: 'alue,month_idx' })
     await fetchOverrides()
     setSaving(false)
     setEditModal(false)
@@ -1109,7 +1109,7 @@ function KuukausikirjeetTab() {
 
   async function handleReset() {
     if (!confirm('Palautetaanko oletusteksti?')) return
-    await supabaseAdmin.from('marketing_newsletters').delete().match({ alue, month_idx: month })
+    await supabase.from('marketing_newsletters').delete().match({ alue, month_idx: month })
     await fetchOverrides()
   }
 
@@ -1298,7 +1298,7 @@ function MarkkinointiTab() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('marketing_events').select('*').order('month', { ascending: true })
+    const { data } = await supabase.from('marketing_events').select('*').order('month', { ascending: true })
     setEvents(data || [])
     setLoading(false)
   }
@@ -1308,7 +1308,7 @@ function MarkkinointiTab() {
   async function handleSave() {
     if (!form.title.trim()) return
     setSaving(true)
-    await supabaseAdmin.from('marketing_events').insert({
+    await supabase.from('marketing_events').insert({
       title: form.title.trim(),
       category: form.alue,
       month: parseInt(form.month),
@@ -1325,7 +1325,7 @@ function MarkkinointiTab() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko tapahtuma?')) return
-    await supabaseAdmin.from('marketing_events').delete().eq('id', id)
+    await supabase.from('marketing_events').delete().eq('id', id)
     fetchData()
   }
 

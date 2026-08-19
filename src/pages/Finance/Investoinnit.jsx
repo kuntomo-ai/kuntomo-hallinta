@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 import {
   ComposedChart, BarChart, Bar, Area,
@@ -489,7 +489,7 @@ export default function Investoinnit() {
 
   // ── Load from Supabase on mount ──────────────────────────────────────────
   useEffect(() => {
-    supabaseAdmin
+    supabase
       .from('investoinnit_data')
       .select('data')
       .eq('id', 'default')
@@ -523,7 +523,7 @@ export default function Investoinnit() {
 
   async function handleSave() {
     setSaveStatus('saving')
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('investoinnit_data')
       .upsert({ id: 'default', data: investments, updated_at: new Date().toISOString() })
     setSaveStatus(error ? 'error' : 'saved')

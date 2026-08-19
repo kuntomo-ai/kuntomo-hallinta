@@ -3,7 +3,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine
 } from 'recharts'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 const MONTHS_FI = ['Tammi', 'Helmi', 'Maalis', 'Huhti', 'Touko', 'Kesä',
@@ -58,7 +58,7 @@ export default function Tulos() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin
+    const { data } = await supabase
       .from('tulos_kuukausiraportti')
       .select('*')
       .order('period')

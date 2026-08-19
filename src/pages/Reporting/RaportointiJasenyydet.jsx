@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, CartesianGrid, Legend, ComposedChart, Area, AreaChart,
 } from 'recharts'
 import { Plus, Edit2, ChevronLeft, ChevronRight } from 'lucide-react'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/ui/Modal'
 
@@ -138,7 +138,7 @@ function WeeklyView() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('membership_stats')
+    const { data } = await supabase.from('membership_stats')
       .select('*').order('week_start', { ascending: true })
     setRows(data || [])
     setLoading(false)
@@ -173,9 +173,9 @@ function WeeklyView() {
       notes: form.notes.trim() || null,
     }
     if (editRow) {
-      await supabaseAdmin.from('membership_stats').update(payload).eq('id', editRow.id)
+      await supabase.from('membership_stats').update(payload).eq('id', editRow.id)
     } else {
-      await supabaseAdmin.from('membership_stats').insert({ ...payload, created_by: profile?.id || null })
+      await supabase.from('membership_stats').insert({ ...payload, created_by: profile?.id || null })
     }
     setSaving(false)
     setShowModal(false)

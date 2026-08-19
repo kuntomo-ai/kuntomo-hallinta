@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Edit2, Trash2, Upload } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import Modal from '../components/ui/Modal'
 
 const empty = { name: '', category: '', ely: '', kempele: '', ostohinta: '', notes: '' }
@@ -32,7 +32,7 @@ export default function Inventory() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin
+    const { data } = await supabase
       .from('inventory_items')
       .select('*')
       .order('name')
@@ -79,9 +79,9 @@ export default function Inventory() {
       updated_at: new Date().toISOString(),
     }
     if (editing) {
-      await supabaseAdmin.from('inventory_items').update(payload).eq('id', editing)
+      await supabase.from('inventory_items').update(payload).eq('id', editing)
     } else {
-      await supabaseAdmin.from('inventory_items').insert(payload)
+      await supabase.from('inventory_items').insert(payload)
     }
     setSaving(false)
     setShowModal(false)
@@ -92,7 +92,7 @@ export default function Inventory() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko tuote?')) return
-    await supabaseAdmin.from('inventory_items').delete().eq('id', id)
+    await supabase.from('inventory_items').delete().eq('id', id)
     fetchData()
   }
 

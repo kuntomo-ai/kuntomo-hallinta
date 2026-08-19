@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 import VoiceMicButton, { parseVoiceAjo, parseVoiceWorkTime } from '../components/VoiceInput'
@@ -96,7 +96,7 @@ function AjokirjausTab({ isAdmin, myName }) {
   }, [myName])
 
   async function fetchDrivers() {
-    const { data } = await supabaseAdmin.from('drive_logs').select('driver_name').not('driver_name', 'is', null)
+    const { data } = await supabase.from('drive_logs').select('driver_name').not('driver_name', 'is', null)
     const unique = [...new Set((data || []).map(r => r.driver_name).filter(Boolean))].sort()
     setDrivers(unique)
   }
@@ -104,7 +104,7 @@ function AjokirjausTab({ isAdmin, myName }) {
   async function fetchData() {
     setLoading(true)
     const { from, to } = getDateRange(periodTab)
-    let q = supabaseAdmin.from('drive_logs').select('*').order('drive_date', { ascending: false })
+    let q = supabase.from('drive_logs').select('*').order('drive_date', { ascending: false })
     if (from) q = q.gte('drive_date', from)
     if (to) q = q.lte('drive_date', to)
     if (isAdmin && selectedDriver) q = q.eq('driver_name', selectedDriver)
@@ -170,8 +170,8 @@ function AjokirjausTab({ isAdmin, myName }) {
       notes: form.notes.trim() || null,
     }
     const { error } = editing
-      ? await supabaseAdmin.from('drive_logs').update(payload).eq('id', editing)
-      : await supabaseAdmin.from('drive_logs').insert(payload)
+      ? await supabase.from('drive_logs').update(payload).eq('id', editing)
+      : await supabase.from('drive_logs').insert(payload)
     setSaving(false)
     if (error) { setSaveError(error.message); return }
     setShowModal(false)
@@ -181,7 +181,7 @@ function AjokirjausTab({ isAdmin, myName }) {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko ajokirjaus?')) return
-    await supabaseAdmin.from('drive_logs').delete().eq('id', id)
+    await supabase.from('drive_logs').delete().eq('id', id)
     fetchData()
   }
 
@@ -366,7 +366,7 @@ function WorkTimeTab({ isAdmin, myName }) {
 
   async function fetchData() {
     setLoading(true)
-    let q = supabaseAdmin.from('work_time_logs').select('*').order('work_date', { ascending: false }).order('start_time', { ascending: false })
+    let q = supabase.from('work_time_logs').select('*').order('work_date', { ascending: false }).order('start_time', { ascending: false })
     if (!isAdmin) q = q.eq('employee_name', myName)
     const { data } = await q
     setRows(data || [])
@@ -422,8 +422,8 @@ function WorkTimeTab({ isAdmin, myName }) {
       notes: form.notes.trim() || null,
     }
     const { error } = editing
-      ? await supabaseAdmin.from('work_time_logs').update(payload).eq('id', editing)
-      : await supabaseAdmin.from('work_time_logs').insert(payload)
+      ? await supabase.from('work_time_logs').update(payload).eq('id', editing)
+      : await supabase.from('work_time_logs').insert(payload)
     setSaving(false)
     if (error) { setSaveError(error.message); return }
     setShowModal(false)
@@ -433,7 +433,7 @@ function WorkTimeTab({ isAdmin, myName }) {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko työaikakirjaus?')) return
-    await supabaseAdmin.from('work_time_logs').delete().eq('id', id)
+    await supabase.from('work_time_logs').delete().eq('id', id)
     fetchData()
   }
 

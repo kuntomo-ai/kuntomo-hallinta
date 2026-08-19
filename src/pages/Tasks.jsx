@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, CheckCircle, Trash2 } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 
@@ -42,14 +42,14 @@ export default function Tasks() {
 
   useEffect(() => {
     if (isAdmin) {
-      supabaseAdmin.from('profiles').select('id, first_name, last_name').order('first_name')
+      supabase.from('profiles').select('id, first_name, last_name').order('first_name')
         .then(({ data }) => setPersons(data || []))
     }
   }, [isAdmin])
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('tasks').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('tasks').select('*').order('created_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -73,7 +73,7 @@ export default function Tasks() {
       }
     }
 
-    await supabaseAdmin.from('tasks').insert({
+    await supabase.from('tasks').insert({
       title: form.title.trim(),
       description: form.description.trim() || null,
       priority: form.priority,
@@ -89,13 +89,13 @@ export default function Tasks() {
   }
 
   async function markDone(id) {
-    await supabaseAdmin.from('tasks').update({ completed: true, status: 'done' }).eq('id', id)
+    await supabase.from('tasks').update({ completed: true, status: 'done' }).eq('id', id)
     fetchData()
   }
 
   async function deleteTask(id) {
     if (!confirm('Poistetaanko tehtävä?')) return
-    await supabaseAdmin.from('tasks').delete().eq('id', id)
+    await supabase.from('tasks').delete().eq('id', id)
     fetchData()
   }
 

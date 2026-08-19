@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 function fmt(v, decimals = 0) {
@@ -25,11 +25,11 @@ export default function Kirjanpito() {
     const { fyStart, fyEnd } = getFiscalYear()
 
     const [tulosRes, taseRes, kassaRes] = await Promise.all([
-      supabaseAdmin.from('tulos_kuukausiraportti').select('*')
+      supabase.from('tulos_kuukausiraportti').select('*')
         .gte('period', fyStart).lte('period', fyEnd)
         .order('period', { ascending: false }),
-      supabaseAdmin.from('tase_snapshot').select('sub_section, loppusaldo'),
-      supabaseAdmin.from('kassavirta_entries').select('amount, entry_type').order('entry_date', { ascending: false }).limit(200),
+      supabase.from('tase_snapshot').select('sub_section, loppusaldo'),
+      supabase.from('kassavirta_entries').select('amount, entry_type').order('entry_date', { ascending: false }).limit(200),
     ])
 
     const tulosRows = tulosRes.data || []

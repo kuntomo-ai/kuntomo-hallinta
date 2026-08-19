@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { Upload, CheckCircle, AlertCircle } from 'lucide-react'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -187,7 +187,7 @@ function UploadCard({ onImported }) {
     let inserted = 0
     for (let i = 0; i < parsed.rows.length; i += CHUNK) {
       const chunk = parsed.rows.slice(i, i + CHUNK)
-      const { error } = await supabaseAdmin
+      const { error } = await supabase
         .from('mobilepay_transactions')
         .upsert(chunk, { onConflict: 'psp_reference' })
       if (error) {
@@ -287,7 +287,7 @@ export default function RaportointiMobilePay() {
     const PAGE = 1000
     const all = []
     for (let offset = 0; ; offset += PAGE) {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabase
         .from('mobilepay_transactions')
         .select('*')
         .gte('booking_date', from)

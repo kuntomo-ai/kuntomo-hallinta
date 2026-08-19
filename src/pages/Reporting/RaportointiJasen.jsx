@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
 const REPORT_NAV = [
@@ -65,8 +65,8 @@ export default function RaportointiJasen() {
   useEffect(() => {
     if (canFilter) {
       Promise.all([
-        supabaseAdmin.from('profiles').select('first_name, last_name').order('first_name'),
-        supabaseAdmin.from('jasenmyynti').select('employee_name').not('employee_name', 'is', null),
+        supabase.from('profiles').select('first_name, last_name').order('first_name'),
+        supabase.from('jasenmyynti').select('employee_name').not('employee_name', 'is', null),
       ]).then(([profRes, salesRes]) => {
         const fromProfiles = (profRes.data || [])
           .map(p => `${p.first_name || ''} ${p.last_name || ''}`.trim())
@@ -84,7 +84,7 @@ export default function RaportointiJasen() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    let query = supabaseAdmin.from('jasenmyynti').select('*').gte('created_at', from).lte('created_at', to + 'T23:59:59')
+    let query = supabase.from('jasenmyynti').select('*').gte('created_at', from).lte('created_at', to + 'T23:59:59')
     if (selectedEmployee) query = query.eq('employee_name', selectedEmployee)
     const { data } = await query.order('created_at', { ascending: false })
     setRows(data || [])

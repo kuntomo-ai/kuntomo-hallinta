@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
 // ─── Row definitions ─────────────────────────────────────────────────────────
@@ -262,19 +262,19 @@ function T7Tab({ loans, setLoans, taseLoans }) {
 
   async function addLoan(isNew, prefill = {}) {
     const row = { ...EMPTY_LOAN, ...prefill, is_new: isNew, sort_order: loans.length }
-    const { data, error } = await supabaseAdmin.from('ennuste_lainat').insert(row).select().single()
+    const { data, error } = await supabase.from('ennuste_lainat').insert(row).select().single()
     if (!error && data) { setLoans(ls => [...ls, data]); setEditId(data.id); setForm(data) }
   }
 
   async function saveLoan() {
     if (!editId) return
-    await supabaseAdmin.from('ennuste_lainat').update(form).eq('id', editId)
+    await supabase.from('ennuste_lainat').update(form).eq('id', editId)
     setLoans(ls => ls.map(l => l.id === editId ? { ...l, ...form } : l))
     setEditId(null)
   }
 
   async function deleteLoan(id) {
-    await supabaseAdmin.from('ennuste_lainat').delete().eq('id', id)
+    await supabase.from('ennuste_lainat').delete().eq('id', id)
     setLoans(ls => ls.filter(l => l.id !== id))
   }
 
@@ -446,13 +446,13 @@ export default function Ennuste() {
 
   async function loadAll() {
     const [{ data: months }, { data: params }, { data: lns }, { data: tase }] = await Promise.all([
-      supabaseAdmin
+      supabase
         .from('tulos_kuukausiraportti')
         .select('period, liikevaihto, muut_tuotot, materiaalit_palvelut, henkilostokulut, muut_kulut, poistot, tilikauden_voitto')
         .order('period'),
-      supabaseAdmin.from('ennuste_params').select('*'),
-      supabaseAdmin.from('ennuste_lainat').select('*').order('sort_order').order('created_at'),
-      supabaseAdmin
+      supabase.from('ennuste_params').select('*'),
+      supabase.from('ennuste_lainat').select('*').order('sort_order').order('created_at'),
+      supabase
         .from('tase_snapshot')
         .select('account_code, account_name, sub_section, loppusaldo')
         .in('sub_section', ['vieras_pit', 'vieras_lyh'])
@@ -502,7 +502,7 @@ export default function Ennuste() {
 
     const row = { period: p }
     for (const k of ALL_KEYS) row[k] = nm[p][k] ?? null
-    await supabaseAdmin.from('ennuste_params').upsert(row, { onConflict: 'period' })
+    await supabase.from('ennuste_params').upsert(row, { onConflict: 'period' })
   }
 
   async function handleUndo() {
@@ -515,7 +515,7 @@ export default function Ennuste() {
         PERIODS.map(p => {
           const row = { period: p }
           for (const k of ALL_KEYS) row[k] = prev[p]?.[k] ?? null
-          return supabaseAdmin.from('ennuste_params').upsert(row, { onConflict: 'period' })
+          return supabase.from('ennuste_params').upsert(row, { onConflict: 'period' })
         })
       )
       return h.slice(0, -1)

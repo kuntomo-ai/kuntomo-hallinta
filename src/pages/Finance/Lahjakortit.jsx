@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2, Edit2, ShoppingCart, Camera, Receipt } from 'lucide-react'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import ReceiptModal from '../../components/ReceiptModal'
 import { useAuth } from '../../context/AuthContext'
@@ -75,7 +75,7 @@ export default function Lahjakortit() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('lahjakortit').select('*').order('sale_date', { ascending: false, nullsFirst: false })
+    const { data } = await supabase.from('lahjakortit').select('*').order('sale_date', { ascending: false, nullsFirst: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -135,7 +135,7 @@ export default function Lahjakortit() {
     if (!file) return null
     const blob = await compressImg(file)
     const path = `lahjakortti/${Date.now()}.jpg`
-    const { error } = await supabaseAdmin.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
+    const { error } = await supabase.storage.from('receipts').upload(path, blob, { contentType: 'image/jpeg' })
     if (error) {
       alert('Kuitin lataus epäonnistui: ' + error.message)
       return null
@@ -147,7 +147,7 @@ export default function Lahjakortit() {
     if (!canSave) return
     setSaving(true)
     const receipt_url = form.payment_method === 'Maksupääte' ? await uploadReceipt(receiptFile) : null
-    const { error } = await supabaseAdmin.from('lahjakortit').insert({
+    const { error } = await supabase.from('lahjakortit').insert({
       code: form.code.trim(),
       service: form.service || null,
       price: form.price !== '' ? parseFloat(form.price) : null,
@@ -176,7 +176,7 @@ export default function Lahjakortit() {
     if (editReceiptFile) {
       receipt_url = await uploadReceipt(editReceiptFile)
     }
-    const { error } = await supabaseAdmin.from('lahjakortit').update({
+    const { error } = await supabase.from('lahjakortit').update({
       code: editForm.code.trim(),
       service: editForm.service || null,
       price: editForm.price !== '' ? parseFloat(editForm.price) : null,
@@ -201,7 +201,7 @@ export default function Lahjakortit() {
     const newUsed = (saleRow.used_amount || 0) + amount
     const noteAppend = `Käytetty ${amount.toFixed(2)} € (${saleDate})${saleNotes ? ': ' + saleNotes : ''}`
     const prevNotes = saleRow.notes ? saleRow.notes + ' | ' : ''
-    const { error } = await supabaseAdmin.from('lahjakortit').update({
+    const { error } = await supabase.from('lahjakortit').update({
       used_amount: newUsed,
       notes: prevNotes + noteAppend,
     }).eq('id', saleRow.id)
@@ -213,7 +213,7 @@ export default function Lahjakortit() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko lahjakortti?')) return
-    await supabaseAdmin.from('lahjakortit').delete().eq('id', id)
+    await supabase.from('lahjakortit').delete().eq('id', id)
     fetchData()
   }
 

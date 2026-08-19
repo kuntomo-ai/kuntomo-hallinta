@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
 const REPORT_NAV = [
@@ -72,8 +72,8 @@ export default function RaportointiValmennus() {
   useEffect(() => {
     if (canFilter) {
       Promise.all([
-        supabaseAdmin.from('employees').select('first_name, last_name').order('first_name'),
-        supabaseAdmin.from('valmennusmyynti').select('employee_name').not('employee_name', 'is', null),
+        supabase.from('employees').select('first_name, last_name').order('first_name'),
+        supabase.from('valmennusmyynti').select('employee_name').not('employee_name', 'is', null),
       ]).then(([empRes, salesRes]) => {
         const fromEmp = (empRes.data || [])
           .map(e => `${e.first_name || ''} ${e.last_name || ''}`.trim())
@@ -91,7 +91,7 @@ export default function RaportointiValmennus() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    let query = supabaseAdmin.from('valmennusmyynti').select('*').gte('visit_date', from).lte('visit_date', to)
+    let query = supabase.from('valmennusmyynti').select('*').gte('visit_date', from).lte('visit_date', to)
     if (selectedEmployee) query = query.eq('employee_name', selectedEmployee)
     const { data } = await query.order('visit_date', { ascending: false })
     setRows(data || [])

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { KeyRound, Check, Eye, EyeOff, User, Phone, Mail } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { supabaseAdmin } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
 export default function UserSettings() {
@@ -45,7 +44,7 @@ export default function UserSettings() {
     setInfoSaving(true)
 
     // Update phone in profiles table
-    const { error: profileErr } = await supabaseAdmin
+    const { error: profileErr } = await supabase
       .from('profiles')
       .update({ phone: phone.trim() || null })
       .eq('id', user?.id)

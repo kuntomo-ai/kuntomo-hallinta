@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, ExternalLink, Trash2 } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 
@@ -18,7 +18,7 @@ export default function KirjanpitoRaportit() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('kirjanpito_documents').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('kirjanpito_documents').select('*').order('created_at', { ascending: false })
     setRows(data || [])
     setLoading(false)
   }
@@ -30,7 +30,7 @@ export default function KirjanpitoRaportit() {
   async function handleSave() {
     if (!form.title.trim()) return
     setSaving(true)
-    await supabaseAdmin.from('kirjanpito_documents').insert({
+    await supabase.from('kirjanpito_documents').insert({
       title: form.title.trim(),
       description: form.description.trim() || null,
       document_type: form.document_type,
@@ -45,7 +45,7 @@ export default function KirjanpitoRaportit() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko raportti?')) return
-    await supabaseAdmin.from('kirjanpito_documents').delete().eq('id', id)
+    await supabase.from('kirjanpito_documents').delete().eq('id', id)
     fetchData()
   }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { Receipt } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import ReceiptModal from '../../components/ReceiptModal'
 
@@ -75,8 +75,8 @@ export default function RaportointiTerapia() {
   useEffect(() => {
     if (canFilter) {
       Promise.all([
-        supabaseAdmin.from('employees').select('first_name, last_name').order('first_name'),
-        supabaseAdmin.from('terapiamyynti').select('employee_name').not('employee_name', 'is', null),
+        supabase.from('employees').select('first_name, last_name').order('first_name'),
+        supabase.from('terapiamyynti').select('employee_name').not('employee_name', 'is', null),
       ]).then(([empRes, salesRes]) => {
         const fromEmp = (empRes.data || [])
           .map(e => `${e.first_name || ''} ${e.last_name || ''}`.trim())
@@ -94,7 +94,7 @@ export default function RaportointiTerapia() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    let query = supabaseAdmin.from('terapiamyynti').select('*').gte('entry_date', from).lte('entry_date', to)
+    let query = supabase.from('terapiamyynti').select('*').gte('entry_date', from).lte('entry_date', to)
     if (selectedEmployee) query = query.eq('employee_name', selectedEmployee)
     const { data } = await query.order('entry_date', { ascending: false })
     setRows(data || [])

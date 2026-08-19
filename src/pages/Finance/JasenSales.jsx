@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2 } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 
 const JASENYYSTYYPIT = ['10x kortti', 'Kuukausikortti', 'Hieronta & Fysioterapia', 'Hieronta & Fysioterapia 100€']
@@ -21,7 +21,7 @@ export default function JasenSales() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('jasenmyynti').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('jasenmyynti').select('*').order('created_at', { ascending: false })
     setRows(data || [])
     const today = new Date().toISOString().slice(0, 10)
     const todayRows = (data || []).filter(r => r.created_at?.slice(0, 10) === today)
@@ -36,7 +36,7 @@ export default function JasenSales() {
   async function handleSave() {
     if (!form.customer_name.trim() || !form.price) return
     setSaving(true)
-    await supabaseAdmin.from('jasenmyynti').insert({
+    await supabase.from('jasenmyynti').insert({
       customer_name: form.customer_name.trim(),
       membership_type: form.membership_type,
       price: parseFloat(form.price),
@@ -53,7 +53,7 @@ export default function JasenSales() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko jäsenmyyntikirjaus?')) return
-    await supabaseAdmin.from('jasenmyynti').delete().eq('id', id)
+    await supabase.from('jasenmyynti').delete().eq('id', id)
     fetchData()
   }
 

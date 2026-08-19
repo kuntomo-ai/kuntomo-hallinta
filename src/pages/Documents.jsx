@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { Plus, FileText, Download, Trash2, Upload, Lock, FileIcon, Eye, X } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 import { useSignedUrl, getSignedUrl } from '../lib/signedUrl'
@@ -123,7 +123,7 @@ export default function Documents() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin
+    const { data } = await supabase
       .from('kirjanpito_documents')
       .select('*')
       .order('created_at', { ascending: false })
@@ -134,7 +134,7 @@ export default function Documents() {
     const uploaderIds = [...new Set(docs.filter(d => d.uploaded_by).map(d => d.uploaded_by))]
     const nameMap = {}
     if (uploaderIds.length) {
-      const { data: profileRows } = await supabaseAdmin
+      const { data: profileRows } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
         .in('id', uploaderIds)
@@ -172,7 +172,7 @@ export default function Documents() {
     if (file) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `${Date.now()}-${safeName}`
-      const { error: uploadError } = await supabaseAdmin.storage.from('documents').upload(path, file)
+      const { error: uploadError } = await supabase.storage.from('documents').upload(path, file)
       if (uploadError) {
         setSaveError('Tiedoston lataus epäonnistui: ' + uploadError.message)
         setUploading(false)
@@ -182,7 +182,7 @@ export default function Documents() {
       file_name = file.name
     }
 
-    const { error: insertError } = await supabaseAdmin.from('kirjanpito_documents').insert({
+    const { error: insertError } = await supabase.from('kirjanpito_documents').insert({
       title: form.title.trim(),
       description: form.description.trim() || null,
       document_type: form.document_type,
@@ -204,7 +204,7 @@ export default function Documents() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko dokumentti?')) return
-    await supabaseAdmin.from('kirjanpito_documents').delete().eq('id', id)
+    await supabase.from('kirjanpito_documents').delete().eq('id', id)
     fetchData()
   }
 

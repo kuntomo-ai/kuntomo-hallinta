@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Edit2, Trash2 } from 'lucide-react'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Modal from '../../components/ui/Modal'
 import EmployeesNav from '../../components/EmployeesNav'
@@ -66,7 +66,7 @@ export default function Kausityontekijat() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin
+    const { data } = await supabase
       .from('kausityontekijat')
       .select('*')
       .order('sukunimi')
@@ -127,9 +127,9 @@ export default function Kausityontekijat() {
       liite2:         form.liite2.trim() || null,
     }
     if (editing) {
-      await supabaseAdmin.from('kausityontekijat').update(payload).eq('id', editing)
+      await supabase.from('kausityontekijat').update(payload).eq('id', editing)
     } else {
-      await supabaseAdmin.from('kausityontekijat').insert(payload)
+      await supabase.from('kausityontekijat').insert(payload)
     }
     setSaving(false)
     setShowModal(false)
@@ -140,7 +140,7 @@ export default function Kausityontekijat() {
   async function handleDelete(e, id) {
     e.stopPropagation()
     if (!confirm('Poistetaanko kausityöntekijä?')) return
-    await supabaseAdmin.from('kausityontekijat').delete().eq('id', id)
+    await supabase.from('kausityontekijat').delete().eq('id', id)
     fetchData()
   }
 

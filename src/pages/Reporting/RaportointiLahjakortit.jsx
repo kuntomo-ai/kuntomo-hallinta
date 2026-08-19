@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 
 const REPORT_NAV = [
   { label: 'Terapiamyynti', to: '/finance/raportointi/terapiamyynti' },
@@ -69,7 +69,7 @@ export default function RaportointiLahjakortit() {
     const { from, to } = getRange(period, customFrom, customTo)
     if (!from || !to) return
     setLoading(true)
-    const { data } = await supabaseAdmin
+    const { data } = await supabase
       .from('lahjakortit')
       .select('*')
       .gte('sale_date', from)

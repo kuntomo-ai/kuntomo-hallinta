@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Search, Edit2, Trash2, Wrench, CheckCircle, QrCode, Copy, Check } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { salivastaavaRole } from '../lib/salivastaava'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
@@ -50,13 +50,13 @@ export default function Laiteluettelo() {
 
   async function fetchData() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('laiteluettelo_items').select('*').order('device_number', { nullsFirst: false }).order('name')
+    const { data } = await supabase.from('laiteluettelo_items').select('*').order('device_number', { nullsFirst: false }).order('name')
     setRows(data || [])
     setLoading(false)
   }
 
   async function fetchServiceHistory(deviceId) {
-    const { data } = await supabaseAdmin.from('laite_huoltohistoria')
+    const { data } = await supabase.from('laite_huoltohistoria')
       .select('*').eq('laite_id', deviceId).order('ilmoitettu_at', { ascending: false })
     setServiceHistory(data || [])
   }
@@ -129,8 +129,8 @@ export default function Laiteluettelo() {
       updated_at:    new Date().toISOString(),
     }
     const { error } = editing
-      ? await supabaseAdmin.from('laiteluettelo_items').update(payload).eq('id', editing)
-      : await supabaseAdmin.from('laiteluettelo_items').insert(payload)
+      ? await supabase.from('laiteluettelo_items').update(payload).eq('id', editing)
+      : await supabase.from('laiteluettelo_items').insert(payload)
     setSaving(false)
     if (error) {
       setSaveError(`Tallennus epäonnistui: ${error.message}`)
@@ -144,7 +144,7 @@ export default function Laiteluettelo() {
 
   async function handleDelete(id) {
     if (!confirm('Poistetaanko laite?')) return
-    await supabaseAdmin.from('laiteluettelo_items').delete().eq('id', id)
+    await supabase.from('laiteluettelo_items').delete().eq('id', id)
     fetchData()
   }
 
@@ -154,14 +154,14 @@ export default function Laiteluettelo() {
     setServiceError('')
     const myName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : profile?.email || 'Tuntematon'
 
-    await supabaseAdmin.from('laite_huoltohistoria').insert({
+    await supabase.from('laite_huoltohistoria').insert({
       laite_id: editing,
       kuvaus: serviceNote.trim(),
       ilmoitettu_by: myName,
       tehty: false,
     })
 
-    await supabaseAdmin.from('laiteluettelo_items').update({ service_requested: true }).eq('id', editing)
+    await supabase.from('laiteluettelo_items').update({ service_requested: true }).eq('id', editing)
 
     const dev = rows.find(r => r.id === editing)
     const deviceNumber = dev?.device_number
@@ -180,10 +180,10 @@ export default function Laiteluettelo() {
     }
     // Linkki laitteen tietoihin + vikailmoitukseen
     const link = `/laiteluettelo?device=${editing}`
-    let { error: taskErr } = await supabaseAdmin.from('tasks').insert({ ...task, link })
+    let { error: taskErr } = await supabase.from('tasks').insert({ ...task, link })
     // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävä ilman sitä
     if (taskErr) {
-      const retry = await supabaseAdmin.from('tasks').insert(task)
+      const retry = await supabase.from('tasks').insert(task)
       taskErr = retry.error
     }
     if (taskErr) {
@@ -199,9 +199,9 @@ export default function Laiteluettelo() {
       recipient_type: 'role',
     }
     await Promise.all([
-      supabaseAdmin.from('channel_messages').insert({ ...msgBase, recipient_role: 'huolto' }),
-      supabaseAdmin.from('channel_messages').insert({ ...msgBase, recipient_role: 'admin' }),
-      supabaseAdmin.from('channel_messages').insert({ ...msgBase, recipient_role: 'respa' }),
+      supabase.from('channel_messages').insert({ ...msgBase, recipient_role: 'huolto' }),
+      supabase.from('channel_messages').insert({ ...msgBase, recipient_role: 'admin' }),
+      supabase.from('channel_messages').insert({ ...msgBase, recipient_role: 'respa' }),
     ])
 
     setServiceRequest(false)
@@ -213,19 +213,19 @@ export default function Laiteluettelo() {
 
   async function deleteServiceHistory(historyId) {
     if (!confirm('Poistetaanko huoltohistoriamerkintä?')) return
-    await supabaseAdmin.from('laite_huoltohistoria').delete().eq('id', historyId)
+    await supabase.from('laite_huoltohistoria').delete().eq('id', historyId)
     fetchServiceHistory(editing)
   }
 
   // Merkitse laitteen avoimet tehtävät valmiiksi, kun huolto on kuitattu
   async function completeDeviceTasks(deviceId, deviceName) {
-    const { error } = await supabaseAdmin.from('tasks')
+    const { error } = await supabase.from('tasks')
       .update({ completed: true, status: 'done' })
       .eq('link', `/laiteluettelo?device=${deviceId}`)
       .eq('completed', false)
     // Varmuus: jos link-saraketta ei ole, kuittaa laitteen nimen perusteella
     if (error) {
-      await supabaseAdmin.from('tasks')
+      await supabase.from('tasks')
         .update({ completed: true, status: 'done' })
         .ilike('title', `Laitehuolto: ${deviceName}%`)
         .eq('completed', false)
@@ -234,17 +234,17 @@ export default function Laiteluettelo() {
 
   async function markServiceDone(historyId) {
     const myName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : profile?.email || 'Tuntematon'
-    await supabaseAdmin.from('laite_huoltohistoria').update({
+    await supabase.from('laite_huoltohistoria').update({
       tehty: true,
       tehty_at: new Date().toISOString(),
       tehty_by: myName,
     }).eq('id', historyId)
 
-    const { data: remaining } = await supabaseAdmin.from('laite_huoltohistoria')
+    const { data: remaining } = await supabase.from('laite_huoltohistoria')
       .select('id').eq('laite_id', editing).eq('tehty', false)
 
     if (!remaining || remaining.length === 0) {
-      await supabaseAdmin.from('laiteluettelo_items').update({ service_requested: false }).eq('id', editing)
+      await supabase.from('laiteluettelo_items').update({ service_requested: false }).eq('id', editing)
       await completeDeviceTasks(editing, editingDeviceName)
     }
 
@@ -255,14 +255,14 @@ export default function Laiteluettelo() {
   async function quickMarkServiceDone(deviceId, deviceName) {
     if (!confirm(`Kuitataanko huolto: ${deviceName}?`)) return
     const myName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : profile?.email || 'Tuntematon'
-    const { data: openReqs } = await supabaseAdmin.from('laite_huoltohistoria')
+    const { data: openReqs } = await supabase.from('laite_huoltohistoria')
       .select('id').eq('laite_id', deviceId).eq('tehty', false)
     for (const req of (openReqs || [])) {
-      await supabaseAdmin.from('laite_huoltohistoria').update({
+      await supabase.from('laite_huoltohistoria').update({
         tehty: true, tehty_at: new Date().toISOString(), tehty_by: myName,
       }).eq('id', req.id)
     }
-    await supabaseAdmin.from('laiteluettelo_items').update({ service_requested: false }).eq('id', deviceId)
+    await supabase.from('laiteluettelo_items').update({ service_requested: false }).eq('id', deviceId)
     await completeDeviceTasks(deviceId, deviceName)
     fetchData()
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { Send, Users, User, Globe } from 'lucide-react'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
 const ROLES = ['admin', 'hallitus', 'terapia_valmennus', 'myynti', 'huolto', 'sport', 'respa']
@@ -27,7 +27,7 @@ export default function Communication() {
   useEffect(() => {
     fetchMessages()
     if (isAdmin) {
-      supabaseAdmin.from('profiles').select('id, first_name, last_name, full_name, role').order('first_name')
+      supabase.from('profiles').select('id, first_name, last_name, full_name, role').order('first_name')
         .then(({ data }) => setAllProfiles(data || []))
     }
     const channel = supabase
@@ -54,7 +54,7 @@ export default function Communication() {
 
   async function fetchMessages() {
     setLoading(true)
-    const { data } = await supabaseAdmin.from('channel_messages').select('*').order('created_at', { ascending: true })
+    const { data } = await supabase.from('channel_messages').select('*').order('created_at', { ascending: true })
     const visible = (data || []).filter(shouldShow)
     setMessages(visible)
     setPinned(visible.filter(m => m.pinned))
@@ -73,7 +73,7 @@ export default function Communication() {
       recipient_role: isAdmin && recipientType === 'role' ? recipientRole : null,
       recipient_id: isAdmin && recipientType === 'user' ? recipientId || null : null,
     }
-    await supabaseAdmin.from('channel_messages').insert(payload)
+    await supabase.from('channel_messages').insert(payload)
     setText('')
     setSending(false)
   }

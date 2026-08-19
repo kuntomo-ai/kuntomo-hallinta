@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabaseAdmin } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -141,7 +141,7 @@ export default function Raportointi() {
     const results = await Promise.all(
       CATEGORIES.map(c => {
         const isDateOnly = c.dateField !== 'created_at'
-        return supabaseAdmin.from(c.table).select(`price, ${c.dateField}`)
+        return supabase.from(c.table).select(`price, ${c.dateField}`)
           .gte(c.dateField, from)
           .lte(c.dateField, isDateOnly ? to : to + 'T23:59:59')
       })
@@ -152,7 +152,7 @@ export default function Raportointi() {
     setAllRows(rows)
 
     if (showMembership) {
-      const { data } = await supabaseAdmin.from('membership_stats')
+      const { data } = await supabase.from('membership_stats')
         .select('total_members').order('week_start', { ascending: false }).limit(1)
       setMemberTotal(data?.[0]?.total_members ?? null)
     }
