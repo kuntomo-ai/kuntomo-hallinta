@@ -4,6 +4,7 @@
 //
 // Kutsu server-puolella jotta service_role -avain ei paljastu selaimessa.
 import { supabaseAdmin } from '../../lib/supabaseAdmin.js'
+import { rateLimit, clientIp } from '../_lib/rateLimit.js'
 
 // Duplikoitu client-lib/salivastaava.js:sta jotta ei tarvi kääntää server-tietoja.
 function salivastaavaRole(sijainti) {
@@ -17,8 +18,15 @@ export default async function handler(req, res) {
   const id = req.query?.id
   if (!id) return res.status(400).json({ error: 'device id required' })
 
-  // GET: laitteen perustiedot
+  const ip = clientIp(req)
+
+  // GET: laitteen perustiedot (kevyt limit, jotta QR-koodin skannaukset toimivat)
   if (req.method === 'GET') {
+    const rl = await rateLimit({ name: 'laite:get', key: ip, limit: 60, window: '1 m' })
+    if (!rl.ok) {
+      res.setHeader('Retry-After', String(Math.ceil((rl.reset - Date.now()) / 1000)))
+      return res.status(429).json({ error: 'Liian monta pyyntöä. Yritä hetken kuluttua uudelleen.' })
+    }
     const { data, error } = await supabaseAdmin
       .from('laiteluettelo_items')
       .select('id, name, model, sijainti, device_number, ohjevideo_url')
@@ -29,8 +37,20 @@ export default async function handler(req, res) {
     return res.status(200).json(data)
   }
 
-  // POST: vikailmoituksen lähetys
+  // POST: vikailmoituksen lähetys — tiukempi limit (5/10min per IP+laite,
+  // 20/tunti per IP) jotta ei voida spammata satoja tehtäviä.
   if (req.method === 'POST') {
+    const rlDevice = await rateLimit({ name: 'laite:post:device', key: `${ip}:${id}`, limit: 5, window: '10 m' })
+    if (!rlDevice.ok) {
+      res.setHeader('Retry-After', String(Math.ceil((rlDevice.reset - Date.now()) / 1000)))
+      return res.status(429).json({ error: 'Sama laite on jo ilmoitettu useita kertoja lyhyessä ajassa. Yritä myöhemmin.' })
+    }
+    const rlIp = await rateLimit({ name: 'laite:post:ip', key: ip, limit: 20, window: '1 h' })
+    if (!rlIp.ok) {
+      res.setHeader('Retry-After', String(Math.ceil((rlIp.reset - Date.now()) / 1000)))
+      return res.status(429).json({ error: 'Liian monta vikailmoitusta. Yritä myöhemmin.' })
+    }
+
     const body = req.body || {}
     const nimi    = String(body.nimi    || '').trim()
     const kuvaus  = String(body.kuvaus  || '').trim()

@@ -11,6 +11,7 @@
 // Requires Authorization: Bearer <supabase-user-jwt> with admin|hallitus|manager role.
 import { supabaseAdmin } from '../../lib/supabaseAdmin.js'
 import { requireRole } from '../_lib/requireRole.js'
+import { rateLimit, clientIp } from '../_lib/rateLimit.js'
 
 const BAN_100_YEARS = '876000h'
 
@@ -20,6 +21,14 @@ export default async function handler(req, res) {
   }
   const auth = await requireRole(req, ['admin', 'hallitus', 'manager'])
   if (auth.error) return res.status(auth.status).json({ error: auth.error })
+
+  // Rate limit — jopa admin-tunnuksen kaappaus ei saa spammata satoja
+  // auth-käyttäjiä/bannauksia (Supabase-costs). 30 auth-op/min/käyttäjä riittää.
+  const rl = await rateLimit({ name: 'admin:users', key: auth.user.id, limit: 30, window: '1 m' })
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(Math.ceil((rl.reset - Date.now()) / 1000)))
+    return res.status(429).json({ error: 'Liian monta admin-toimintoa. Odota hetki.' })
+  }
 
   const { action, uid, email, first_name, last_name } = req.body || {}
 
