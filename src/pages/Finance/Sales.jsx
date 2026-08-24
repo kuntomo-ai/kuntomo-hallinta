@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, Trash2, Camera, ChevronLeft, ChevronRight, Edit2, CheckCircle, Receipt, ExternalLink } from 'lucide-react'
+import { Search, Trash2, Camera, ChevronLeft, ChevronRight, Edit2, CheckCircle, Receipt, ExternalLink, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
@@ -1061,6 +1061,18 @@ export default function Sales() {
     fetchTerapia()
   }
 
+  async function toggleActivated(row) {
+    if (!isAdmin) return
+    const empName = profile ? `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() : null
+    const nextActivated = !row.activated
+    await supabase.from('jasenmyynti').update({
+      activated: nextActivated,
+      activated_at: nextActivated ? new Date().toISOString() : null,
+      activated_by: nextActivated ? (empName || null) : null,
+    }).eq('id', row.id)
+    fetchOther('jasen')
+  }
+
   const [editRow, setEditRow] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [editSaving, setEditSaving] = useState(false)
@@ -1334,6 +1346,22 @@ export default function Sales() {
                                 style={{ color: '#16A34A' }}
                                 onClick={() => markLaskutettu(r.id)}>
                                 <CheckCircle size={13} />
+                              </button>
+                            )}
+                            {tab === 'jasen' && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                title={r.activated
+                                  ? `Aktivoitu${r.activated_by ? ` — ${r.activated_by}` : ''}${r.activated_at ? ' ' + new Date(r.activated_at).toLocaleDateString('fi-FI') : ''}${isAdmin ? ' (klikkaa poistaaksesi)' : ''}`
+                                  : (isAdmin ? 'Merkitse aktivoiduksi' : 'Ei vielä aktivoitu')}
+                                style={{
+                                  color: r.activated ? '#16A34A' : 'var(--text4)',
+                                  cursor: isAdmin ? 'pointer' : 'not-allowed',
+                                  opacity: isAdmin || r.activated ? 1 : 0.5,
+                                }}
+                                onClick={() => isAdmin && toggleActivated(r)}
+                                disabled={!isAdmin && !r.activated}>
+                                <ShieldCheck size={13} />
                               </button>
                             )}
                             <button className="btn btn-ghost btn-sm" onClick={() => openEdit(r)}><Edit2 size={13} /></button>
