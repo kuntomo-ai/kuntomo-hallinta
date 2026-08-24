@@ -1,0 +1,30 @@
+[extend]
+useDefault = true
+
+# Kaikki oletusssäännöt (mm. supabase-service-role-jwt, generic-api-key,
+# private-key, aws-access-token) käytössä. Alta whitelist tunnetuille
+# false positive -tapauksille ja historiallisille (invalidoiduille) avaimille.
+
+[allowlist]
+description = "Historialliset invalidoidut avaimet ja publishable-avain"
+paths = [
+  # Riippuvuudet
+  '''node_modules''',
+  '''package-lock\.json''',
+  '''dist''',
+  # Vercelin build-cache voi sisältää OIDC-tokeneja jotka vanhenevat itsestään
+  '''\.vercel''',
+]
+
+# Regex-allowlist:
+# 1) sb_publishable_ — turvallinen selaimessa (Supabase-designed public key)
+# 2) Legacy anon+service_role JWT:t jotka DISABLOITU Supabase Dashboardissa
+#    2026-08-19 — nämä ovat vielä historiassa (poisto vaatisi force-pushin) mutta
+#    eivät toimi enää. Sallitaan ettei CI vinguta jokaisen scaanin yhteydessä.
+regexes = [
+  '''sb_publishable_[A-Za-z0-9_]+''',
+  # Legacy anon-JWT (rooli=anon, projekti=ogboigmanmeepaoqepil, exp=2036) — INVALIDOITU
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nYm9pZ21hbm1lZXBhb3FlcGlsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1ODI0NDgsImV4cCI6MjA5MzE1ODQ0OH0\.f9prm3J0u66QU4vjMqvNWC0g8bev-i2plRlxiEXNp44''',
+  # Legacy service_role-JWT — INVALIDOITU 2026-08-19
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nYm9pZ21hbm1lZXBhb3FlcGlsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NzU4MjQ0OCwiZXhwIjoyMDkzMTU4NDQ4fQ\.JDyVF2eOcUpmmwpMt1Vb5hLgYH6T4wj0ik3s0DmWHJo''',
+]

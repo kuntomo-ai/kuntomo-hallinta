@@ -1,0 +1,24 @@
+name: gitleaks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    name: scan repo for secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history so gitleaks scans past commits too)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # Käytä konfigurointiin repossa olevaa .gitleaks.toml (allowlist)
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # Ei tarvita GITLEAKS_LICENSEä koska tämä on henkilö-/pieni org repo
