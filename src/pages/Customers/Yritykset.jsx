@@ -34,6 +34,9 @@ export default function Yritykset() {
   const [notes, setNotes] = useState('')
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesSaving, setNotesSaving] = useState(false)
+  const [lisaravinteet, setLisaravinteet] = useState('')
+  const [editingLisaravinteet, setEditingLisaravinteet] = useState(false)
+  const [lisaravinteetSaving, setLisaravinteetSaving] = useState(false)
   const [newPersonName, setNewPersonName] = useState('')
   const [addingPerson, setAddingPerson] = useState(false)
   const [csvImporting, setCsvImporting] = useState(false)
@@ -75,6 +78,7 @@ export default function Yritykset() {
     setPersons(personsRes.data || [])
     setVisits(visitsRes.data || [])
     setNotes(notesRes.data?.notes || '')
+    setLisaravinteet(notesRes.data?.lisaravinteet || '')
   }
 
   useEffect(() => {
@@ -121,6 +125,18 @@ export default function Yritykset() {
     }
     setNotesSaving(false)
     setEditingNotes(false)
+  }
+
+  async function saveLisaravinteet() {
+    setLisaravinteetSaving(true)
+    const existing = await supabase.from('company_notes').select('id').eq('company_id', selected.id).eq('year', viewYear).maybeSingle()
+    if (existing.data) {
+      await supabase.from('company_notes').update({ lisaravinteet }).eq('id', existing.data.id)
+    } else {
+      await supabase.from('company_notes').insert({ company_id: selected.id, year: viewYear, lisaravinteet })
+    }
+    setLisaravinteetSaving(false)
+    setEditingLisaravinteet(false)
   }
 
   async function handleSave() {
@@ -447,6 +463,35 @@ export default function Yritykset() {
               <button className="btn btn-ghost btn-sm" onClick={() => setEditingNotes(true)}>Muokkaa</button>
             )}
           </div>
+
+          {/* Lisäravinteet — vain Keki miehet -yritykselle */}
+          {(selected?.name || '').toLowerCase().includes('keki miehet') && (
+            <div className="card" style={{ padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.3rem' }}>
+                  Lisäravinteet ({viewYear})
+                </div>
+                {editingLisaravinteet ? (
+                  <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                    <textarea className="input-field" rows={2} value={lisaravinteet} onChange={e => setLisaravinteet(e.target.value)}
+                      style={{ flex: 1, resize: 'vertical', fontSize: '.85rem' }} autoFocus />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+                      <button className="btn btn-primary btn-sm" onClick={saveLisaravinteet} disabled={lisaravinteetSaving}>Tallenna</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setEditingLisaravinteet(false)}>Peruuta</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '.85rem', cursor: 'pointer', color: lisaravinteet ? 'var(--text)' : 'var(--text4)', fontStyle: lisaravinteet ? 'normal' : 'italic' }}
+                    onClick={() => setEditingLisaravinteet(true)}>
+                    {lisaravinteet || 'Lisää lisäravinteet...'}
+                  </div>
+                )}
+              </div>
+              {!editingLisaravinteet && (
+                <button className="btn btn-ghost btn-sm" onClick={() => setEditingLisaravinteet(true)}>Muokkaa</button>
+              )}
+            </div>
+          )}
 
           {/* Monthly grid */}
           {persons.length === 0 && !hasOrphans ? (
