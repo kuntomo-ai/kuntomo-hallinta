@@ -335,6 +335,33 @@ export default function RaportointiMobilePay() {
       Netto:  +d.netto.toFixed(2),
     }))
 
+  // Chart: viikoittain (ISO-viikko)
+  function isoWeekKey(dateStr) {
+    const d = new Date(dateStr + 'T00:00:00Z')
+    const day = d.getUTCDay() || 7
+    d.setUTCDate(d.getUTCDate() + 4 - day)
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+    const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
+    return `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+  }
+  const weekly = {}
+  sales.forEach(r => {
+    if (!r.booking_date) return
+    const k = isoWeekKey(r.booking_date)
+    if (!weekly[k]) weekly[k] = { week: k, brutto: 0, netto: 0, palkkio: 0, count: 0 }
+    weekly[k].brutto  += r.amount || 0
+    weekly[k].netto   += r.net_amount || 0
+    weekly[k].palkkio += Math.abs(r.fee || 0)
+    weekly[k].count   += 1
+  })
+  const weeklyChartData = Object.values(weekly)
+    .sort((a, b) => a.week.localeCompare(b.week))
+    .map(w => ({
+      label: w.week.slice(5),        // 'Wxx'
+      Brutto: +w.brutto.toFixed(2),
+      Netto:  +w.netto.toFixed(2),
+    }))
+
   const periodLabel = PERIODS.find(p => p.value === period)?.label || ''
 
   return (
@@ -396,11 +423,42 @@ export default function RaportointiMobilePay() {
         </div>
       </div>
 
-      {/* Chart */}
+      {/* Chart — viikoittain */}
+      <div className="card" style={{ marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '.6rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', margin: 0 }}>
+            Myynti viikoittain
+          </h2>
+          <span style={{ fontSize: '.72rem', color: 'var(--text3)' }}>ISO-viikot, brutto ja netto</span>
+        </div>
+        {loading ? (
+          <div style={{ height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: '.83rem' }}>Ladataan…</div>
+        ) : weeklyChartData.length === 0 ? (
+          <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: '.83rem' }}>Ei tapahtumia valitulla aikavälillä.</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={weeklyChartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--text3)' }} tickLine={false} interval="preserveStartEnd" minTickGap={20} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false}
+                tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} width={38} />
+              <Tooltip
+                formatter={(v) => fmtEur(v)}
+                contentStyle={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, fontSize: '.78rem' }}
+              />
+              <Legend wrapperStyle={{ fontSize: '.78rem', paddingTop: '.5rem' }} />
+              <Bar dataKey="Brutto" fill="#7C3AED" maxBarSize={40} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="Netto"  fill="#16A34A" maxBarSize={40} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Chart — päivittäin */}
       <div className="card" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '.6rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', margin: 0 }}>
-            Myynnin kehitys
+            Myynti päivittäin
           </h2>
           <span style={{ fontSize: '.72rem', color: 'var(--text3)' }}>päivittäin, brutto ja netto</span>
         </div>
