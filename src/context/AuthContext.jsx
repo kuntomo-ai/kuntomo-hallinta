@@ -56,7 +56,20 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }
 
-  const signOut = () => supabase.auth.signOut()
+  async function signOut() {
+    // Kirjaudu ulos Supabasesta ensin, sitten tyhjennä paikalliset tallennukset
+    // ja Supabase-vastausten Cache Storage. Muuten kirjautuneen käyttäjän
+    // fetchit voisivat olla vielä 30 s ajan luettavissa DevToolsista.
+    try { await supabase.auth.signOut() } catch { /* jatka silti */ }
+    try {
+      sessionStorage.clear()
+      // Poista service worker -perustainen supabase-cache
+      if (typeof caches !== 'undefined') {
+        const keys = await caches.keys()
+        await Promise.all(keys.filter(k => k.includes('supabase')).map(k => caches.delete(k)))
+      }
+    } catch { /* ei-fataali */ }
+  }
 
   // Multi-role: prefer the roles array, fall back to the singular role
   // for profiles that pre-date the migration.
