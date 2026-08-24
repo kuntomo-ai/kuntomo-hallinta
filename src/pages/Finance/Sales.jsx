@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../components/VoiceInput'
 import Modal from '../../components/ui/Modal'
 import ReceiptModal from '../../components/ReceiptModal'
+import { validateImage, IMAGE_ACCEPT } from '../../lib/fileValidation'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -637,8 +638,15 @@ function TerapiaForm({ onSaved }) {
           <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', background: 'var(--bg2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.85rem', color: 'var(--text2)' }}>
             <Camera size={15} />
             {receipt ? receipt.name : 'Ota kuva tai valitse tiedosto'}
-            <input type="file" accept="image/*" style={{ display: 'none' }}
-              onChange={e => setReceipt(e.target.files[0] || null)} />
+            <input type="file" accept={IMAGE_ACCEPT} style={{ display: 'none' }}
+              onChange={e => {
+                const f = e.target.files[0] || null
+                if (f) {
+                  const err = validateImage(f)
+                  if (err) { alert(err); e.target.value = ''; setReceipt(null); return }
+                }
+                setReceipt(f)
+              }} />
           </label>
           {receipt && (
             <div style={{ marginTop: '.35rem', fontSize: '.72rem', color: 'var(--text3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

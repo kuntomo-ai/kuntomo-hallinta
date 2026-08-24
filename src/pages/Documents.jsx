@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import Modal from '../components/ui/Modal'
 import { useSignedUrl, getSignedUrl } from '../lib/signedUrl'
+import { validateDocument, DOC_ACCEPT } from '../lib/fileValidation'
 
 const DOC_TYPES = ['Tuloslaskelma', 'Tase', 'Sopimus', 'Ohje', 'Tiedote', 'Kokouspöytäkirja', 'Muu']
 const FILTER_TYPES = ['Kaikki', ...DOC_TYPES]
@@ -170,6 +171,12 @@ export default function Documents() {
     let file_name = null
 
     if (file) {
+      const validationErr = validateDocument(file)
+      if (validationErr) {
+        setSaveError(validationErr)
+        setUploading(false)
+        return
+      }
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `${Date.now()}-${safeName}`
       const { error: uploadError } = await supabase.storage.from('documents').upload(path, file)
@@ -392,7 +399,14 @@ export default function Documents() {
                   </div>
                 )}
               </div>
-              <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={e => setFile(e.target.files[0] || null)} />
+              <input ref={fileRef} type="file" accept={DOC_ACCEPT} style={{ display: 'none' }} onChange={e => {
+                const f = e.target.files[0] || null
+                if (f) {
+                  const err = validateDocument(f)
+                  if (err) { alert(err); e.target.value = ''; setFile(null); return }
+                }
+                setFile(f)
+              }} />
             </div>
             {saveError && (
               <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.82rem', color: 'var(--red)' }}>

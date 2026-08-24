@@ -6,6 +6,7 @@ import ReceiptModal from '../../components/ReceiptModal'
 import { useAuth } from '../../context/AuthContext'
 import { useSignedUrl } from '../../lib/signedUrl'
 import { compressImg } from '../../lib/imageCompress'
+import { validateImage, IMAGE_ACCEPT } from '../../lib/fileValidation'
 
 const SERVICES = [
   { label: 'Valitse palvelu...', value: '', price: '' },
@@ -585,8 +586,15 @@ function LahjakorttiReceiptPicker({ file, onFile, existingPath, onRemoveExisting
       <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', background: 'var(--bg2)', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', padding: '.6rem .9rem', fontSize: '.85rem', color: 'var(--text2)' }}>
         <Camera size={15} />
         {file ? file.name : (hasExisting ? 'Vaihda kuitti' : 'Ota kuva tai valitse tiedosto')}
-        <input type="file" accept="image/*" style={{ display: 'none' }}
-          onChange={e => onFile(e.target.files?.[0] || null)} />
+        <input type="file" accept={IMAGE_ACCEPT} style={{ display: 'none' }}
+          onChange={e => {
+            const f = e.target.files?.[0] || null
+            if (f) {
+              const err = validateImage(f)
+              if (err) { alert(err); e.target.value = ''; onFile(null); return }
+            }
+            onFile(f)
+          }} />
       </label>
       {file && (
         <div style={{ marginTop: '.35rem', fontSize: '.72rem', color: 'var(--text3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
