@@ -1242,7 +1242,7 @@ export default function Sales() {
         ))}
       </div>
 
-      <div className="grid-sidebar-main" style={{ alignItems: 'start', gridTemplateColumns: '280px minmax(0, 1fr)', maxWidth: 1400 }}>
+      <div className="grid-sidebar-main" style={{ alignItems: 'start' }}>
 
         {tab === 'terapia' && <TerapiaForm onSaved={fetchTerapia} />}
         {tab === 'valmennus' && <ValmennusForm onSaved={() => fetchOther('valmennus')} />}
@@ -1298,7 +1298,7 @@ export default function Sales() {
           </div>
 
           {/* Table + breakdown */}
-          <div className="grid-main-aside" style={{ gridTemplateColumns: 'minmax(0, 1fr) 220px' }}>
+          <div className="grid-main-aside">
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.5rem' }}>
                 <div className="search-wrap" style={{ flex: 1 }}>
