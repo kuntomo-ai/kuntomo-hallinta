@@ -1078,6 +1078,18 @@ export default function Sales() {
       activated_at: nextActivated ? new Date().toISOString() : null,
       activated_by: nextActivated ? (empName || null) : null,
     }).eq('id', row.id)
+
+    // Kun aktivoidaan → merkitse vastaava "Uusi jäsenmyynti: X — Y" -tehtävä
+    // valmiiksi jotta se katoaa etusivun Tehtävät-widgetistä (Dashboard-suodatin
+    // piilottaa status='done' + completed=true -tehtävät).
+    if (nextActivated) {
+      const service = row.membership_type || row.service || ''
+      const title = `Uusi jäsenmyynti: ${row.customer_name || ''} — ${service}`
+      await supabase.from('tasks').update({ completed: true, status: 'done' })
+        .eq('title', title)
+        .or('completed.is.null,completed.eq.false')
+    }
+
     fetchOther('jasen')
   }
 
