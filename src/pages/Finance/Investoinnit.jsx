@@ -64,7 +64,7 @@ function memberCount(m, monthIdx = 0) {
   const byYear = m.countsByYear
   if (byYear && byYear[year] != null && byYear[year] !== '')
     return Number(byYear[year])
-  return (m.count || 0) * Math.pow(1 + (m.growthPct ?? 0) / 100, year)
+  return (m.count || 0) * Math.pow(1 + (m.growthPct ?? 0) / 100, monthIdx)
 }
 
 // 4-week billing → monthly: price × 13/12
@@ -362,7 +362,7 @@ function ItemRowHeader() {
       <ColHeader>Nimi</ColHeader>
       <ColHeader right>Summa</ColHeader>
       <ColHeader right>Tyyppi</ColHeader>
-      <ColHeader right>Kasvu/Kk</ColHeader>
+      <ColHeader right>Kasvu/v%</ColHeader>
       <span />
       <span />
     </div>
@@ -395,84 +395,98 @@ function ItemRow({ item, onUpdate, onDelete, maxMonth }) {
   )
 }
 
-// ── Membership row (with expandable per-year member counts) ───────────────────
-const MEMBER_GRID = '1fr 58px 52px 50px 52px'
-
+// ── Membership editor (monthly count grid) ───────────────────────────────────
 const MONTH_ABBR = ['Tam', 'Hel', 'Maa', 'Huh', 'Tou', 'Kes', 'Hei', 'Elo', 'Syy', 'Lok', 'Mar', 'Jou']
 
-function MembershipRow({ m, horisontti, onUpdate, onUpdateMonthCount, onFillYear }) {
-  const [open, setOpen] = useState(false)
+function MembershipEditor({ m, horisontti, onUpdate, onUpdateMonthCount, onFillAll, onDelete, isOnly }) {
+  const [fillValue, setFillValue] = useState('')
   const years = Math.ceil(horisontti / 12)
-  const hasMonthCounts = Array.isArray(m.countsByMonth) && m.countsByMonth.some(c => c != null && c !== '')
+
+  function doFill() {
+    if (fillValue === '') return
+    onFillAll(fillValue)
+    setFillValue('')
+  }
+
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: MEMBER_GRID, gap: '.3rem', alignItems: 'center' }}>
-        <div onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer' }} title="Näytä jäsenmäärä kuukausittain">
-          <div style={{ fontSize: '.8rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '.28rem' }}>
-            <span style={{ fontSize: '.58rem', color: hasMonthCounts ? 'var(--violet, #7c5cbf)' : 'var(--text3)' }}>
-              {open ? '▾' : '▸'}
-            </span>
-            {m.label}
-          </div>
-          <div style={{ fontSize: '.65rem', color: 'var(--text3)', paddingLeft: '.86rem' }}>
-            {m.periodWeeks ? `/${m.periodWeeks} vko` : '/käynti'}
-            {hasMonthCounts && <span style={{ color: 'var(--violet, #7c5cbf)', marginLeft: '.3rem' }}>· kk-määrät</span>}
-          </div>
-        </div>
-        <NumInput value={m.price} step={0.10} min={0} onChange={v => onUpdate('price', v)} />
-        <NumInput value={m.count} step={1}    min={0} onChange={v => onUpdate('count', v)} />
-        <NumInput value={m.growthPct} step={1}       onChange={v => onUpdate('growthPct', v)} />
-        <span style={{ fontSize: '.8rem', fontWeight: 600, textAlign: 'right' }}>
-          {fmt(memberMonthly(m))}
-        </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.7rem' }}>
+      {/* Product settings */}
+      <div style={{ display: 'flex', gap: '.3rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          className="input-field"
+          value={m.label}
+          onChange={e => onUpdate('label', e.target.value)}
+          style={{ fontSize: '.8rem', padding: '.28rem .5rem', height: 'auto', flex: '1 1 80px', minWidth: 60 }}
+        />
+        <NumInput value={m.price} step={0.10} min={0} onChange={v => onUpdate('price', v)} style={{ width: 60 }} />
+        <span style={{ fontSize: '.7rem', color: 'var(--text3)' }}>€ /</span>
+        <input
+          className="input-field"
+          type="number" min={1}
+          value={m.periodWeeks ?? ''}
+          placeholder="—"
+          onChange={e => onUpdate('periodWeeks', e.target.value === '' ? null : Number(e.target.value))}
+          style={{ fontSize: '.8rem', padding: '.28rem .3rem', height: 'auto', width: 36, textAlign: 'center' }}
+        />
+        <span style={{ fontSize: '.7rem', color: 'var(--text3)' }}>vko</span>
+        {!isOnly && <DeleteBtn onClick={onDelete} />}
       </div>
 
-      {open && (
-        <div style={{ margin: '.5rem 0 .3rem', padding: '.55rem .6rem', background: 'var(--bg2)', borderRadius: 6 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.5rem' }}>
-            <span style={{ fontSize: '.66rem', fontWeight: 700, color: 'var(--text2)' }}>Jäsenmäärä / kuukausi</span>
-            <span style={{ fontSize: '.62rem', color: 'var(--text3)' }}>tyhjä = auto (kasvu%)</span>
+      {/* Fill-all shortcut */}
+      <div style={{ display: 'flex', gap: '.3rem', alignItems: 'center' }}>
+        <span style={{ fontSize: '.68rem', color: 'var(--text3)' }}>Täytä kaikki:</span>
+        <input
+          className="input-field"
+          type="number" min={0}
+          value={fillValue}
+          placeholder="jäseniä"
+          onChange={e => setFillValue(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && doFill()}
+          style={{ fontSize: '.78rem', padding: '.22rem .35rem', height: 'auto', width: 72, textAlign: 'right' }}
+        />
+        <button className="btn btn-ghost btn-sm" onClick={doFill}
+          style={{ padding: '.22rem .55rem', fontSize: '.78rem' }}>→</button>
+      </div>
+
+      {/* Monthly count grid */}
+      {Array.from({ length: years }, (_, y) => {
+        const startM = y * 12
+        const endM   = Math.min((y + 1) * 12, horisontti)
+        const cols   = endM - startM
+        return (
+          <div key={y}>
+            <div style={{
+              fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '.06em', color: 'var(--text3)', marginBottom: '.28rem',
+            }}>
+              Vuosi {y + 1}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '.15rem' }}>
+              {Array.from({ length: cols }, (_, k) => {
+                const monthIdx = startM + k
+                const val = m.countsByMonth?.[monthIdx]
+                return (
+                  <div key={monthIdx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.07rem' }}>
+                    <span style={{ fontSize: '.5rem', color: 'var(--text3)', userSelect: 'none' }}>
+                      {MONTH_ABBR[monthIdx % 12]}
+                    </span>
+                    <input
+                      className="input-field"
+                      type="number" min={0}
+                      value={val ?? ''}
+                      onChange={e => onUpdateMonthCount(monthIdx, e.target.value)}
+                      style={{
+                        fontSize: '.64rem', padding: '.15rem .05rem', height: 'auto',
+                        textAlign: 'center', width: '100%', minWidth: 0,
+                      }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
           </div>
-          {Array.from({ length: years }, (_, y) => {
-            const startM = y * 12
-            const endM   = Math.min((y + 1) * 12, horisontti)
-            const autoY  = Math.round((m.count || 0) * Math.pow(1 + (m.growthPct ?? 0) / 100, y))
-            return (
-              <div key={y} style={{ marginBottom: '.55rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.25rem' }}>
-                  <span style={{ fontSize: '.62rem', fontWeight: 700, color: 'var(--text3)' }}>Vuosi {y + 1}</span>
-                  <button
-                    onClick={() => onFillYear(y, autoY)}
-                    title={`Täytä vuoden ${y + 1} kaikki kuukaudet arvolla ${autoY}`}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--violet, #7c5cbf)',
-                      fontSize: '.6rem', padding: 0 }}>
-                    täytä {autoY} →
-                  </button>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '.3rem' }}>
-                  {Array.from({ length: endM - startM }, (_, k) => {
-                    const monthIdx = startM + k
-                    const val = m.countsByMonth?.[monthIdx]
-                    return (
-                      <div key={monthIdx}>
-                        <div style={{ fontSize: '.57rem', color: 'var(--text3)', textAlign: 'center', marginBottom: '.1rem' }}>
-                          {MONTH_ABBR[monthIdx % 12]} {monthIdx + 1}
-                        </div>
-                        <input
-                          className="input-field" type="number" min={0}
-                          value={val ?? ''} placeholder={String(autoY)}
-                          onChange={e => onUpdateMonthCount(monthIdx, e.target.value)}
-                          style={{ fontSize: '.74rem', padding: '.22rem .2rem', height: 'auto', textAlign: 'center', width: '100%' }}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+        )
+      })}
     </div>
   )
 }
@@ -482,10 +496,12 @@ export default function Investoinnit() {
   const [investments, setInvestments] = useState(() => [makeInvestment(1)])
   const [activeId,    setActiveId]    = useState(null)
   const [loading,     setLoading]     = useState(true)
-  const [saveStatus,  setSaveStatus]  = useState(null) // null | 'saving' | 'saved' | 'error'
+  const [saveStatus,          setSaveStatus]          = useState(null) // null | 'saving' | 'saved' | 'error'
+  const [selectedMembershipId, setSelectedMembershipId] = useState(null)
 
-  const currentId = activeId ?? investments[0]?.id
-  const inv       = investments.find(i => i.id === currentId) ?? investments[0]
+  const currentId      = activeId ?? investments[0]?.id
+  const inv            = investments.find(i => i.id === currentId) ?? investments[0]
+  const activeMembership = inv.memberships.find(m => m.id === selectedMembershipId) ?? inv.memberships[0]
 
   // ── Load from Supabase on mount ──────────────────────────────────────────
   useEffect(() => {
@@ -551,14 +567,21 @@ export default function Investoinnit() {
       arr[monthIdx] = (val === '' || val == null) ? null : Number(val)
       return { ...m, countsByMonth: arr }
     }) })
-  // Täytä yhden vuoden kaikki kuukaudet samalla jäsenmäärällä
-  const fillMemberYear = (id, year, value) =>
+  const fillAllMemberMonths = (id, value) =>
     patch({ memberships: inv.memberships.map(m => {
       if (m.id !== id) return m
-      const arr = Array.isArray(m.countsByMonth) ? [...m.countsByMonth] : []
-      for (let k = year * 12; k < Math.min((year + 1) * 12, inv.horisontti); k++) arr[k] = value
-      return { ...m, countsByMonth: arr }
+      return { ...m, countsByMonth: Array.from({ length: inv.horisontti }, () => Number(value)) }
     }) })
+  const addMembership = () => {
+    const newM = { id: nid(), label: 'Uusi jäsenyys', price: 0, periodWeeks: 4, countsByMonth: [] }
+    patch({ memberships: [...inv.memberships, newM] })
+    setSelectedMembershipId(newM.id)
+  }
+  const removeMembership = (id) => {
+    const remaining = inv.memberships.filter(m => m.id !== id)
+    patch({ memberships: remaining })
+    if (id === selectedMembershipId) setSelectedMembershipId(null)
+  }
 
   const updateOtherRev = (id, field, val) =>
     patch({ otherRevs: inv.otherRevs.map(r => r.id === id ? { ...r, [field]: val } : r) })
@@ -731,24 +754,39 @@ export default function Investoinnit() {
           {/* Jäsenyysmyynti */}
           <div className="card" style={{ padding: '1rem' }}>
             <SectionLabel>Jäsenyysmyynti</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: MEMBER_GRID, gap: '.3rem', marginBottom: '.3rem' }}>
-              <ColHeader>Tuote</ColHeader>
-              <ColHeader right>Hinta €</ColHeader>
-              <ColHeader right>Asiak.</ColHeader>
-              <ColHeader right>Kasvu/v%</ColHeader>
-              <ColHeader right>€/kk</ColHeader>
+
+            {/* Product selector + add button */}
+            <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginBottom: '.85rem' }}>
+              <select
+                className="input-field"
+                value={activeMembership?.id ?? ''}
+                onChange={e => setSelectedMembershipId(Number(e.target.value))}
+                style={{ flex: 1, fontSize: '.82rem', padding: '.3rem .45rem', height: 'auto', cursor: 'pointer' }}
+              >
+                {inv.memberships.map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+              <button className="btn btn-ghost btn-sm" onClick={addMembership}
+                style={{ display: 'flex', alignItems: 'center', gap: '.25rem', whiteSpace: 'nowrap' }}>
+                <Plus size={13} /> Lisää
+              </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
-              {inv.memberships.map(m => (
-                <MembershipRow key={m.id} m={m} horisontti={inv.horisontti}
-                  onUpdate={(f, v) => updateMembership(m.id, f, v)}
-                  onUpdateMonthCount={(mi, v) => updateMemberMonthCount(m.id, mi, v)}
-                  onFillYear={(y, v) => fillMemberYear(m.id, y, v)} />
-              ))}
-            </div>
-            <div style={{ marginTop: '.6rem', fontSize: '.66rem', color: 'var(--text3)', lineHeight: 1.4 }}>
-              Avaa tuote (▸) syöttääksesi jäsenmäärän erikseen jokaiselle kuukaudelle. Tyhjä kenttä käyttää automaattista kasvua. "Täytä" asettaa koko vuoden kerralla.
-            </div>
+
+            {/* Monthly grid editor for selected product */}
+            {activeMembership && (
+              <MembershipEditor
+                key={activeMembership.id}
+                m={activeMembership}
+                horisontti={inv.horisontti}
+                onUpdate={(f, v) => updateMembership(activeMembership.id, f, v)}
+                onUpdateMonthCount={(mi, v) => updateMemberMonthCount(activeMembership.id, mi, v)}
+                onFillAll={v => fillAllMemberMonths(activeMembership.id, v)}
+                onDelete={() => removeMembership(activeMembership.id)}
+                isOnly={inv.memberships.length === 1}
+              />
+            )}
+
             <RowTotal label="Yhteensä kk 1" value={fmt(memberM1)} />
           </div>
 
