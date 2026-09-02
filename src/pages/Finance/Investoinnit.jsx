@@ -476,7 +476,7 @@ function MembershipEditor({ m, horisontti, onUpdate, onUpdateMonthCount, onFillA
                       value={val ?? ''}
                       onChange={e => onUpdateMonthCount(monthIdx, e.target.value)}
                       style={{
-                        fontSize: '.64rem', padding: '.15rem .05rem', height: 'auto',
+                        fontSize: '.7rem', padding: '.18rem .05rem', height: 'auto',
                         textAlign: 'center', width: '100%', minWidth: 0,
                       }}
                     />
@@ -721,7 +721,7 @@ export default function Investoinnit() {
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 340px) 1fr', gap: '1.25rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 420px) 1fr', gap: '1.25rem', alignItems: 'start' }}>
 
         {/* ── Left panel ──────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
