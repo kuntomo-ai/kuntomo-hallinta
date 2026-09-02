@@ -721,7 +721,7 @@ export default function Investoinnit() {
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 420px) 1fr', gap: '1.25rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(420px, 500px) 1fr', gap: '1.25rem', alignItems: 'start' }}>
 
         {/* ── Left panel ──────────────────────────────────────────────────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
