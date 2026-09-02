@@ -33,6 +33,22 @@ const CLR_GREEN = 'var(--green)'
 const CLR_RED   = 'var(--red)'
 const CLR_BLUE  = '#6366f1'
 
+const MONTH_ABBR         = ['Tam', 'Hel', 'Maa', 'Huh', 'Tou', 'Kes', 'Hei', 'Elo', 'Syy', 'Lok', 'Mar', 'Jou']
+const TILIKAUSI_VUOSI    = 2026  // tilikausi alkaa 1.5.2026
+const TILIKAUSI_KK_OFFSET = 4   // Toukokuu = 0-indeksoitu kuukausi 4
+
+function fiscalMonthLabel(monthIdx) {
+  const abs  = monthIdx + TILIKAUSI_KK_OFFSET
+  const year = TILIKAUSI_VUOSI + Math.floor(abs / 12)
+  return `${MONTH_ABBR[abs % 12]} '${String(year).slice(2)}`
+}
+function fiscalYearLabel(y) {
+  return `1.5.${TILIKAUSI_VUOSI + y}–30.4.${TILIKAUSI_VUOSI + y + 1}`
+}
+function fiscalYearShort(y) {
+  return `${TILIKAUSI_VUOSI + y}–'${String(TILIKAUSI_VUOSI + y + 1).slice(2)}`
+}
+
 // ── Billing type calculation ──────────────────────────────────────────────────
 // type 'kk':    amount per month, grows annually
 // type 'v':     amount per year, paid as lump sum in month 1 of each year, grows annually
@@ -88,7 +104,7 @@ function calcMonths(expenses, memberships, otherRevs, savings, deviceInvestments
     cum += netto
     return {
       kk: i + 1,
-      label: `Kk ${i + 1}`,
+      label: fiscalMonthLabel(i),
       tulot:          Math.round(tulot),
       menot:          Math.round(menot),
       laitteet:       Math.round(laitteet),
@@ -396,8 +412,6 @@ function ItemRow({ item, onUpdate, onDelete, maxMonth }) {
 }
 
 // ── Membership editor (monthly count grid) ───────────────────────────────────
-const MONTH_ABBR = ['Tam', 'Hel', 'Maa', 'Huh', 'Tou', 'Kes', 'Hei', 'Elo', 'Syy', 'Lok', 'Mar', 'Jou']
-
 function MembershipEditor({ m, horisontti, onUpdate, onUpdateMonthCount, onFillAll, onDelete, isOnly }) {
   const [fillValue, setFillValue] = useState('')
   const years = Math.ceil(horisontti / 12)
@@ -459,7 +473,7 @@ function MembershipEditor({ m, horisontti, onUpdate, onUpdateMonthCount, onFillA
               fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase',
               letterSpacing: '.06em', color: 'var(--text3)', marginBottom: '.28rem',
             }}>
-              Vuosi {y + 1}
+              {fiscalYearLabel(y)}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '.15rem' }}>
               {Array.from({ length: cols }, (_, k) => {
@@ -468,7 +482,7 @@ function MembershipEditor({ m, horisontti, onUpdate, onUpdateMonthCount, onFillA
                 return (
                   <div key={monthIdx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.07rem' }}>
                     <span style={{ fontSize: '.5rem', color: 'var(--text3)', userSelect: 'none' }}>
-                      {MONTH_ABBR[monthIdx % 12]}
+                      {MONTH_ABBR[(monthIdx + TILIKAUSI_KK_OFFSET) % 12]}
                     </span>
                     <input
                       className="input-field"
@@ -616,8 +630,9 @@ export default function Investoinnit() {
     Array.from({ length: Math.ceil(inv.horisontti / 12) }, (_, y) => {
       const slice = months.slice(y * 12, (y + 1) * 12)
       return {
-        year:  y + 1,
-        label: `Vuosi ${y + 1}`,
+        year:       y + 1,
+        label:      fiscalYearShort(y),
+        fullLabel:  fiscalYearLabel(y),
         Tulot: slice.reduce((s, m) => s + m.tulot, 0),
         Menot: slice.reduce((s, m) => s + m.menot, 0),
         Netto: slice.reduce((s, m) => s + m.netto, 0),
@@ -629,7 +644,7 @@ export default function Investoinnit() {
   const cumBreakEvenMonth = useMemo(() => { const i = months.findIndex(m => m.kumulatiivinen >= 0); return i === -1 ? null : i + 1 }, [months])
 
   const chartData = inv.horisontti > 24
-    ? months.map((m, i) => ({ ...m, label: i % 3 === 2 ? `Kk ${m.kk}` : '' }))
+    ? months.map((m, i) => ({ ...m, label: i % 3 === 2 ? MONTH_ABBR[(i + TILIKAUSI_KK_OFFSET) % 12] : '' }))
     : months
 
   // Month-1 totals from actual calculation (correct for all types)
@@ -698,13 +713,13 @@ export default function Investoinnit() {
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', marginBottom: '1.25rem' }}>
         {yearSummaries.map(y => (
           <div className="stat-card" key={y.year}>
-            <div className="stat-label">Vuosi {y.year} netto</div>
+            <div className="stat-label" title={y.fullLabel}>{y.label} netto</div>
             <div className="stat-value" style={{ color: y.Netto >= 0 ? CLR_GREEN : CLR_RED }}>{fmt(y.Netto)}</div>
             <div style={{ fontSize: '.7rem', color: 'var(--text3)' }}>Tulot {fmt(y.Tulot)} · Menot {fmt(y.Menot)}</div>
           </div>
         ))}
         <div className="stat-card">
-          <div className="stat-label">Kk 1 netto</div>
+          <div className="stat-label">{fiscalMonthLabel(0)} netto</div>
           <div className="stat-value" style={{ color: m1.netto >= 0 ? CLR_GREEN : CLR_RED }}>{fmt(m1.netto)}</div>
           <div style={{ fontSize: '.7rem', color: 'var(--text3)' }}>Tulot {fmt(m1.tulot)} · Menot {fmt(m1.menot)}</div>
         </div>
