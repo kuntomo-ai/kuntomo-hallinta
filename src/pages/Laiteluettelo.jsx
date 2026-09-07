@@ -12,8 +12,8 @@ const SIJAINNIT = ['Kaikki', 'linnakangas', 'Etu-Lyötty', 'Kempele']
 const empty = { sijainti: '', category: '', name: '', model: '', serial_number: '', price: '', purchase_date: '', notes: '', device_number: '', ohjevideo_url: '' }
 
 export default function Laiteluettelo() {
-  const { profile, isAdmin, role } = useAuth()
-  const canService = isAdmin || role === 'respa' || role === 'huolto'
+  const { profile, isAdmin, hasRole } = useAuth()
+  const canService = isAdmin || hasRole('respa') || hasRole('huolto')
 
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
