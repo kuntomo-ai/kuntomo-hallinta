@@ -4,4 +4,5 @@ dist
 .env.local
 .DS_Store
 .vercel
-scripts/
+# Backup config (ei koskaan commitoida)
+.kuntomo_backup_config
