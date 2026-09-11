@@ -1445,6 +1445,13 @@ export default function Sales() {
                   <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--violet)' }}>{tilitettava.toFixed(2)} €</div>
                   <div style={{ fontSize: '.62rem', color: 'var(--text3)', marginTop: '.15rem' }}>Käteinen ei sisälly · Lahjakortti −10% · Hyvinvointietu −5%</div>
                 </div>
+                {isAdmin && (
+                  <div>
+                    <div style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text3)', marginBottom: '.2rem' }}>Provisio (1,5% brutto)</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#D97706' }}>{(brutto * 0.015).toFixed(2)} €</div>
+                    <div style={{ fontSize: '.62rem', color: 'var(--text3)', marginTop: '.15rem' }}>1,5 % × {brutto.toFixed(2)} €</div>
+                  </div>
+                )}
               </div>
             )
           })()}
