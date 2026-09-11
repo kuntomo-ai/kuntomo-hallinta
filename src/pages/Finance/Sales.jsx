@@ -6,6 +6,7 @@ import VoiceMicButton, { parseVoiceTerapia, parseVoiceValmennus } from '../../co
 import Modal from '../../components/ui/Modal'
 import ReceiptModal from '../../components/ReceiptModal'
 import { validateImage, IMAGE_ACCEPT } from '../../lib/fileValidation'
+import Provisio from './Provisio'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,7 @@ const TABS = [
   { key: 'terapia', label: 'Terapiamyynti' },
   { key: 'valmennus', label: 'Valmennusmyynti' },
   { key: 'jasen', label: 'Jäsenmyynti' },
+  { key: 'provisio', label: 'Provisio', adminOnly: true },
 ]
 
 const MAKSUTAVAT_TERAPIA = [
@@ -1247,14 +1249,16 @@ export default function Sales() {
       </div>
 
       <div className="sub-tabs" style={{ marginBottom: '1.25rem' }}>
-        {TABS.map(t => (
+        {TABS.filter(t => !t.adminOnly || isAdmin).map(t => (
           <button key={t.key} className={`sub-tab${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}
       </div>
 
-      <div className="grid-sidebar-main" style={{ alignItems: 'start' }}>
+      {tab === 'provisio' && <Provisio />}
+
+      <div className="grid-sidebar-main" style={{ alignItems: 'start', display: tab === 'provisio' ? 'none' : undefined }}>
 
         {tab === 'terapia' && <TerapiaForm onSaved={fetchTerapia} />}
         {tab === 'valmennus' && <ValmennusForm onSaved={() => fetchOther('valmennus')} />}
