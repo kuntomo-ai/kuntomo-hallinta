@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Trash2, Edit2, ShoppingCart, Camera, Receipt } from 'lucide-react'
+import { Plus, Search, Trash2, Edit2, ShoppingCart, Camera, Receipt, CalendarDays } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import ReceiptModal from '../../components/ReceiptModal'
@@ -31,16 +31,33 @@ const TODAY = new Date().toISOString().slice(0, 10)
 
 const empty = { code: '', service: '', price: '', payment_method: '', sale_date: TODAY, notes: '' }
 
+function getExpiry(r) {
+  if (r.valid_until) return new Date(r.valid_until)
+  if (!r.sale_date) return null
+  const d = new Date(r.sale_date)
+  d.setFullYear(d.getFullYear() + 1)
+  return d
+}
+
+function isExpired(r) {
+  const used = r.used_amount || 0
+  const price = r.price || 0
+  if (used >= price && price > 0) return false
+  const exp = getExpiry(r)
+  return exp ? new Date() > exp : false
+}
+
 function statusBadge(r) {
   const used = r.used_amount || 0
   const price = r.price || 0
   if (used >= price && price > 0) return <span className="badge badge-red">Käytetty</span>
+  if (isExpired(r)) return <span className="badge" style={{ background: '#e5e7eb', color: '#6b7280' }}>Vanhentunut</span>
   if (used > 0) return <span className="badge badge-yellow">Osittain</span>
   return <span className="badge badge-green">Aktiivinen</span>
 }
 
 export default function Lahjakortit() {
-  const { profile } = useAuth()
+  const { profile, isAdmin } = useAuth()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -60,6 +77,11 @@ export default function Lahjakortit() {
 
   // Kuitti-modaali (listanäkymä)
   const [receiptModal, setReceiptModal] = useState(null)
+
+  // Jatka voimassaoloa (admin)
+  const [extendRow, setExtendRow] = useState(null)
+  const [extendDate, setExtendDate] = useState('')
+  const [extendSaving, setExtendSaving] = useState(false)
 
   // Kirjaa käyttö
   const [saleRow, setSaleRow] = useState(null)
@@ -212,6 +234,23 @@ export default function Lahjakortit() {
     await fetchData()
   }
 
+  function openExtend(r) {
+    const exp = getExpiry(r)
+    const defaultDate = exp ? exp.toISOString().slice(0, 10) : ''
+    setExtendRow(r)
+    setExtendDate(defaultDate)
+  }
+
+  async function handleExtend() {
+    if (!extendRow || !extendDate) return
+    setExtendSaving(true)
+    const { error } = await supabase.from('lahjakortit').update({ valid_until: extendDate }).eq('id', extendRow.id)
+    setExtendSaving(false)
+    if (error) { alert('Tallennus epäonnistui: ' + error.message); return }
+    setExtendRow(null)
+    await fetchData()
+  }
+
   async function handleDelete(id) {
     if (!confirm('Poistetaanko lahjakortti?')) return
     await supabase.from('lahjakortit').delete().eq('id', id)
@@ -257,7 +296,8 @@ export default function Lahjakortit() {
     r.service?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const active = rows.filter(r => (r.used_amount || 0) < (r.price || 0)).length
+  const active = rows.filter(r => (r.used_amount || 0) < (r.price || 0) && !isExpired(r)).length
+  const expired = rows.filter(r => isExpired(r)).length
   const totalValue = rows.reduce((s, r) => s + (r.price || 0), 0)
   const remainingValue = rows.reduce((s, r) => s + Math.max(0, (r.price || 0) - (r.used_amount || 0)), 0)
 
@@ -328,16 +368,16 @@ export default function Lahjakortit() {
           <div className="stat-value">{active}</div>
         </div>
         <div className="stat-card">
+          <div className="stat-label">Vanhentuneet</div>
+          <div className="stat-value" style={{ color: expired > 0 ? '#6b7280' : undefined }}>{expired}</div>
+        </div>
+        <div className="stat-card">
           <div className="stat-label">Kokonaisarvo</div>
           <div className="stat-value">{totalValue.toFixed(2)} €</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Jäljellä yhteensä</div>
           <div className="stat-value">{remainingValue.toFixed(2)} €</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Kortit yhteensä</div>
-          <div className="stat-value">{rows.length}</div>
         </div>
       </div>
 
@@ -359,6 +399,7 @@ export default function Lahjakortit() {
               <th>Jäljellä</th>
               <th>Maksutapa</th>
               <th>Myyty</th>
+              <th>Voimassa</th>
               <th>Tila</th>
               <th>Muistiinpanot</th>
               <th></th>
@@ -366,30 +407,42 @@ export default function Lahjakortit() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className="table-empty">Ladataan...</td></tr>
+              <tr><td colSpan={11} className="table-empty">Ladataan...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={10} className="table-empty">Ei lahjakortteja.</td></tr>
+              <tr><td colSpan={11} className="table-empty">Ei lahjakortteja.</td></tr>
             ) : filtered.map(r => {
               const remaining = Math.max(0, (r.price || 0) - (r.used_amount || 0))
               const isFullyUsed = (r.used_amount || 0) >= (r.price || 0) && (r.price || 0) > 0
+              const expired = isExpired(r)
+              const expiry = getExpiry(r)
+              const rowOpacity = expired ? 0.55 : 1
               return (
-                <tr key={r.id}>
+                <tr key={r.id} style={{ opacity: rowOpacity }}>
                   <td style={{ fontWeight: 700, fontFamily: 'monospace', letterSpacing: '.05em' }}>{r.code}</td>
                   <td style={{ fontSize: '.82rem' }}>{r.service || '—'}</td>
-                  <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{r.price != null ? r.price.toFixed(2) + ' €' : '—'}</td>
+                  <td style={{ fontWeight: 700, color: expired ? 'var(--text3)' : 'var(--violet)' }}>{r.price != null ? r.price.toFixed(2) + ' €' : '—'}</td>
                   <td style={{ color: 'var(--text3)' }}>{r.used_amount != null && r.used_amount > 0 ? r.used_amount.toFixed(2) + ' €' : '—'}</td>
-                  <td style={{ fontWeight: 600, color: remaining > 0 ? 'var(--green)' : 'var(--text4)' }}>
+                  <td style={{ fontWeight: 600, color: remaining > 0 && !expired ? 'var(--green)' : 'var(--text4)' }}>
                     {remaining > 0 ? remaining.toFixed(2) + ' €' : '—'}
                   </td>
                   <td>{r.payment_method || '—'}</td>
                   <td style={{ color: 'var(--text3)', fontSize: '.78rem' }}>{r.sale_date ? new Date(r.sale_date).toLocaleDateString('fi-FI') : '—'}</td>
+                  <td style={{ fontSize: '.78rem', color: expired ? '#dc2626' : 'var(--text3)', whiteSpace: 'nowrap' }}>
+                    {expiry ? expiry.toLocaleDateString('fi-FI') : '—'}
+                    {r.valid_until && <span style={{ marginLeft: 4, color: 'var(--violet)', fontSize: '.7rem' }}>✎</span>}
+                  </td>
                   <td>{statusBadge(r)}</td>
                   <td style={{ color: 'var(--text3)', fontSize: '.78rem', maxWidth: 140 }}>{r.notes || '—'}</td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.3rem' }}>
-                      {!isFullyUsed && (
+                      {!isFullyUsed && !expired && (
                         <button className="btn btn-primary btn-sm" title="Kirjaa käyttö" onClick={() => openSale(r)}>
                           <ShoppingCart size={13} />
+                        </button>
+                      )}
+                      {isAdmin && !isFullyUsed && (
+                        <button className="btn btn-ghost btn-sm" title="Jatka voimassaoloa" style={{ color: 'var(--violet)' }} onClick={() => openExtend(r)}>
+                          <CalendarDays size={13} />
                         </button>
                       )}
                       {r.receipt_url && (
@@ -453,6 +506,61 @@ export default function Lahjakortit() {
             existingReceiptPath={editReceiptPath}
             onRemoveExistingReceipt={() => setEditReceiptPath(null)}
           />
+        </Modal>
+      )}
+
+      {/* Jatka voimassaoloa */}
+      {extendRow && (
+        <Modal
+          title={`Voimassaolo — ${extendRow.code}`}
+          onClose={() => setExtendRow(null)}
+          footer={
+            <>
+              <button className="btn btn-ghost" onClick={() => setExtendRow(null)}>Peruuta</button>
+              <button className="btn btn-primary" onClick={handleExtend} disabled={extendSaving || !extendDate}>
+                {extendSaving ? 'Tallennetaan...' : 'Tallenna'}
+              </button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <div style={{ padding: '.6rem .9rem', background: 'var(--surface2)', borderRadius: 8, fontSize: '.85rem', gridColumn: '1 / -1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Myyty: <strong>{extendRow.sale_date ? new Date(extendRow.sale_date).toLocaleDateString('fi-FI') : '—'}</strong></span>
+                <span>Nykyinen voimassaolo: <strong style={{ color: isExpired(extendRow) ? '#dc2626' : undefined }}>
+                  {getExpiry(extendRow)?.toLocaleDateString('fi-FI') ?? '—'}
+                </strong></span>
+              </div>
+            </div>
+            <div className="input-group" style={{ gridColumn: '1 / -1' }}>
+              <label className="input-label">Uusi voimassaolopäivä</label>
+              <input
+                className="input-field"
+                type="date"
+                value={extendDate}
+                min={TODAY}
+                onChange={e => setExtendDate(e.target.value)}
+              />
+              <div style={{ display: 'flex', gap: '.5rem', marginTop: '.4rem', flexWrap: 'wrap' }}>
+                {[6, 12, 24].map(months => (
+                  <button key={months} className="btn btn-ghost btn-sm" onClick={() => {
+                    const d = new Date(extendRow.sale_date || TODAY)
+                    d.setMonth(d.getMonth() + months)
+                    setExtendDate(d.toISOString().slice(0, 10))
+                  }}>
+                    +{months} kk myyntipäivästä
+                  </button>
+                ))}
+                <button className="btn btn-ghost btn-sm" onClick={() => {
+                  const d = new Date()
+                  d.setFullYear(d.getFullYear() + 1)
+                  setExtendDate(d.toISOString().slice(0, 10))
+                }}>
+                  +1 v tänään
+                </button>
+              </div>
+            </div>
+          </div>
         </Modal>
       )}
 
