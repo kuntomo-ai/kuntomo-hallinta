@@ -1019,7 +1019,9 @@ export default function Sales() {
   async function fetchTerapia(activeTab) {
     setLoading(true)
     const data = await fetchAllPaginated(() => {
-      let q = supabase.from('terapiamyynti').select('*').order('entry_date', { ascending: false })
+      let q = supabase.from('terapiamyynti').select('*')
+        .order('entry_date', { ascending: false })
+        .order('created_at', { ascending: false })
       if (!isAdmin) q = q.eq('employee_id', user?.id)
       return q
     })
@@ -1032,7 +1034,12 @@ export default function Sales() {
   async function fetchOther(t) {
     setLoading(true)
     const data = await fetchAllPaginated(() => {
-      let q = supabase.from(TABLE_MAP[t]).select('*').order('created_at', { ascending: false })
+      let q = supabase.from(TABLE_MAP[t]).select('*')
+      if (t === 'valmennus') {
+        q = q.order('visit_date', { ascending: false }).order('created_at', { ascending: false })
+      } else {
+        q = q.order('created_at', { ascending: false })
+      }
       if (!isAdmin) q = q.eq('employee_id', user?.id)
       return q
     })
