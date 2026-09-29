@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 
 const PALVELUT = ['Fysiikkavalmennus', 'Jatkuva valmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Pienryhmä', 'Muu']
-const MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Eazybreak', 'SmartumPay', 'ePassi']
+const MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Eazybreak', 'Zevoy', 'ePassi', 'Wolt']
 
 const empty = { customer_name: '', service: PALVELUT[0], price: '', payment_method: MAKSUTAVAT[0], notes: '', recurring_months: null }
 

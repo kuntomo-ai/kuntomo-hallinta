@@ -24,7 +24,7 @@ const MAKSUTAVAT_TERAPIA = [
 const COMPANY_METHODS = ['Yrityslaskutus', 'Yrityskäynti']
 
 const VALMENNUS_PALVELUT = ['Jatkuva valmennus', 'Fysiikkavalmennus', 'Harjoitusohjelma', 'Harjoitusohjelman päivitys', 'Inbody mittaus', 'Muu']
-const VALMENNUS_MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Edenred', 'SmartumPay', 'ePassi']
+const VALMENNUS_MAKSUTAVAT = ['Käteinen', 'Kortti', 'Lasku', 'MobilePay', 'Lahjakortti', 'Edenred', 'Zevoy', 'ePassi', 'Wolt']
 const JASENYYSTUOTTEET = [
   { name: 'Kuntosali', price: 30 },
   { name: 'Päiväjäsenyys', price: 25 },
@@ -413,7 +413,7 @@ function TerapiaForm({ onSaved }) {
                 </label>
                 {m === 'Hyvinvointietu' && form.payment_methods.includes('Hyvinvointietu') && (
                   <div style={{ display: 'flex', gap: '1rem', marginLeft: '1.65rem', marginTop: '.3rem' }}>
-                    {['Smartum', 'Epassi', 'Edenred'].map(p => (
+                    {['Zevoy', 'Epassi', 'Edenred', 'Wolt'].map(p => (
                       <label key={p} style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer', fontSize: '.82rem', userSelect: 'none' }}>
                         <input type="radio" name="hve_provider" value={p}
                           checked={form.hve_provider === p}
