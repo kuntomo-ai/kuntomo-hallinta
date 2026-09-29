@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/" }
+    { "source": "/((?!api/)(?!.*\\.[a-zA-Z0-9]+$).*)", "destination": "/" }
   ],
   "crons": [
     { "path": "/api/cron/ig-daily", "schedule": "0 4 * * *" }
