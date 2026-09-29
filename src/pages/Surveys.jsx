@@ -263,6 +263,7 @@ export default function Surveys() {
         <button className={`sub-tab${tab === 'henkilosto' ? ' active' : ''}`} onClick={() => setTab('henkilosto')}>Henkilöstökysely</button>
         <button className={`sub-tab${tab === 'vaatetus' ? ' active' : ''}`} onClick={() => setTab('vaatetus')}>Vaatetilaus</button>
         <button className={`sub-tab${tab === 'ohjeet' ? ' active' : ''}`} onClick={() => setTab('ohjeet')}>Ohjeet</button>
+        <button className={`sub-tab${tab === 'fysipartners' ? ' active' : ''}`} onClick={() => setTab('fysipartners')}>Fysipartners</button>
       </div>
 
       {/* ── Henkilöstökysely ───────────────────────────────────────────────── */}
@@ -708,6 +709,67 @@ export default function Surveys() {
                 <li key={item} style={{ fontSize: '.88rem', color: 'var(--text2)', lineHeight: 1.55 }}>{item}</li>
               ))}
             </ul>
+          </section>
+
+        </div>
+      )}
+
+      {/* ── Fysipartners ────────────────────────────────────────────────── */}
+      {tab === 'fysipartners' && (
+        <div style={{ maxWidth: 760 }}>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.5rem', marginBottom: '.25rem' }}>Fysipartners — Extranet</h2>
+            <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Ohjeet Fysipartnersin extranet-järjestelmään kirjautumiseen</p>
+          </div>
+
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Kirjautuminen
+            </h3>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem', marginBottom: '1rem' }}>
+              Extranetin kirjautumissivulle pääset tästä linkistä:{' '}
+              <a href="https://secure.fpf.fi/extranet" target="_blank" rel="noopener noreferrer"
+                style={{ color: 'var(--violet)', fontWeight: 600 }}>
+                https://secure.fpf.fi/extranet
+              </a>
+            </p>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem', marginBottom: '1rem' }}>
+              Järjestelmä toimii kaikilla yleisesti käytössä olevilla nettiselaimilla.
+            </p>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem', marginBottom: '1rem' }}>
+              Kun olet kirjautunut sisään järjestelmään vahvalla tunnistautumisella ensimmäisen kerran, pääset jatkossa
+              sisään kaksivaiheisella tunnistautumisella. Eli syötä kirjautumissivulla käyttäjätunnuksesi ja keksimäsi
+              salasana niihin varattuihin kenttiin. Sen jälkeen järjestelmä lähettää puhelimeesi tekstiviestillä
+              kirjautumiskoodin, jonka syöttämällä pääset sisälle.
+            </p>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem' }}>
+              Vahva tunnistautuminen tulee uudelleen eteen, jos vaihdat järjestelmän sisällä salasanasi tai painat
+              kirjautumissivulla <strong>Salasana unohtunut</strong> -painiketta.
+            </p>
+          </section>
+
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Uuden käyttäjän ohje
+            </h3>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem', marginBottom: '1rem' }}>
+              Ensimmäistä kertaa kirjautuvan käyttäjän vaiheittainen ohje PDF-muodossa:
+            </p>
+            <a
+              href="/fysipartners-kirjautuminen.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '.5rem',
+                padding: '.6rem 1.1rem', borderRadius: 'var(--radius)',
+                background: 'var(--bg2)', border: '1px solid var(--border)',
+                color: 'var(--text)', fontWeight: 600, fontSize: '.88rem',
+                textDecoration: 'none',
+              }}
+            >
+              📄 Uuden käyttäjän kirjautuminen (PDF)
+            </a>
           </section>
 
         </div>
