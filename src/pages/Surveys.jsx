@@ -757,7 +757,7 @@ export default function Surveys() {
               Ensimmäistä kertaa kirjautuvan käyttäjän vaiheittainen ohje PDF-muodossa:
             </p>
             <a
-              href="/fysipartners-kirjautuminen.pdf"
+              href="https://ogboigmanmeepaoqepil.supabase.co/storage/v1/object/public/public-docs/fysipartners-kirjautuminen.pdf"
               target="_blank"
               rel="noopener noreferrer"
               style={{
