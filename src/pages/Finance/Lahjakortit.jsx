@@ -27,7 +27,7 @@ const SERVICES = [
   { label: 'Purentalihasfysioterapia 45 min – 65 €', value: 'Purentalihasfysioterapia 45min', price: '65' },
   { label: 'Purentalihasfysioterapia 60 min – 75 €', value: 'Purentalihasfysioterapia 60min', price: '75' },
   { label: 'Äitiysfysioterapia 60 min – 75 €', value: 'Äitiysfysioterapia 60min', price: '75' },
-  { label: 'Äitiysfysioterapia ensikäynti – 85 €', value: 'Äitiysfysioterapia ensikäynti', price: '85' },
+  { label: 'Äitiysfysioterapia ensikäynti – 88 €', value: 'Äitiysfysioterapia ensikäynti', price: '88' },
   { label: 'Äitiysfysioterapiapaketti – 155 €', value: 'Äitiysfysioterapiapaketti', price: '155' },
   { label: 'Vapaa summa', value: 'Vapaa summa', price: '' },
 ]
