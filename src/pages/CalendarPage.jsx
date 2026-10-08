@@ -587,64 +587,101 @@ Kaikille nykyisille jäsenille: kiitos kuluvasta vuodesta. Teette Kuntomosta sen
   ],
   hieronta: [
     {
-      otsikko: 'Kehon reset uudelle vuodelle! 🌟',
-      ingressi: 'Joulu jätti jälkensä – tammikuu on täydellinen aika antaa keholle kaipaamansa huolto.',
-      tarjous: 'Tammikuun reset-paketti: 2 hierontaa puolitoista hinnalla',
-      cta: 'Varaa hoito →',
-      sisalto: `Hyvä Kuntomon asiakas,
+      otsikko: 'Kipeä selkä tai jäykkä keho – lepoa vai liikettä? 💚',
+      ingressi: 'Monissa tuki- ja liikuntaelinvaivoissa sopivasti annosteltu liike voi edistää kuntoutumista paremmin kuin pelkkä lepo.',
+      tarjous: 'Kysy fysioterapeutiltamme, millainen liikkuminen sopii omaan tilanteeseesi',
+      cta: 'Varaa aika →',
+      sisalto: `Selkä tuntuu jäykältä, hartiat ovat jumissa tai polvi muistuttelee itsestään lenkin jälkeen. Ensimmäinen ajatus saattaa olla, että nyt kannattaa ottaa rauhallisesti. Joskus lepo on tarpeen, mutta monissa tuki- ja liikuntaelinvaivoissa sopivasti annosteltu liike voi edistää kuntoutumista.
 
-joulu on juhlinnan ja kiireiden aikaa – keho kerää sen aikana jännityksiä, rasitusta ja väsymystä tavalla, jota ei aina edes huomaa. Epäsäännölliset unet, lomaruoka, pitkät istumispäivät ja sosiaalinen kiire jättävät jälkensä.
+Keho on tehty liikkumaan
+Kun jokin paikka kipeytyy, alamme helposti varoa sitä. Lyhytaikainen kuormituksen keventäminen voi olla järkevää, mutta pitkään jatkuva liikkumisen välttäminen ei useinkaan ole paras ratkaisu. Tärkeintä on löytää sopiva tasapaino levon ja liikkumisen välillä.
 
-Tammikuu on täydellinen aika antaa keholle se huolto, jota se on ansainnut. Hieronta ja fysioterapia yhdistettynä tekevät merkittävän eron: lihasjännitykset laukeaa, verenkierto paranee ja keho palautuu rasituksesta tehokkaammin. Säännöllinen hoito tammikuussa rakentaa pohjan koko loppuvuodelle.
+Entä jos liikkuminen sattuu?
+Kaikki liikkeen aikana tuntuva kipu ei automaattisesti tarkoita vauriota, mutta kaikkea kipua ei myöskään pidä sivuuttaa. Fysioterapeutti voi auttaa selvittämään, millainen liikkuminen sopii tilanteeseesi ja miten kuormitusta lisätään turvallisesti.
 
-Tarjoamme tammikuun erityispakettia: kaksi hierontakertaa puolitoista hinnalla. Ensimmäinen kerta puhdistaa joulun jälkeisen jännityksen, toinen vakiinnuttaa hyvän olon pysyvämmäksi.
+Hieronta ja harjoittelu tukevat toisiaan
+Hieronta voi auttaa rentoutumaan ja lievittää lihasperäisiä oireita. Harjoittelulla voidaan kehittää voimaa, liikkeen hallintaa ja kuormituksensietokykyä. Käsittely ja liike eivät ole toistensa vaihtoehtoja.
 
-Ei tarvitse oireita – ennaltaehkäisevä hoito on kaikkein kustannustehokkain tapa pitää keho toimintakuntoisena. Varaa aika verkosta tai soita suoraan. Tammikuun ajat täyttyvät nopeasti.`,
+Pieni ajatus arkeen
+Seuraavan kerran, kun keho tuntuu jäykältä, pohdi: tarvitseeko kehoni lepoa vai voisiko kevyt kävely tai rauhallinen liikkuvuusharjoittelu tehdä hyvää? Jos olet epävarma, autamme mielellämme.
+
+Nähdään Kuntomolla! 💚
+Kuntomon hieronta- ja fysioterapiatiimi
+www.kuntomo.fi`,
     },
     {
-      otsikko: 'Talvikehon huolto ❄️',
-      ingressi: 'Kylmät lihakset, jäykkyys, niskakipu – talvi on kehon kovimpia kokeita. Kuumakivihieronta auttaa.',
-      tarjous: 'Helmikuun talvipaketti: 75 min kuumakivihieronta',
-      cta: 'Varaa →',
-      sisalto: `Hyvä Kuntomon asiakas,
+      otsikko: 'Entä jos kehosi ei kaipaa lisää suorittamista? 💚',
+      ingressi: 'Hyvinvoinnissa keskitymme usein siihen, mitä pitäisi tehdä enemmän. Mutta saako kehosi riittävästi aikaa palautua kaikesta siitä, mitä jo teet?',
+      tarjous: 'Kerro meille arjestasi – katsotaan yhdessä, miten kehon hyvinvointia voi tukea hoitojen välillä',
+      cta: 'Varaa aika →',
+      sisalto: `Liikut säännöllisesti, hoidat työsi ja huolehdit arjesta. Silti hartiat ovat kireät ja keho tuntuu väsyneeltä. Hyvinvoinnissa keskitymme usein siihen, mitä pitäisi tehdä enemmän. Mutta saako kehosi riittävästi aikaa palautua kaikesta siitä, mitä jo teet?
 
-helmikuussa Suomessa on kylmintä. Kehon lihakset reagoivat kylmyyteen supistumalla, mikä johtaa jäykkyyteen, kivuihin ja heikentyneeseen liikkuvuuteen – erityisesti niska-hartiaseudulla, selässä ja alaraajoissa. Moni tottuu tähän olotilaan ilman, että huomaa kuinka paljon paremmin keho voisi toimia.
+Kuormitus ei synny vain kuntosalilla
+Raskas työpäivä, huonosti nukuttu yö, kiireinen perhearki ja kova treeni voivat kaikki kuormittaa. Siksi palautumista kannattaa tarkastella kokonaisuutena.
 
-Kuumakivihieronta on talvinen erityishoidomme. Kuumat basalttikivet sulautuvat lihaksiin syvemmältä kuin kädet yksin, lämmittäen ja rentouttaen yhtä aikaa. Kivet pitävät lämmön pidempään – ja lihakset reagoivat syvempään rentoutumiseen kuin tavallisessa hieronnassa.
+Hieronta voi olla yksi tapa pysähtyä
+Monelle hieronta on harvoja hetkiä viikossa, jolloin ei tarvitse suorittaa mitään. Hieronta voi lievittää lihaskireyden tunnetta ja tarjota hengähdystauon. Palautumisen perustan muodostavat kuitenkin myös uni, ravinto, arjen tauot ja sopiva liikunta.
 
-Talvipaketti sisältää 75 minuutin kuumakivihieronnan, jossa käydään läpi selkä, niska-hartiaseutu ja jalat. Hoito on sopiva sekä ensimmäiselle hierontakäynnille että säännölliselle asiakkaalle.
+Kolme pientä palautumistekoa
+1. Jätä kalenteriin myös tyhjää tilaa.
+2. Vaihtele harjoittelun tehoa – jokaisen treenin ei tarvitse olla raskas.
+3. Kuuntele kehon viestejä ja tarkastele kokonaiskuormitusta.
 
-Helmikuussa vapaat ajat menevät nopeasti – varaa ajoissa. Nettivaraus käy ympäri vuorokauden tai soita suoraan meille.`,
+Kuntomolla katsomme kokonaisuutta
+Kerro hieronnassa tai fysioterapiassa myös siitä, millaista arkeasi elät. Voimme yhdessä pohtia, miten kehon hyvinvointia voisi tukea vastaanottokäyntien välillä. Hyvinvointi ei ole jatkuvaa suorittamista. Joskus se on myös lupa levätä.
+
+Nähdään Kuntomolla! 💚
+Kuntomon hieronta- ja fysioterapiatiimi
+www.kuntomo.fi`,
     },
     {
-      otsikko: 'Kevätaktivointi – ole valmis! 🌿',
-      ingressi: 'Ulkoliikunta alkaa – mutta talvijäykät lihakset ovat loukkaantumisriski. Ennaltaehkäise ajoissa.',
-      tarjous: 'Kevätaktivointikäynti: Lihashuolto + liikkuvuusohjelma',
-      cta: 'Varaa kevätaktivointikäynti →',
-      sisalto: `Hyvä Kuntomon asiakas,
+      otsikko: 'Kipu helpotti – mutta onko kehosi valmis palaamaan arkeen? 💚',
+      ingressi: 'Kivuttomuus ja täysi toimintakyky ovat eri asioita. Kuntoutus kannattaa viedä loppuun asti.',
+      tarjous: 'Jatka kuntoutusta kuntosalin puolella – kerro meille tavoitteesi, suunnitellaan yhdessä',
+      cta: 'Varaa aika →',
+      sisalto: `Polvesi on oireillut, mutta fysioterapian ja harjoittelun jälkeen kipu on vähentynyt. Mahtavaa! Tarkoittaako se silti, että kuntoutus on valmis? Ei välttämättä.
 
-maaliskuu tuo valoa, pidempiä päiviä ja halun liikkua enemmän. Ulkolenkki, pyöräily, pallopelit – keho aktivoituu talven jälkeen nopeasti. Mutta talven aikana jäykistyneet lihakset ja nivelet ovat loukkaantumisriski, jos aktivointi tapahtuu liian nopeasti ja ilman valmistelua.
+Kivuttomuus ja toimintakyky ovat eri asioita
+Kipu voi helpottaa ennen kuin lihasvoima, tasapaino, liikkeen hallinta tai kuormituksensietokyky ovat palautuneet. Saatat pystyä kävelemään normaalisti, mutta juokseminen tuntuu vielä epävarmalta.
 
-Ennaltaehkäisevä hieronta ennen kauden aloitusta on viisain sijoitus. Lihakset laukaistaan, nivelet tarkistetaan liikkuvuuden suhteen ja keho valmistellaan optimaaliselle tasolle – ennen kuin urheilukausi alkaa ja kuormitus kasvaa merkittävästi.
+Hoitopöydältä takaisin omaan elämään
+Kuntomolla fysioterapia voi jatkua kuntosalin puolella. Harjoittelussa voidaan keskittyä lihasvoiman palauttamiseen, tasapainoon, liikkeiden varmuuteen ja asteittaiseen paluuseen työn tai harrastusten pariin.
 
-Kevätaktivointikäynti sisältää koko kehon lihashuollon erityisellä painotuksella alaraajoihin, lantioon ja selkään. Mukaan saat kotiin liikkuvuusharjoitteet, joita voit tehdä itse ennen treenejä.
+Uskallatko luottaa kehoosi?
+Jos jokin liike on aiemmin aiheuttanut kipua, sitä saattaa varoa vielä oireiden helpottamisen jälkeen. Ammattilaisen kanssa harjoittelu voi auttaa palauttamaan luottamusta omaan kehoon.
 
-Varaa kevätaktivointikäynti maaliskuun aikana. Ennaltaehkäisy on aina halvempaa kuin loukkaantumisen hoitaminen – sekä rahallisesti että ajallisesti menetettyinä treenipäivinä.`,
+Mikä on seuraava tavoitteesi?
+Mieti, mitä haluaisit pystyä tekemään kolmen kuukauden kuluttua – ei vain sitä, mistä kivusta haluaisit eroon. Kerro tavoitteesi meille, niin suunnitellaan yhdessä, miten sitä kohti edetään.
+
+Nähdään Kuntomolla! 💚
+Kuntomon hieronta- ja fysioterapiatiimi
+www.kuntomo.fi`,
     },
     {
-      otsikko: 'Selkäkipu & etätyö 💻',
-      ingressi: 'Etätyön yleisin haitta on niska-hartiakipu. Hoidetaan se kunnolla – hieronta + ergonomiaohjaus.',
-      tarjous: 'Etätyöpaketti: 60 min hieronta + ergonomiaohjaus',
-      cta: 'Varaa etätyöpaketti →',
-      sisalto: `Hyvä Kuntomon asiakas,
+      otsikko: 'Yksi tuttu hoitopaikka – monta tapaa auttaa 💚',
+      ingressi: 'Oletko käynyt meillä hieronnassa jo vuosia – mutta tiedätkö, mitä kaikkea muuta Kuntomolta löytyy?',
+      tarjous: 'Kysy tutulta hierojaltasi: "Olisiko Kuntomolla jotakin muutakin, mistä voisin hyötyä?"',
+      cta: 'Tutustu palveluihin →',
+      sisalto: `Olet ehkä käynyt meillä hieronnassa jo vuosia. Mutta oletko miettinyt, mitä kaikkea muuta Kuntomolta löytyy? Saman katon alta löytyy osaamista monenlaisiin hyvinvoinnin, liikkumisen ja kuntoutumisen tarpeisiin.
 
-etätyö on muuttanut suomalaisten työskentelyasentoja merkittävästi. Kotitoimistojen ergonomia on useimmiten huonompi kuin toimistolla: näyttö liian alhaalla, tuoli väärän korkuinen, hiiri liian kaukana. Pitkät istumispäivät samassa asennossa johtavat niska-hartiakipuihin, selkäongelmiin ja päänsärkyyn.
+Kun tavallinen hieronta ei tunnu riittävän
+Leuan alueen jännitykset ja purentalihasten oireet voivat hyötyä niihin kohdistuvasta käsittelystä. Kuntomon palveluihin kuuluu purentalihashieronta sekä dry needling eli kuivaneulaus, jota voidaan harkita osaksi tiettyjen lihasperäisten oireiden hoitoa. Sopiva menetelmä valitaan aina yksilöllisesti.
 
-Fysioterapia ja hieronta yhdistettynä ergonomiaohjaukseen on todettu tehokkaimmaksi tavaksi hoitaa etätyön aiheuttamia vaivoja. Hieronta laukaisee olemassa olevat jännitykset – ergonomiaohjaus ehkäisee niiden syntymisen uudelleen. Pelkkä hieronta ilman tilanteen korjaamista on kuin tyhjennettyä ämpäriä: se täyttyy taas nopeasti.
+Kun haluat takaisin liikunnan pariin
+Fysioterapia ja urheilufysioterapia voivat auttaa vamman kuntouttamisessa, voimatasojen kehittämisessä ja paluussa omaan lajiin. Kuntomon kuntosalia voidaan hyödyntää osana kuntoutusta.
 
-Etätyöpakettimme sisältää: 60 minuutin niska-hartiahieronnan, ergonomia-arvion ja venyttelyohjeen kotiin.
+Kun elämäntilanne muuttuu
+Raskaus, synnytys, leikkaus tai pidempi liikkumattomuus voivat tuoda uusia tarpeita. Palveluvalikoimaan kuuluvat myös äitiysfysioterapia, raskausajan hieronta sekä leikkauksen jälkeinen kuntoutus.
 
-Paketti sopii niin niille, joilla on jo oireita, kuin niille jotka haluavat ehkäistä ne ennen kuin ne alkavat. Varaa aika – mainitse varauksessa, että haluat etätyöpaketin.`,
+Entä jos haluat vain voida paremmin?
+Aina ei tarvitse olla kipeä. Ehkä haluat vahvistaa kehoasi tai oppia harjoittelemaan kuntosalilla. Fysioterapian ja personal training -valmennuksen osaamisesta voi löytyä sopiva ratkaisu.
+
+Kysy seuraavalla käynnillä jotakin uutta
+Kysy tutulta hierojaltasi tai fysioterapeutiltasi: "Olisiko Kuntomolla jotakin muutakin, mistä voisin hyötyä?" Tärkeintä on, että löydät omaan tilanteeseesi sopivan avun.
+
+Nähdään Kuntomolla! 💚
+Kuntomon hieronta- ja fysioterapiatiimi
+www.kuntomo.fi`,
     },
     {
       otsikko: 'Juoksukausi alkaa! 🏃',
@@ -737,34 +774,50 @@ Syyshuoltomme on lokakuun erityishoito: 75 minuutin koko kehon hieronta lämmitt
 Säännöllinen hoito pitää kehon toimintakykyisenä läpi talven. Varaa oma aikasi – tai hanki lahjakortti sellaiselle läheiselle, jonka hyvinvoinnista välität.`,
     },
     {
-      otsikko: 'Laskettelukausi alkaa – oletko valmis? ⛷️',
-      ingressi: 'Talviurheilu kuormittaa kehoa yksipuolisesti. Valmistaudu ennen ensimmäistä rinnettä.',
-      tarjous: 'Talviurheiluvalmistautumishoito: Selkä, lonkat, polvet ja nilkat kuntoon',
-      cta: 'Varaa valmistautumishoito →',
-      sisalto: `Hyvä Kuntomon asiakas,
+      otsikko: 'Miksi sama lihasjumi palaa aina uudelleen? 💚',
+      ingressi: 'Hartiat rentoutuvat hieronnassa, mutta muutaman viikon kuluttua sama kireys palaa. Ehkä syy löytyy muualta kuin luulet.',
+      tarjous: 'Kerro hierojallesi, jos sama vaiva toistuu – pohditaan yhdessä uudenlainen lähestymistapa',
+      cta: 'Varaa aika →',
+      sisalto: `Tuttu tilanne? Tulet hierontaan, hartiat rentoutuvat ja olo tuntuu kevyeltä. Mutta muutaman päivän tai viikon kuluttua sama kireys alkaa taas hiipiä takaisin. Miksi näin käy?
 
-marraskuussa alkaa hiihtosesonki monelle suomalaiselle. Rinteille päästään ehkä vasta joulukuussa tai tammikuussa – mutta kehon valmistelu kannattaa aloittaa jo nyt.
+Lihasjumi voi olla viesti keholta
+Pitkät työpäivät, yksipuoliset asennot, vähäinen liikkuminen, kuormittava harjoittelu tai riittämätön palautuminen voivat vaikuttaa siihen, miltä kehossa tuntuu. Jos arjen kuormitus pysyy samanlaisena, myös tutut oireet voivat palata.
 
-Talviurheilu kuormittaa kehoa yllättävän yksipuolisesti. Laskettelu painottaa etureiden, pakaran ja alaraajojen lihaksia – ja tämä lihasepätasapaino yhdistettynä talven jäykkyyttä lisäävään kylmyyteen on resepti loukkaantumiselle. Yleisimmät lasketteluvammat ovat usein ehkäistävissä oikealla valmistautumisella.
+Hieronta ja fysioterapia täydentävät toisiaan
+Kuntomossa hieronnan ei tarvitse olla irrallinen hoitokerta. Hieroja voi auttaa lihaskireyksien ja kipujen lievittämisessä, ja fysioterapeutin kanssa voidaan tarvittaessa selvittää tarkemmin, millaiset tekijät vaikuttavat oireiden toistumiseen. Joskus ratkaisu löytyy pienistä muutoksista arjessa, toisinaan yksilöllisistä harjoitteista tai kuormituksen säätelystä.
 
-Talviurheiluvalmistautumishoito kattaa ne kehon osa-alueet, jotka kantavat suurimman kuormituksen: selkä, lonkkanivelet, etureidet, polvet ja nilkat. Lihasepätasapaino kartoitetaan ja korjataan, liikkuvuus varmistetaan ennen ensimmäistä rinnettä.
+Kolme asiaa, joita voit kokeilla jo tänään
+• Vaihtele työasentoa ja lisää pieniä liikehetkiä päivään.
+• Huolehdi sinulle sopivasta lihaskuntoharjoittelusta.
+• Kiinnitä huomiota uneen ja palautumiseen.
 
-Varaa hoito marraskuussa – se on parempi kuin hoitaa loukkaantumista helmikuussa. Toimiva keho antaa enemmän irti koko talvikaudesta.`,
+Meiltä saa kysyä! Kun seuraavan kerran tulet hierontaan, kerro rohkeasti, jos sama vaiva palaa jatkuvasti. Pohditaan yhdessä, voisiko tilanteeseesi löytyä uudenlainen lähestymistapa. Tavoitteemme ei ole vain helpottaa tämän päivän kireyttä, vaan auttaa sinua voimaan paremmin myös huomenna.
+
+Nähdään Kuntomolla! 💚
+Kuntomon hieronta- ja fysioterapiatiimi
+www.kuntomo.fi`,
     },
     {
-      otsikko: 'Joululahja itsellesi ja läheiselle! 🎁',
-      ingressi: 'Hyvinvointi on paras joululahja. Lahjakortit hierontaan – sopii kaikille ikäryhmille.',
-      tarjous: 'Joulupaketit ja lahjakortit alk. 55 € | Voimassa 6 kuukautta',
-      cta: 'Hanki joulupaketit →',
-      sisalto: `Hyvä Kuntomon asiakas,
+      otsikko: 'Pitääkö olla kipeä tullakseen fysioterapiaan? 💚',
+      ingressi: 'Moni ajattelee, että fysioterapeutille mennään vasta silloin, kun jokin oireilee. Fysioterapiasta voi olla hyötyä jo paljon ennen ongelmien ilmaantumista.',
+      tarjous: 'Kysy rohkeasti fysioterapeuteiltamme – ei tarvita oireita, riittää, että haluat pitää itsestäsi huolta',
+      cta: 'Varaa fysioterapia →',
+      sisalto: `Moni ajattelee, että fysioterapeutille mennään vasta silloin, kun selkä on kipeä, polvi oireilee tai jokin vamma estää liikkumisen. Fysioterapiasta voi kuitenkin olla hyötyä jo paljon ennen ongelmien ilmaantumista.
 
-joulu lähestyy – ja sen kanssa ikuinen kysymys: mitä lahjaksi sille, jolle on jo kaikki?
+Haluaisitko liikkua varmemmin?
+Ehkä haluaisit aloittaa kuntosaliharjoittelun, mutta et tiedä, millaiset liikkeet sopisivat sinulle. Tai olet huomannut, että tasapaino ei ole entisellään tai keho ei tunnu toimivan samalla tavalla kuin ennen. Fysioterapeutti voi auttaa arvioimaan liikkumistasi ja toimintakykyäsi sekä suunnittelemaan harjoittelua lähtökohdistasi.
 
-Hyvinvointi on joululahja, josta jokainen hyötyy. Kuntomon hierontalahjapaketteja saa kaikenkokoisina ja -hintaisina: rentouttava hieronta, urheiluhieronta, fysioterapia tai yhdistelmäpaketti useammasta hoidosta. Lahjakortti on voimassa 6 kuukautta ja sopii kaikille ikäryhmille.
+Hoitohuoneesta kuntosalille
+Kuntomon vahvuus on se, että fysioterapiaa voidaan toteuttaa myös kuntosalilla. Harjoittelu voi tarkoittaa jalkojen voiman, tasapainon tai olkapäiden toiminnan kehittämistä, turvallista kuntosaliharjoittelun aloittamista tai paluuta harrastukseen pitkän tauon jälkeen.
 
-Meillä on valmiit joululahjapaketteja hyllyssä – kauniisti paketoituina lahjakortteina. Voit ostaa ne salilta tai tilata postitse. Sähköinen lahjakortti toimitetaan sähköpostiin välittömästi – sopii myös joulupäivän yllätyslahjalle.
+Paras hetki huolehtia toimintakyvystä on jo tänään
+Voimaa, liikkuvuutta ja tasapainoa voi kehittää kaikenikäisenä. Sinun ei tarvitse olla huonossa kunnossa tullaksesi fysioterapiaan. Riittää, että haluat pitää itsestäsi huolta.
 
-Hinnat alkavat 55 eurosta yhden 60 minuutin hieronnan lahjakortille. Tarjolla on myös isommat paketit: 3 hieronnan sarja tai fysioterapia + hieronta -yhdistelmä. Hanki ajoissa – joululoman ajat varautuvat nopeasti.`,
+Kysy rohkeasti fysioterapeuteiltamme, miten voisit kehittää toimintakykyäsi.
+
+Nähdään Kuntomolla! 💚
+Kuntomon hieronta- ja fysioterapiatiimi
+www.kuntomo.fi`,
     },
   ],
   valmennus: [
@@ -1293,6 +1346,7 @@ function MarkkinointiTab() {
   const [filterAlue, setFilterAlue] = useState(null)
   const [filterCategory, setFilterCategory] = useState('')
   const [viewYear, setViewYear] = useState(new Date().getFullYear())
+  const [nlModal, setNlModal] = useState(null)
 
   useEffect(() => { fetchData() }, [])
 
@@ -1495,7 +1549,7 @@ function MarkkinointiTab() {
                                   <span style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: a.color, borderRadius: 3, padding: '1px 5px', flexShrink: 0, lineHeight: 1.7 }}>
                                     Kirje
                                   </span>
-                                  <span style={{ fontSize: '.68rem', color: 'var(--text2)', lineHeight: 1.4 }}>{nl.otsikko}</span>
+                                  <span style={{ fontSize: '.68rem', color: 'var(--text2)', lineHeight: 1.4, cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }} onClick={() => setNlModal({ nl, alue: a, monthIdx: i })}>{nl.otsikko}</span>
                                 </div>
                               )}
                             </div>
@@ -1509,6 +1563,31 @@ function MarkkinointiTab() {
             )
           })}
         </div>
+      )}
+
+      {nlModal && (
+        <Modal title={nlModal.nl.otsikko} onClose={() => setNlModal(null)} wide footer={
+          <button className="btn btn-ghost" onClick={() => setNlModal(null)}>Sulje</button>
+        }>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.1em', color: nlModal.alue?.color }}>
+              {nlModal.alue?.label} · {MONTH_NAMES[nlModal.monthIdx]}
+            </div>
+            {nlModal.nl.ingressi && <p style={{ fontSize: '.9rem', color: 'var(--text2)', fontStyle: 'italic', margin: 0 }}>{nlModal.nl.ingressi}</p>}
+            {nlModal.nl.sisalto && <p style={{ fontSize: '.85rem', color: 'var(--text)', lineHeight: 1.65, margin: 0, whiteSpace: 'pre-wrap' }}>{nlModal.nl.sisalto}</p>}
+            {nlModal.nl.tarjous && (
+              <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '.85rem 1rem' }}>
+                <div style={{ fontSize: '.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--text3)', marginBottom: '.25rem' }}>Tarjous / CTA</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--violet)' }}>{nlModal.nl.tarjous}</div>
+              </div>
+            )}
+            {nlModal.nl.cta && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', padding: '.45rem 1rem', background: nlModal.alue?.color, color: 'white', borderRadius: 99, fontSize: '.82rem', fontWeight: 700 }}>
+                {nlModal.nl.cta}
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
 
       {showModal && subTab === 'kalenteri' && (
