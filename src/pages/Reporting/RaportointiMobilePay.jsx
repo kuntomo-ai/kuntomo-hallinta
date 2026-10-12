@@ -264,6 +264,15 @@ function UploadCard({ onImported }) {
   )
 }
 
+// ─── Location config ─────────────────────────────────────────────────────────
+
+const LOCATIONS = [
+  { key: 'all',              label: 'Kaikki',      match: null },
+  { key: 'etu-lyotty',      label: 'Etu-Lyötty',  match: 'Kuntomo Etu-Lyötty' },
+  { key: 'kempele',         label: 'Kempele',      match: 'Kuntomo Kempele' },
+  { key: 'kuntomo',         label: 'Kuntomo',      match: 'Kuntomo' },
+]
+
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function RaportointiMobilePay() {
@@ -275,6 +284,7 @@ export default function RaportointiMobilePay() {
   const [rows, setRows]             = useState([])
   const [loading, setLoading]       = useState(true)
   const [reloadKey, setReloadKey]   = useState(0)
+  const [locKey, setLocKey]         = useState('all')
 
   useEffect(() => { fetchData() }, [period, customFrom, customTo, reloadKey])
 
@@ -303,10 +313,22 @@ export default function RaportointiMobilePay() {
     setLoading(false)
   }
 
+  // Filter by selected location (exact match; 'Kuntomo' must not match 'Kuntomo Kempele')
+  const locMatch = LOCATIONS.find(l => l.key === locKey)?.match
+  const filteredRows = locMatch
+    ? rows.filter(r => r.merchant_location === locMatch)
+    : rows
+
   // Split rows by type
-  const sales   = rows.filter(r => r.type === 'Toteutunut')
-  const fees    = rows.filter(r => r.type === 'Palkkiot vähennetty')
-  const payouts = rows.filter(r => r.type === 'Maksu suunniteltu')
+  const sales   = filteredRows.filter(r => r.type === 'Toteutunut')
+  const fees    = filteredRows.filter(r => r.type === 'Palkkiot vähennetty')
+  const payouts = filteredRows.filter(r => r.type === 'Maksu suunniteltu')
+
+  // Per-location breakdown for "Kaikki" view
+  const locBreakdown = LOCATIONS.filter(l => l.match).map(l => {
+    const s = rows.filter(r => r.type === 'Toteutunut' && r.merchant_location === l.match)
+    return { label: l.label, gross: s.reduce((a, r) => a + (r.amount || 0), 0), net: s.reduce((a, r) => a + (r.net_amount || 0), 0), count: s.length }
+  })
 
   const gross = sales.reduce((s, r) => s + (r.amount || 0), 0)
   const feesTotal = fees.reduce((s, r) => s + Math.abs(r.amount || 0), 0) +
@@ -316,7 +338,7 @@ export default function RaportointiMobilePay() {
   const avg = sales.length ? gross / sales.length : 0
   const payoutTotal = payouts.reduce((s, r) => s + Math.abs(r.amount || 0), 0)
 
-  // Chart: daily gross vs net
+  // Chart: daily gross vs net (filtered)
   const daily = {}
   sales.forEach(r => {
     const d = r.booking_date
@@ -376,6 +398,28 @@ export default function RaportointiMobilePay() {
       </div>
 
       <UploadCard onImported={() => setReloadKey(k => k + 1)} />
+
+      {/* Location selector */}
+      <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        {LOCATIONS.map(l => (
+          <button key={l.key} className={`sub-tab${locKey === l.key ? ' active' : ''}`} onClick={() => setLocKey(l.key)}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Per-location breakdown when Kaikki is selected */}
+      {locKey === 'all' && !loading && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '.75rem', marginBottom: '1.5rem' }}>
+          {locBreakdown.map(l => (
+            <div key={l.label} className="card" style={{ padding: '1rem' }}>
+              <div style={{ fontSize: '.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text3)', marginBottom: '.4rem' }}>{l.label}</div>
+              <div style={{ fontWeight: 800, fontSize: '1.15rem', color: 'var(--violet)' }}>{fmtEur(l.gross)}</div>
+              <div style={{ fontSize: '.75rem', color: 'var(--text3)', marginTop: '.15rem' }}>Netto {fmtEur(l.net)} · {l.count} kpl</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Period selector */}
       <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -496,6 +540,7 @@ export default function RaportointiMobilePay() {
               <thead>
                 <tr>
                   <th>Aika</th>
+                  {locKey === 'all' && <th>Toimipiste</th>}
                   <th>Summa</th>
                   <th>Palkkio</th>
                   <th>Netto</th>
@@ -504,14 +549,17 @@ export default function RaportointiMobilePay() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={5} className="table-empty">Ladataan…</td></tr>
+                  <tr><td colSpan={locKey === 'all' ? 6 : 5} className="table-empty">Ladataan…</td></tr>
                 ) : sales.length === 0 ? (
-                  <tr><td colSpan={5} className="table-empty">Ei tapahtumia valitulla aikavälillä.</td></tr>
+                  <tr><td colSpan={locKey === 'all' ? 6 : 5} className="table-empty">Ei tapahtumia valitulla aikavälillä.</td></tr>
                 ) : sales.slice(0, 500).map(r => (
                   <tr key={r.id}>
                     <td style={{ color: 'var(--text3)', fontSize: '.78rem', whiteSpace: 'nowrap' }}>
                       {r.transaction_time ? new Date(r.transaction_time).toLocaleString('fi-FI', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                     </td>
+                    {locKey === 'all' && (
+                      <td style={{ fontSize: '.72rem', color: 'var(--text3)' }}>{r.merchant_location?.replace('Kuntomo ', '') || '—'}</td>
+                    )}
                     <td style={{ fontWeight: 700, color: 'var(--violet)' }}>{fmtEur(r.amount)}</td>
                     <td style={{ color: 'var(--red, #DC2626)', fontSize: '.83rem' }}>{r.fee != null ? fmtEur(Math.abs(r.fee)) : '—'}</td>
                     <td style={{ fontWeight: 600, color: 'var(--green, #16A34A)' }}>{fmtEur(r.net_amount)}</td>
