@@ -23,6 +23,7 @@ import Tase from './pages/Finance/Tase'
 import Tulos from './pages/Finance/Tulos'
 import Kassavirta from './pages/Finance/Kassavirta'
 import KirjanpitoTuonti from './pages/Finance/KirjanpitoTuonti'
+import KirjanpitoRaportit from './pages/Finance/KirjanpitoRaportit'
 import Tilinpaatos from './pages/Finance/Tilinpaatos'
 import Ennuste from './pages/Finance/Ennuste'
 import Investoinnit from './pages/Finance/Investoinnit'
@@ -113,7 +114,7 @@ function AppRoutes() {
               <Route path="/finance/kirjanpito/tase" element={<RoleRoute><Tase /></RoleRoute>} />
               <Route path="/finance/kirjanpito/tulos" element={<RoleRoute><Tulos /></RoleRoute>} />
               <Route path="/finance/kirjanpito/kassavirta" element={<RoleRoute><Kassavirta /></RoleRoute>} />
-              <Route path="/finance/kirjanpito/raportit" element={<Navigate to="/finance/kirjanpito" replace />} />
+              <Route path="/finance/kirjanpito/liitteet" element={<RoleRoute><KirjanpitoRaportit /></RoleRoute>} />
               <Route path="/finance/kirjanpito/tilinpaatos" element={<RoleRoute><Tilinpaatos /></RoleRoute>} />
               <Route path="/finance/kirjanpito/ennuste" element={<RoleRoute><Ennuste /></RoleRoute>} />
               <Route path="/finance/kirjanpito/investoinnit" element={<RoleRoute><Investoinnit /></RoleRoute>} />

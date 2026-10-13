@@ -9,6 +9,7 @@ const LINKS = [
   { label: 'Tilinpäätös',   to: '/finance/kirjanpito/tilinpaatos' },
   { label: 'Investoinnit',  to: '/finance/kirjanpito/investoinnit' },
   { label: 'Tuo CSV',       to: '/finance/kirjanpito/tuonti' },
+  { label: 'Liitteet',      to: '/finance/kirjanpito/liitteet' },
 ]
 
 export default function KirjanpitoNav() {
