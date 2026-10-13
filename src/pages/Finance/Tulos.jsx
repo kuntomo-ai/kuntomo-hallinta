@@ -53,8 +53,13 @@ export default function Tulos() {
   const [fy, setFy] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
+  const [docs, setDocs] = useState([])
 
   useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    supabase.from('kirjanpito_documents').select('id,title,period,file_url').eq('document_type', 'Tuloslaskelma').order('period', { ascending: false })
+      .then(({ data }) => setDocs(data || []))
+  }, [])
 
   async function fetchData() {
     setLoading(true)
@@ -338,6 +343,19 @@ export default function Tulos() {
                 })}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {docs.length > 0 && (
+        <div className="card" style={{ padding: '1.25rem', marginTop: '1.5rem' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.88rem', marginBottom: '.75rem' }}>Liitteet</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem' }}>
+            {docs.map(d => (
+              <a key={d.id} href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                📄 {d.title}
+              </a>
+            ))}
           </div>
         </div>
       )}
