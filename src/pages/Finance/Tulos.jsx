@@ -158,19 +158,6 @@ export default function Tulos() {
             {bestMonth ? `Tulos: ${fmt(bestMonth.tilikauden_voitto)}` : ''}
           </div>
         </div>
-        {docs.length > 0 && (
-          <div className="stat-card">
-            <div className="stat-label">Liitteet</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', marginTop: '.4rem' }}>
-              {docs.map(d => (
-                <a key={d.id} href={d.file_url} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: '.8rem', color: 'var(--violet)', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-                  📄 {d.title}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Liikevaihto bar chart */}
@@ -359,6 +346,16 @@ export default function Tulos() {
           </div>
         </div>
       )}
+
+      {docs.map(d => (
+        <div key={d.id} className="card" style={{ padding: '1.25rem', marginTop: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem' }}>{d.title}</div>
+            <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">Avaa uudessa välilehdessä</a>
+          </div>
+          <iframe src={d.file_url} style={{ width: '100%', height: 700, border: 'none', borderRadius: 6 }} title={d.title} />
+        </div>
+      ))}
     </div>
   )
 }
