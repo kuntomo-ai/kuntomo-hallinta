@@ -158,6 +158,19 @@ export default function Tulos() {
             {bestMonth ? `Tulos: ${fmt(bestMonth.tilikauden_voitto)}` : ''}
           </div>
         </div>
+        {docs.length > 0 && (
+          <div className="stat-card">
+            <div className="stat-label">Liitteet</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', marginTop: '.4rem' }}>
+              {docs.map(d => (
+                <a key={d.id} href={d.file_url} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: '.8rem', color: 'var(--violet)', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                  📄 {d.title}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Liikevaihto bar chart */}
@@ -343,19 +356,6 @@ export default function Tulos() {
                 })}
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {docs.length > 0 && (
-        <div className="card" style={{ padding: '1.25rem', marginTop: '1.5rem' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '.88rem', marginBottom: '.75rem' }}>Liitteet</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.5rem' }}>
-            {docs.map(d => (
-              <a key={d.id} href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
-                📄 {d.title}
-              </a>
-            ))}
           </div>
         </div>
       )}
