@@ -29,6 +29,7 @@ const SERVICES = [
   { label: 'Äitiysfysioterapia 60 min – 75 €', value: 'Äitiysfysioterapia 60min', price: '75' },
   { label: 'Äitiysfysioterapia ensikäynti – 88 €', value: 'Äitiysfysioterapia ensikäynti', price: '88' },
   { label: 'Äitiysfysioterapiapaketti – 155 €', value: 'Äitiysfysioterapiapaketti', price: '155' },
+  { label: 'Liikunta', value: 'Liikunta', price: '' },
   { label: 'Vapaa summa', value: 'Vapaa summa', price: '' },
 ]
 
