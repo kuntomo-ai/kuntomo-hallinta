@@ -214,13 +214,8 @@ export default function Tase() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState(null)
-  const [docs, setDocs] = useState([])
 
   useEffect(() => { fetchData() }, [])
-  useEffect(() => {
-    supabase.from('kirjanpito_documents').select('id,title,period,file_url').eq('document_type', 'Tase').order('period', { ascending: false })
-      .then(({ data }) => setDocs(data || []))
-  }, [])
 
   async function fetchData() {
     setLoading(true)
@@ -335,15 +330,6 @@ export default function Tase() {
             </div>
           </div>
 
-          {docs.map(d => (
-            <div key={d.id} className="card" style={{ padding: '1.25rem', marginTop: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem' }}>{d.title}</div>
-                <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">Avaa uudessa välilehdessä</a>
-              </div>
-              <iframe src={d.file_url} style={{ width: '100%', height: 700, border: 'none', borderRadius: 6 }} title={d.title} />
-            </div>
-          ))}
         </>
       )}
     </div>
