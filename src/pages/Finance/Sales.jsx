@@ -68,6 +68,7 @@ function TerapiaForm({ onSaved }) {
   const [giftCard, setGiftCard] = useState(null)       // found lahjakortti row
   const [giftNotFound, setGiftNotFound] = useState(false)
   const [giftChecking, setGiftChecking] = useState(false)
+  const [vanhaHinta, setVanhaHinta] = useState(false)
 
   const [form, setForm] = useState({
     visit_date: TODAY,
@@ -121,6 +122,7 @@ function TerapiaForm({ onSaved }) {
       setGiftCode('')
       setGiftCard(null)
       setGiftNotFound(false)
+      setVanhaHinta(false)
     }
   }
 
@@ -460,6 +462,20 @@ function TerapiaForm({ onSaved }) {
                               <div style={{ color: 'var(--text2)', marginTop: '.2rem' }}>
                                 Valitse alla toinen maksutapa loppusummalle <strong>{(saleAmt - remaining).toFixed(2)} €</strong>.
                               </div>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginTop: '.5rem', cursor: 'pointer', userSelect: 'none' }}>
+                                <input type="radio" checked={vanhaHinta} onChange={() => setVanhaHinta(v => !v)}
+                                  style={{ accentColor: 'var(--violet)', cursor: 'pointer' }} />
+                                <span style={{ fontSize: '.82rem', fontWeight: 600, color: 'var(--text)' }}>Vanha hinta</span>
+                              </label>
+                              {vanhaHinta && (
+                                <div style={{ marginTop: '.4rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                                  <input className="input-field" type="number" step="0.01" min="0" placeholder="Syötä hinta"
+                                    style={{ maxWidth: 130 }}
+                                    value={form.price}
+                                    onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+                                  <span style={{ fontSize: '.8rem', color: 'var(--text3)' }}>€</span>
+                                </div>
+                              )}
                             </>
                           ) : (
                             <>
