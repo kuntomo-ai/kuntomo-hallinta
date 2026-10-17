@@ -7,7 +7,7 @@ import {
 import { Download, Upload, FileText, FileSpreadsheet, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import KirjanpitoNav from '../../components/KirjanpitoNav'
 import { supabase } from '../../lib/supabase'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -249,15 +249,22 @@ export default function Kassavirta() {
   const totalCosts0 = breakdown.reduce((s, b) => s + (b.value || 0), 0)
 
   // ── Viennit ──────────────────────────────────────────────────────────────
-  function exportExcel() {
+  async function exportExcel() {
     const rows = [
       ['Kk', 'Liikevaihto', 'Ulkopuoliset palv.', 'Ostot', 'Kiinteät kulut', 'Rahoitus', 'Kassavirta', 'Kumulatiivinen'],
       ...months.map(m => [m.label, m.liikevaihto, m.ulkopuoliset, m.ostot, m.kiinteat, m.rahoitus, m.kassavirta, m.kumulatiivinen]),
     ]
-    const ws = XLSX.utils.aoa_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Kassavirta')
-    XLSX.writeFile(wb, 'kassavirta_ennuste.xlsx')
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('Kassavirta')
+    rows.forEach(row => ws.addRow(row))
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'kassavirta_ennuste.xlsx'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   function exportPDF() {

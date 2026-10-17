@@ -13,11 +13,16 @@ export async function requireRole(req, allowedRoles) {
   if (userErr || !userData?.user) {
     return { error: 'invalid or expired token', status: 401 }
   }
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('role, roles')
-    .eq('id', userData.user.id)
-    .maybeSingle()
+  const [{ data: profile }, { data: employee, error: empError }] = await Promise.all([
+    supabaseAdmin.from('profiles').select('role, roles').eq('id', userData.user.id).maybeSingle(),
+    supabaseAdmin.from('employees').select('status').eq('auth_user_id', userData.user.id).maybeSingle(),
+  ])
+  if (empError) {
+    return { error: 'authorization check failed', status: 503 }
+  }
+  if (employee?.status === 'inactive') {
+    return { error: 'account inactive', status: 403 }
+  }
   const rolesArr = Array.isArray(profile?.roles) ? profile.roles.map(String) : []
   if (profile?.role) rolesArr.push(String(profile.role))
   const matched = rolesArr.some(r => allowedRoles.includes(r))

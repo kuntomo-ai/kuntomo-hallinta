@@ -32,9 +32,12 @@ export default async function handler(req, res) {
       .select('id, name, model, sijainti, device_number, ohjevideo_url')
       .eq('id', id)
       .maybeSingle()
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) return res.status(500).json({ error: 'Palvelinvirhe' })
     if (!data)  return res.status(404).json({ error: 'not found' })
-    return res.status(200).json(data)
+    return res.status(200).json({
+      ...data,
+      ohjevideo_url: /^https?:\/\//i.test(data.ohjevideo_url ?? '') ? data.ohjevideo_url : null,
+    })
   }
 
   // POST: vikailmoituksen lähetys — tiukempi limit (5/10min per IP+laite,
@@ -66,7 +69,7 @@ export default async function handler(req, res) {
       .select('id, name, sijainti, device_number')
       .eq('id', id)
       .maybeSingle()
-    if (devErr) return res.status(500).json({ error: devErr.message })
+    if (devErr) return res.status(500).json({ error: 'Palvelinvirhe' })
     if (!device) return res.status(404).json({ error: 'device not found' })
 
     // 1) Insert huoltohistoria
@@ -79,7 +82,7 @@ export default async function handler(req, res) {
       source: 'qr',
       tehty: false,
     })
-    if (histErr) return res.status(500).json({ error: histErr.message })
+    if (histErr) return res.status(500).json({ error: 'Palvelinvirhe' })
 
     // 2) Mark device as service_requested
     await supabaseAdmin
