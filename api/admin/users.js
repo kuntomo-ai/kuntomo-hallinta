@@ -14,6 +14,9 @@ import { requireRole } from '../_lib/requireRole.js'
 import { rateLimit, clientIp } from '../_lib/rateLimit.js'
 
 const BAN_100_YEARS = '876000h'
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isUuid(v) { return typeof v === 'string' && UUID_RE.test(v) }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -46,6 +49,7 @@ export default async function handler(req, res) {
 
     if (action === 'ban') {
       if (!uid) return res.status(400).json({ error: 'uid required' })
+      if (!isUuid(uid)) return res.status(400).json({ error: 'invalid uid' })
       const { error } = await supabaseAdmin.auth.admin.updateUserById(uid, { ban_duration: BAN_100_YEARS })
       if (error) return res.status(400).json({ error: error.message })
       return res.status(200).json({ ok: true })
@@ -53,6 +57,7 @@ export default async function handler(req, res) {
 
     if (action === 'unban') {
       if (!uid) return res.status(400).json({ error: 'uid required' })
+      if (!isUuid(uid)) return res.status(400).json({ error: 'invalid uid' })
       const { error } = await supabaseAdmin.auth.admin.updateUserById(uid, { ban_duration: 'none' })
       if (error) return res.status(400).json({ error: error.message })
       return res.status(200).json({ ok: true })
@@ -73,6 +78,7 @@ export default async function handler(req, res) {
 
     if (action === 'delete') {
       if (!uid) return res.status(400).json({ error: 'uid required' })
+      if (!isUuid(uid)) return res.status(400).json({ error: 'invalid uid' })
       const { error } = await supabaseAdmin.auth.admin.deleteUser(uid)
       if (error) {
         // Fallback: ban permanently + rename email so re-creation is possible

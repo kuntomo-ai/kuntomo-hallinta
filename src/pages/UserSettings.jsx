@@ -7,6 +7,7 @@ export default function UserSettings() {
   const { profile, user } = useAuth()
 
   // Password
+  const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [showNew, setShowNew] = useState(false)
@@ -25,13 +26,24 @@ export default function UserSettings() {
     e.preventDefault()
     setPwError('')
     setPwSuccess(false)
+    if (!currentPw) { setPwError('Syötä nykyinen salasana.'); return }
     if (newPw.length < 8) { setPwError('Salasanan tulee olla vähintään 8 merkkiä.'); return }
     if (newPw !== confirmPw) { setPwError('Uudet salasanat eivät täsmää.'); return }
     setPwSaving(true)
+    const { error: verifyErr } = await supabase.auth.signInWithPassword({
+      email: user?.email,
+      password: currentPw,
+    })
+    if (verifyErr) {
+      setPwSaving(false)
+      setPwError('Nykyinen salasana on väärä.')
+      return
+    }
     const { error: updateErr } = await supabase.auth.updateUser({ password: newPw })
     setPwSaving(false)
     if (updateErr) { setPwError('Salasanan vaihto epäonnistui: ' + updateErr.message); return }
     setPwSuccess(true)
+    setCurrentPw('')
     setNewPw('')
     setConfirmPw('')
     setTimeout(() => setPwSuccess(false), 4000)
@@ -175,6 +187,18 @@ export default function UserSettings() {
 
         <form onSubmit={handlePasswordChange} className="form-grid">
           <div className="input-group">
+            <label className="input-label">Nykyinen salasana</label>
+            <input
+              className="input-field"
+              type="password"
+              placeholder="••••••••"
+              value={currentPw}
+              onChange={e => setCurrentPw(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="input-group">
             <label className="input-label">Uusi salasana</label>
             <div style={{ position: 'relative' }}>
               <input
@@ -233,7 +257,7 @@ export default function UserSettings() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={pwSaving || !newPw || !confirmPw}
+            disabled={pwSaving || !currentPw || !newPw || !confirmPw}
             style={{ width: 'fit-content' }}
           >
             {pwSaving ? 'Vaihdetaan...' : 'Vaihda salasana'}
