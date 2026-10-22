@@ -24,6 +24,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.4",
     "recharts": "^3.10.1",
+    "resend": "^6.34.1",
     "rolldown": "^1.2.14"
   },
   "devDependencies": {
