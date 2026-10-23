@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { salivastaavaRole } from '../../lib/salivastaava'
+
+function siivousAssignedTo(locationSlug) {
+  const sv = salivastaavaRole(locationSlug)
+  return ['admin', sv, 'respa'].filter(Boolean).join(', ')
+}
 import {
   ChevronDown, ChevronUp, CheckCircle, AlertTriangle,
   Plus, Trash2, Camera, ArrowLeft, ChevronRight,
@@ -353,6 +359,17 @@ function VikaTab({ location }) {
           await supabase.from('siivous_fault_images').insert({ fault_id: fault.id, storage_path: path })
         } catch { /* non-fatal */ }
       }
+      try {
+        await supabase.from('tasks').insert({
+          title: `Siivous-vikailmoitus: ${category} — ${location.name}`,
+          description: `${description.trim()}\nIlmoittaja: ${reporterName}`,
+          status: 'avoin',
+          priority: 'high',
+          assigned_to: siivousAssignedTo(location.slug),
+          created_by: reporterName,
+          link: `/huolto/siivous/${location.slug}`,
+        })
+      } catch { /* non-fatal */ }
       setSubmitted(true)
     } catch (e) {
       setError(e.message || 'Tallentaminen epäonnistui')
@@ -627,7 +644,8 @@ function TarkastusTab({ location }) {
     setLoading(false)
   }
 
-  const canSubmit = rooms.every(r => roomData[r]?.status !== null)
+  const filledRooms = rooms.filter(r => roomData[r]?.status !== null)
+  const canSubmit = filledRooms.length > 0
 
   async function handleSubmit() {
     if (!canSubmit) return
@@ -642,7 +660,7 @@ function TarkastusTab({ location }) {
         .select('id').single()
       if (insErr) throw insErr
 
-      const roomRows = rooms.map((room, idx) => ({ inspection_id: inspection.id, room, status: roomData[room].status, notes: roomData[room].notes.trim() || null, sort_order: idx }))
+      const roomRows = filledRooms.map((room, idx) => ({ inspection_id: inspection.id, room, status: roomData[room].status, notes: roomData[room].notes.trim() || null, sort_order: idx }))
       const { data: insertedRooms, error: roomErr } = await supabase.from('siivous_inspection_rooms').insert(roomRows).select('id, room')
       if (roomErr) throw roomErr
 
@@ -659,6 +677,24 @@ function TarkastusTab({ location }) {
             } catch { /* non-fatal */ }
           }
         }
+      }
+      const huomRooms = filledRooms.filter(r => roomData[r]?.status === 'huomautettavaa')
+      if (huomRooms.length > 0) {
+        try {
+          const lines = huomRooms.map(r => {
+            const notes = roomData[r]?.notes?.trim()
+            return notes ? `• ${r}: ${notes}` : `• ${r}`
+          }).join('\n')
+          await supabase.from('tasks').insert({
+            title: `Tarkastushuomautus: ${location.name}`,
+            description: `Tarkastaja: ${inspectorName}\n${lines}`,
+            status: 'avoin',
+            priority: 'medium',
+            assigned_to: siivousAssignedTo(location.slug),
+            created_by: inspectorName,
+            link: `/huolto/siivous/${location.slug}`,
+          })
+        } catch { /* non-fatal */ }
       }
       setSubmitted(true)
       await load()
@@ -727,7 +763,11 @@ function TarkastusTab({ location }) {
       <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => { if (e.target.files[0] && activeImageRoom) setRoomData(p => ({ ...p, [activeImageRoom]: { ...p[activeImageRoom], images: [...(p[activeImageRoom].images || []), { file: e.target.files[0], preview: URL.createObjectURL(e.target.files[0]) }] } })) }} />
 
       {error && <div style={{ color: 'var(--red)', fontSize: '.82rem', marginBottom: '.75rem' }}>⚠️ {error}</div>}
-      {!canSubmit && <p style={{ fontSize: '.78rem', color: 'var(--text3)', textAlign: 'center', marginBottom: '.5rem' }}>Merkitse jokainen tila ennen lähettämistä</p>}
+      {canSubmit && filledRooms.length < rooms.length && (
+        <p style={{ fontSize: '.78rem', color: 'var(--text3)', textAlign: 'center', marginBottom: '.5rem' }}>
+          Tallennetaan {filledRooms.length}/{rooms.length} tilaa — merkitsemättömät jätetään pois
+        </p>
+      )}
       <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={!canSubmit || submitting} onClick={handleSubmit}>
         {submitting ? 'Tallennetaan...' : 'Tallenna tarkastus'}
       </button>
