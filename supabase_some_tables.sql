@@ -1,5 +1,7 @@
--- SOME-analytiikkataulut: YouTube, Google Search Console, LinkedIn
+-- SOME-analytiikkataulut: YouTube, Google Search Console
+-- Google OAuth token storage (RLS enabled, no client policies = service role only)
 -- Aja Supabase SQL Editorissa ennen kuin SOME-sivu hakee dataa.
+-- Turvallinen ajaa uudelleen: käyttää IF NOT EXISTS kaikkialla.
 
 -- ── YouTube ───────────────────────────────────────────────────────────────────
 
@@ -19,9 +21,13 @@ create table if not exists yt_channel_snapshots (
   subscribers bigint,
   total_views bigint,
   video_count int,
+  watch_time_minutes bigint,
   created_at timestamptz not null default now(),
   unique(channel_id, snapshot_date)
 );
+
+-- Migration: add column to existing installations
+alter table yt_channel_snapshots add column if not exists watch_time_minutes bigint;
 
 create table if not exists yt_videos (
   id text primary key,
@@ -77,54 +83,33 @@ create table if not exists gsc_top_queries (
   created_at timestamptz not null default now()
 );
 
--- ── LinkedIn ──────────────────────────────────────────────────────────────────
+-- ── Google OAuth token storage ────────────────────────────────────────────────
+-- RLS enabled, no policies → only service_role can access.
+-- anon ja authenticated roolit revoke'd explicitly.
 
-create table if not exists li_pages (
+create table if not exists google_oauth_tokens (
   id uuid primary key default gen_random_uuid(),
-  organization_id text not null unique,
-  name text,
-  vanity_name text,
-  is_active boolean not null default true,
+  email text not null unique,
+  access_token text not null,
+  refresh_token text not null,
+  expires_at timestamptz not null,
+  scopes text,
   created_at timestamptz not null default now()
 );
+alter table google_oauth_tokens enable row level security;
+revoke all on google_oauth_tokens from anon, authenticated;
 
-create table if not exists li_page_snapshots (
+-- OAuth state for CSRF protection (poistetaan callback-kutsussa, TTL 15 min)
+create table if not exists google_oauth_state (
   id uuid primary key default gen_random_uuid(),
-  page_id uuid not null references li_pages(id) on delete cascade,
-  snapshot_date date not null,
-  followers bigint,
-  impressions bigint,
-  reactions int,
-  comments int,
-  shares int,
-  created_at timestamptz not null default now(),
-  unique(page_id, snapshot_date)
-);
-
-create table if not exists li_posts (
-  id text primary key,
-  page_id uuid not null references li_pages(id) on delete cascade,
-  published_at timestamptz,
-  text_content text,
-  post_url text,
-  media_type text,
+  state text not null unique,
+  expires_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+alter table google_oauth_state enable row level security;
+revoke all on google_oauth_state from anon, authenticated;
 
-create table if not exists li_post_metrics (
-  id uuid primary key default gen_random_uuid(),
-  post_id text not null references li_posts(id) on delete cascade,
-  snapshot_date date not null,
-  impressions bigint,
-  clicks int,
-  reactions int,
-  comments int,
-  shares int,
-  created_at timestamptz not null default now(),
-  unique(post_id, snapshot_date)
-);
-
--- ── RLS: autentikoituneet käyttäjät voivat lukea kaiken ──────────────────────
+-- ── RLS: autentikoituneet käyttäjät voivat lukea analytiikkataulut ────────────
 
 alter table yt_channels enable row level security;
 alter table yt_channel_snapshots enable row level security;
@@ -133,19 +118,27 @@ alter table yt_video_metrics enable row level security;
 alter table gsc_properties enable row level security;
 alter table gsc_weekly_summary enable row level security;
 alter table gsc_top_queries enable row level security;
-alter table li_pages enable row level security;
-alter table li_page_snapshots enable row level security;
-alter table li_posts enable row level security;
-alter table li_post_metrics enable row level security;
 
-create policy "auth_read_yt_channels"         on yt_channels         for select to authenticated using (true);
-create policy "auth_read_yt_snapshots"        on yt_channel_snapshots for select to authenticated using (true);
-create policy "auth_read_yt_videos"           on yt_videos           for select to authenticated using (true);
-create policy "auth_read_yt_video_metrics"    on yt_video_metrics    for select to authenticated using (true);
-create policy "auth_read_gsc_properties"      on gsc_properties      for select to authenticated using (true);
-create policy "auth_read_gsc_weekly_summary"  on gsc_weekly_summary  for select to authenticated using (true);
-create policy "auth_read_gsc_top_queries"     on gsc_top_queries     for select to authenticated using (true);
-create policy "auth_read_li_pages"            on li_pages            for select to authenticated using (true);
-create policy "auth_read_li_page_snapshots"   on li_page_snapshots   for select to authenticated using (true);
-create policy "auth_read_li_posts"            on li_posts            for select to authenticated using (true);
-create policy "auth_read_li_post_metrics"     on li_post_metrics     for select to authenticated using (true);
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename='yt_channels' and policyname='auth_read_yt_channels') then
+    create policy "auth_read_yt_channels" on yt_channels for select to authenticated using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='yt_channel_snapshots' and policyname='auth_read_yt_snapshots') then
+    create policy "auth_read_yt_snapshots" on yt_channel_snapshots for select to authenticated using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='yt_videos' and policyname='auth_read_yt_videos') then
+    create policy "auth_read_yt_videos" on yt_videos for select to authenticated using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='yt_video_metrics' and policyname='auth_read_yt_video_metrics') then
+    create policy "auth_read_yt_video_metrics" on yt_video_metrics for select to authenticated using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='gsc_properties' and policyname='auth_read_gsc_properties') then
+    create policy "auth_read_gsc_properties" on gsc_properties for select to authenticated using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='gsc_weekly_summary' and policyname='auth_read_gsc_weekly_summary') then
+    create policy "auth_read_gsc_weekly_summary" on gsc_weekly_summary for select to authenticated using (true);
+  end if;
+  if not exists (select 1 from pg_policies where tablename='gsc_top_queries' and policyname='auth_read_gsc_top_queries') then
+    create policy "auth_read_gsc_top_queries" on gsc_top_queries for select to authenticated using (true);
+  end if;
+end $$;

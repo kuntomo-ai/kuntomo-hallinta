@@ -11,6 +11,11 @@ function fiDate(s) {
   if (!s) return '—'
   return new Date(s).toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' })
 }
+function pctDelta(curr, prev) {
+  if (curr == null || prev == null || prev === 0) return null
+  const d = curr - prev
+  return { d, pct: (d / prev) * 100 }
+}
 
 // ── Shared: not-connected placeholder ────────────────────────────────────────
 
@@ -28,6 +33,221 @@ function NotConnected({ platform, instructions }) {
         {instructions.map((step, i) => <li key={i}>{step}</li>)}
       </ol>
     </div>
+  )
+}
+
+// ── Google Connect button ─────────────────────────────────────────────────────
+
+function GoogleConnectButton() {
+  const [busy, setBusy] = useState(false)
+
+  async function handleConnect() {
+    setBusy(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setBusy(false); return }
+      const res = await fetch('/api/google/auth', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        window.location.href = `/some?google_error=${encodeURIComponent(err.error || 'auth_failed')}`
+        return
+      }
+      const { url } = await res.json()
+      window.location.href = url
+    } catch {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleConnect}
+      disabled={busy}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '.4rem',
+        background: '#4285F4', color: '#fff', fontWeight: 700, fontSize: '.85rem',
+        padding: '.55rem 1.1rem', borderRadius: 'var(--radius)',
+        border: 'none', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.7 : 1,
+      }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      {busy ? 'Yhdistetään...' : 'Yhdistä Google'}
+    </button>
+  )
+}
+
+// ── Yhteenveto tab ────────────────────────────────────────────────────────────
+
+function YhteenvetoTab({ isAdmin }) {
+  const [igSnap, setIgSnap] = useState(null)
+  const [igPrevSnap, setIgPrevSnap] = useState(null)
+  const [ytSnap, setYtSnap] = useState(null)
+  const [ytPrevSnap, setYtPrevSnap] = useState(null)
+  const [gscSummary, setGscSummary] = useState(null)
+  const [gscPrevSummary, setGscPrevSummary] = useState(null)
+  const [analysis, setAnalysis] = useState(null)
+  const [googleConnected, setGoogleConnected] = useState(true)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { fetchAll() }, [])
+
+  async function fetchAll() {
+    setLoading(true)
+    try {
+      const since = new Date(Date.now() - 14 * 86400e3).toISOString().slice(0, 10)
+
+      const [igAccRes, ytChRes, gscPropRes, anRes] = await Promise.all([
+        supabase.from('ig_accounts').select('id').eq('is_active', true).limit(1),
+        supabase.from('yt_channels').select('id').eq('is_active', true).limit(1),
+        supabase.from('gsc_properties').select('id').eq('is_active', true).limit(1),
+        supabase.from('ig_analyses').select('*').order('period_end', { ascending: false }).limit(1),
+      ])
+
+      const igAccId = igAccRes.data?.[0]?.id
+      const ytChId = ytChRes.data?.[0]?.id
+      const gscPropId = gscPropRes.data?.[0]?.id
+
+      setAnalysis(anRes.data?.[0] || null)
+
+      if (igAccId) {
+        const { data: snaps } = await supabase.from('ig_account_snapshots')
+          .select('*').eq('account_id', igAccId).gte('snapshot_date', since)
+          .order('snapshot_date', { ascending: true })
+        const rows = snaps || []
+        setIgSnap(rows[rows.length - 1] || null)
+        setIgPrevSnap(rows[0] || null)
+      }
+
+      if (!ytChRes.error && ytChId) {
+        const { data: snaps } = await supabase.from('yt_channel_snapshots')
+          .select('*').eq('channel_id', ytChId).gte('snapshot_date', since)
+          .order('snapshot_date', { ascending: true })
+        const rows = snaps || []
+        setYtSnap(rows[rows.length - 1] || null)
+        setYtPrevSnap(rows[0] || null)
+      } else if (!ytChId) {
+        setGoogleConnected(false)
+      }
+
+      if (!gscPropRes.error && gscPropId) {
+        const { data: rows } = await supabase.from('gsc_weekly_summary')
+          .select('*').eq('property_id', gscPropId)
+          .order('week_start', { ascending: false }).limit(2)
+        setGscSummary(rows?.[0] || null)
+        setGscPrevSummary(rows?.[1] || null)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) return <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text3)' }}>Ladataan...</div>
+
+  const igDelta = pctDelta(igSnap?.followers_count, igPrevSnap?.followers_count)
+  const ytDelta = pctDelta(ytSnap?.subscribers, ytPrevSnap?.subscribers)
+  const gscDelta = pctDelta(gscSummary?.clicks, gscPrevSummary?.clicks)
+
+  const channels = [
+    {
+      name: 'Instagram',
+      color: '#E4405F',
+      metric: 'Seuraajia',
+      value: igSnap ? fmtInt(igSnap.followers_count) : '—',
+      delta: igDelta,
+      deltaLabel: 'vs. 14 pv sitten',
+      sub: igSnap ? `Reach: ${fmtInt(igSnap.reach)}` : null,
+      connected: !!igSnap,
+    },
+    {
+      name: 'YouTube',
+      color: '#EF4444',
+      metric: 'Tilaajat',
+      value: ytSnap ? fmtInt(ytSnap.subscribers) : '—',
+      delta: ytDelta,
+      deltaLabel: 'vs. 14 pv sitten',
+      sub: ytSnap ? `Katselut: ${fmtInt(ytSnap.total_views)}` : null,
+      connected: !!ytSnap,
+    },
+    {
+      name: 'Google Search',
+      color: '#4285F4',
+      metric: 'Klikkaukset (vk)',
+      value: gscSummary ? fmtInt(gscSummary.clicks) : '—',
+      delta: gscDelta,
+      deltaLabel: 'vs. edellinen vk',
+      sub: gscSummary ? `CTR: ${gscSummary.ctr != null ? (gscSummary.ctr * 100).toFixed(1) + ' %' : '—'}` : null,
+      connected: !!gscSummary,
+    },
+  ]
+
+  return (
+    <>
+      {isAdmin && (
+        <div className="card" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '.88rem', marginBottom: '.15rem' }}>
+              {googleConnected ? 'Google yhdistetty' : 'Google ei ole yhdistetty'}
+            </div>
+            <div style={{ fontSize: '.79rem', color: 'var(--text3)' }}>
+              {googleConnected
+                ? 'Tili: info@kuntomo.fi · Voit yhdistää uudelleen jos token on vanhentunut.'
+                : 'Yhdistä Google-tili (info@kuntomo.fi) hakemaan YouTube ja Search Console -data.'}
+            </div>
+          </div>
+          <GoogleConnectButton />
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        {channels.map(ch => {
+          const isGood = ch.delta ? ch.delta.d >= 0 : null
+          return (
+            <div key={ch.name} className="stat-card" style={{ borderLeft: `3px solid ${ch.color}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginBottom: '.4rem' }}>
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: ch.color, flexShrink: 0 }} />
+                <span style={{ fontSize: '.75rem', color: 'var(--text3)', fontWeight: 600 }}>{ch.name}</span>
+              </div>
+              <div className="stat-label">{ch.metric}</div>
+              <div className="stat-value" style={{ fontSize: '1.5rem' }}>{ch.value}</div>
+              {ch.delta && ch.delta.d !== 0 && (
+                <div style={{ fontSize: '.72rem', color: isGood ? 'var(--green)' : 'var(--red)', fontWeight: 700, marginTop: '.2rem' }}>
+                  {ch.delta.d >= 0 ? '▲' : '▼'} {Math.abs(ch.delta.pct).toFixed(1)}% {ch.deltaLabel}
+                </div>
+              )}
+              {ch.sub && <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.2rem' }}>{ch.sub}</div>}
+              {!ch.connected && (
+                <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.2rem', fontStyle: 'italic' }}>ei dataa vielä</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="card" style={{ padding: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '.75rem' }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', margin: 0 }}>AI-yhteenveto (Instagram)</h3>
+          {analysis && (
+            <span style={{ fontSize: '.7rem', color: 'var(--text3)' }}>
+              {fiDate(analysis.period_start)} – {fiDate(analysis.period_end)}
+            </span>
+          )}
+        </div>
+        {!analysis ? (
+          <p style={{ color: 'var(--text3)', fontSize: '.82rem', margin: 0 }}>Ei yhteenvetoja vielä. Viikoittainen analyysi ajetaan maanantaisin.</p>
+        ) : (
+          <div className="markdown-body" style={{ fontSize: '.85rem', lineHeight: 1.55 }}>
+            <ReactMarkdown>{analysis.summary_md}</ReactMarkdown>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -219,7 +439,7 @@ function InstagramTab() {
 
 // ── YouTube tab ───────────────────────────────────────────────────────────────
 
-function YouTubeTab() {
+function YouTubeTab({ isAdmin }) {
   const [channels, setChannels] = useState([])
   const [snaps, setSnaps] = useState([])
   const [videos, setVideos] = useState([])
@@ -287,16 +507,20 @@ function YouTubeTab() {
 
   if (loading) return <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text3)' }}>Ladataan...</div>
   if (notConnected) return (
-    <NotConnected platform="YouTube" instructions={[
-      'Luo Google Cloud -projekti ja ota käyttöön YouTube Data API v3.',
-      'Luo API-avain ja lisää se Vercel-ympäristömuuttujiin: YOUTUBE_API_KEY',
-      'Lisää kanavasi ID yt_channels-tauluun Supabasessa (channel_id = UCxxxxxxx)',
-      'Aja supabase_some_tables.sql ensin, jos taulut puuttuvat vielä.',
-      'Cron-ajo (api/cron/some-daily.js) tallentaa dataa automaattisesti yöllä.',
-    ]} />
+    <div>
+      <NotConnected platform="YouTube" instructions={[
+        'Siirry Yhteenveto-välilehdelle ja klikkaa "Yhdistä Google" -nappia (vaatii admin-roolin).',
+        'Kirjaudu Google-tilillä info@kuntomo.fi ja hyväksy käyttöoikeudet.',
+        'Callback ohjaa takaisin SOME-sivulle — kanava löytyy automaattisesti.',
+        'Cron-ajo (api/cron/some-daily.js) tallentaa dataa automaattisesti yöllä.',
+      ]} />
+      {isAdmin && (
+        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <GoogleConnectButton />
+        </div>
+      )}
+    </div>
   )
-
-  const sel = channels.find(c => c.id === selected)
 
   return (
     <>
@@ -387,7 +611,7 @@ function YouTubeTab() {
 
 // ── Google Search Console tab ─────────────────────────────────────────────────
 
-function GoogleTab() {
+function GoogleTab({ isAdmin }) {
   const [properties, setProperties] = useState([])
   const [summaries, setSummaries] = useState([])
   const [queries, setQueries] = useState([])
@@ -430,21 +654,21 @@ function GoogleTab() {
       .slice(0, 15),
     [queries, selected, latestWeek])
 
-  function pctDelta(curr, prev) {
-    if (curr == null || prev == null || prev === 0) return null
-    const d = curr - prev
-    return { d, pct: (d / prev) * 100 }
-  }
-
   if (loading) return <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text3)' }}>Ladataan...</div>
   if (notConnected) return (
-    <NotConnected platform="Google Search Console" instructions={[
-      'Luo Google Cloud -projekti ja ota käyttöön Search Console API.',
-      'Lisää OAuth-tunnukset Vercel-ympäristömuuttujiin: GSC_CLIENT_ID, GSC_CLIENT_SECRET, GSC_REFRESH_TOKEN.',
-      'Hae refresh token OAuth Playground -palvelulla (scope: webmasters.readonly).',
-      'Lisää sivustosi gsc_properties-tauluun (site_url = sc-domain:kuntomo.com).',
-      'Cron-ajo (api/cron/some-daily.js) hakee dataa automaattisesti maanantaisin.',
-    ]} />
+    <div>
+      <NotConnected platform="Google Search Console" instructions={[
+        'Siirry Yhteenveto-välilehdelle ja klikkaa "Yhdistä Google" -nappia (vaatii admin-roolin).',
+        'Kirjaudu Google-tilillä info@kuntomo.fi ja hyväksy käyttöoikeudet.',
+        'Callback ohjaa takaisin SOME-sivulle — sivusto löytyy automaattisesti.',
+        'Cron-ajo (api/cron/some-daily.js) hakee dataa automaattisesti maanantaisin.',
+      ]} />
+      {isAdmin && (
+        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <GoogleConnectButton />
+        </div>
+      )}
+    </div>
   )
 
   const statCards = [
@@ -537,191 +761,74 @@ function GoogleTab() {
   )
 }
 
-// ── LinkedIn tab ──────────────────────────────────────────────────────────────
-
-function LinkedInTab() {
-  const [pages, setPages] = useState([])
-  const [snaps, setSnaps] = useState([])
-  const [posts, setPosts] = useState([])
-  const [postMetrics, setPostMetrics] = useState([])
-  const [selected, setSelected] = useState(null)
-  const [notConnected, setNotConnected] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => { fetchAll() }, [])
-
-  async function fetchAll() {
-    setLoading(true)
-    const since = new Date(Date.now() - LOOKBACK_DAYS * 86400e3).toISOString().slice(0, 10)
-    const [pageRes, snapRes, postRes] = await Promise.all([
-      supabase.from('li_pages').select('*').eq('is_active', true).order('name'),
-      supabase.from('li_page_snapshots').select('*').gte('snapshot_date', since).order('snapshot_date', { ascending: true }),
-      supabase.from('li_posts').select('*').order('published_at', { ascending: false }).limit(50),
-    ])
-    if (pageRes.error) { setNotConnected(true); setLoading(false); return }
-    const pg = pageRes.data || []
-    setPages(pg)
-    if (!pg.length) { setNotConnected(true); setLoading(false); return }
-    setSelected(s => s ?? pg[0]?.id ?? null)
-    setSnaps(snapRes.data || [])
-    setPosts(postRes.data || [])
-
-    const postIds = (postRes.data || []).map(p => p.id)
-    if (postIds.length) {
-      const { data: met } = await supabase
-        .from('li_post_metrics')
-        .select('*')
-        .in('post_id', postIds)
-        .order('snapshot_date', { ascending: false })
-      setPostMetrics(met || [])
-    }
-    setLoading(false)
-  }
-
-  const pageSnaps = useMemo(() => snaps.filter(s => s.page_id === selected), [snaps, selected])
-  const latestSnap = pageSnaps[pageSnaps.length - 1] || null
-  const chartData = useMemo(() => pageSnaps.map(s => ({
-    pvm: fiDate(s.snapshot_date),
-    seuraajat: s.followers ?? 0,
-    nayttokerrat: s.impressions ?? 0,
-  })), [pageSnaps])
-  const pagePosts = useMemo(() => {
-    const since = new Date(Date.now() - LOOKBACK_DAYS * 86400e3).toISOString()
-    return posts.filter(p => p.page_id === selected && (!p.published_at || p.published_at >= since))
-  }, [posts, selected])
-  const latestMetricByPost = useMemo(() => {
-    const m = new Map()
-    for (const row of postMetrics) { if (!m.has(row.post_id)) m.set(row.post_id, row) }
-    return m
-  }, [postMetrics])
-  // Show recent posts; sort by metrics if available, otherwise by date
-  const topPosts = useMemo(() => {
-    const withMetrics = pagePosts.filter(p => latestMetricByPost.has(p.id))
-    if (withMetrics.length >= 3) {
-      return withMetrics
-        .sort((a, b) => (latestMetricByPost.get(b.id)?.impressions || 0) - (latestMetricByPost.get(a.id)?.impressions || 0))
-        .slice(0, 5)
-        .map(p => ({ p, mx: latestMetricByPost.get(p.id) }))
-    }
-    return pagePosts.slice(0, 5).map(p => ({ p, mx: latestMetricByPost.get(p.id) || null }))
-  }, [pagePosts, latestMetricByPost])
-  const trendDiff = useMemo(() => {
-    if (pageSnaps.length < 2) return null
-    const first = pageSnaps[0], last = pageSnaps[pageSnaps.length - 1]
-    const diff = (last.followers || 0) - (first.followers || 0)
-    return { diff, pct: first.followers ? (diff / first.followers) * 100 : null }
-  }, [pageSnaps])
-
-  if (loading) return <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text3)' }}>Ladataan...</div>
-  if (notConnected) return (
-    <NotConnected platform="LinkedIn" instructions={[
-      'Luo LinkedIn Developer -sovellus osoitteessa developer.linkedin.com.',
-      'Pyydä Community Management API -oikeudet yrityssivullesi.',
-      'Lisää access token ympäristömuuttujiin: LINKEDIN_ACCESS_TOKEN.',
-      'Lisää yrityksesi LinkedIn-sivun URN li_pages-tauluun (organization_id = urn:li:organization:xxxxxxx).',
-      'Cron-ajo (api/cron/some-daily.js) hakee dataa automaattisesti maanantaisin.',
-    ]} />
-  )
-
-  return (
-    <>
-      <div className="stats-grid" style={{ marginBottom: '1.5rem' }}>
-        <div className="stat-card">
-          <div className="stat-label">Seuraajat</div>
-          <div className="stat-value gold">{fmtInt(latestSnap?.followers)}</div>
-          {trendDiff && trendDiff.diff !== 0 && (
-            <div style={{ fontSize: '.72rem', color: trendDiff.diff >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 700, marginTop: '.25rem' }}>
-              {trendDiff.diff >= 0 ? '▲' : '▼'} {fmtInt(Math.abs(trendDiff.diff))}{trendDiff.pct != null ? ` (${trendDiff.pct.toFixed(1)}%)` : ''} vs. {LOOKBACK_DAYS} pv sitten
-            </div>
-          )}
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Näyttökerrat (vk)</div>
-          <div className="stat-value">{fmtInt(latestSnap?.impressions)}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Reaktiot (vk)</div>
-          <div className="stat-value">{fmtInt(latestSnap?.reactions)}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Julkaisuja {LOOKBACK_DAYS} pv</div>
-          <div className="stat-value">{pagePosts.length}</div>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
-        <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '.75rem' }}>Seuraajamäärän kehitys</h3>
-        {chartData.length < 2 ? (
-          <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Ei riittävästi snapshotteja vielä.</p>
-        ) : (
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-              <XAxis dataKey="pvm" tick={{ fontSize: 10, fill: 'var(--text3)' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} />
-              <Tooltip />
-              <Line type="monotone" dataKey="seuraajat" stroke="#0077B5" strokeWidth={2.5} dot={false} name="Seuraajat" />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-
-      <div className="card" style={{ padding: '1rem' }}>
-        <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '.75rem' }}>Parhaat julkaisut (näyttökerrat)</h3>
-        {topPosts.length === 0 ? (
-          <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Ei julkaisuja {LOOKBACK_DAYS} päivän aikana.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-            {topPosts.map(({ p, mx }) => (
-              <div key={p.id} style={{ padding: '.6rem', background: 'var(--bg2)', borderRadius: 'var(--radius)' }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '.5rem', marginBottom: '.3rem' }}>
-                  <span style={{ fontSize: '.72rem', color: 'var(--text3)' }}>{fiDate(p.published_at)}</span>
-                  {p.post_url && (
-                    <a href={p.post_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--violet)', fontSize: '.72rem', display: 'inline-flex', alignItems: 'center', gap: 3, textDecoration: 'none' }}>
-                      Avaa <ExternalLink size={11} />
-                    </a>
-                  )}
-                </div>
-                <div style={{ fontSize: '.82rem', color: 'var(--text2)', marginBottom: '.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {p.text_content || <em style={{ color: 'var(--text3)' }}>(ei tekstiä)</em>}
-                </div>
-                {mx && (
-                  <div style={{ display: 'flex', gap: '.85rem', fontSize: '.72rem', color: 'var(--text3)' }}>
-                    {mx.impressions != null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Eye size={11} /> {fmtInt(mx.impressions)}</span>}
-                    {mx.reactions != null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Heart size={11} /> {fmtInt(mx.reactions)}</span>}
-                    {mx.comments != null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><MessageCircle size={11} /> {fmtInt(mx.comments)}</span>}
-                    {mx.shares != null && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><Share2 size={11} /> {fmtInt(mx.shares)}</span>}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </>
-  )
-}
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 const CHANNEL_TABS = [
+  { id: 'yhteenveto', label: 'Yhteenveto' },
   { id: 'instagram', label: 'Instagram' },
   { id: 'youtube', label: 'YouTube' },
   { id: 'google', label: 'Google' },
-  { id: 'linkedin', label: 'LinkedIn' },
 ]
 
 export default function Some() {
-  const [channel, setChannel] = useState('instagram')
+  const [channel, setChannel] = useState('yhteenveto')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [notification, setNotification] = useState(null)
+
+  useEffect(() => {
+    checkRole()
+    handleGoogleParams()
+  }, [])
+
+  async function checkRole() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: profile } = await supabase.from('profiles').select('role, roles').eq('id', user.id).maybeSingle()
+    const rolesArr = Array.isArray(profile?.roles) ? profile.roles.map(String) : []
+    if (profile?.role) rolesArr.push(String(profile.role))
+    setIsAdmin(rolesArr.includes('admin'))
+  }
+
+  function handleGoogleParams() {
+    const params = new URLSearchParams(window.location.search)
+    const google = params.get('google')
+    const googleError = params.get('google_error')
+    if (google === 'connected') {
+      setNotification({ type: 'success', msg: 'Google yhdistetty onnistuneesti! Data päivittyy yöllä.' })
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (googleError) {
+      setNotification({ type: 'error', msg: `Google-yhteys epäonnistui: ${googleError}` })
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }
 
   return (
     <div>
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">SOME-analytiikka</h1>
-          <p className="page-subtitle">Instagram · YouTube · Google · LinkedIn</p>
+          <p className="page-subtitle">Instagram · YouTube · Google Search Console</p>
         </div>
       </div>
+
+      {notification && (
+        <div style={{
+          padding: '.75rem 1rem',
+          marginBottom: '1.25rem',
+          borderRadius: 'var(--radius)',
+          background: notification.type === 'success' ? 'var(--green-bg, #dcfce7)' : 'var(--red-bg, #fee2e2)',
+          color: notification.type === 'success' ? 'var(--green, #16a34a)' : 'var(--red, #dc2626)',
+          fontSize: '.85rem',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '.5rem',
+        }}>
+          <span>{notification.msg}</span>
+          <button onClick={() => setNotification(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: 'inherit', padding: 0, lineHeight: 1 }}>✕</button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         {CHANNEL_TABS.map(ch => (
@@ -735,10 +842,10 @@ export default function Some() {
         ))}
       </div>
 
+      {channel === 'yhteenveto' && <YhteenvetoTab isAdmin={isAdmin} />}
       {channel === 'instagram' && <InstagramTab />}
-      {channel === 'youtube' && <YouTubeTab />}
-      {channel === 'google' && <GoogleTab />}
-      {channel === 'linkedin' && <LinkedInTab />}
+      {channel === 'youtube' && <YouTubeTab isAdmin={isAdmin} />}
+      {channel === 'google' && <GoogleTab isAdmin={isAdmin} />}
     </div>
   )
 }

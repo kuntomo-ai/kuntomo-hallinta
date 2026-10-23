@@ -1,26 +1,24 @@
-// YouTube Data API v3 daily sync — ei vaadi OAuth, vain API-avain.
-// Hakee kanavat yt_channels-taulusta, tallentaa snapshots + videot + metriikat.
+// YouTube daily sync via Google OAuth (no API key).
+// Fetches channel stats + recent video metrics + weekly watch time.
 import { supabaseAdmin } from '../../lib/supabaseAdmin.js'
 import { requireCron } from '../_lib/auth.js'
+import { getGoogleToken } from '../_lib/googleOAuth.js'
 
-const YT_BASE = 'https://www.googleapis.com/youtube/v3'
+const YT_DATA_BASE = 'https://www.googleapis.com/youtube/v3'
 
-async function ytGet(path, params) {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) throw new Error('YOUTUBE_API_KEY not configured')
-  const url = new URL(`${YT_BASE}${path}`)
-  url.searchParams.set('key', apiKey)
+async function ytGet(path, params, token) {
+  const url = new URL(`${YT_DATA_BASE}${path}`)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v))
-  const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(`YouTube API ${res.status}: ${await res.text()}`)
+  const res = await fetch(url.toString(), { headers: { 'Authorization': `Bearer ${token}` } })
+  if (!res.ok) throw new Error(`YouTube Data API ${res.status}: ${await res.text()}`)
   return res.json()
 }
 
-async function syncChannel(ch) {
+async function syncChannel(ch, token) {
   const today = new Date().toISOString().slice(0, 10)
 
   // 1. Channel statistics
-  const chData = await ytGet('/channels', { part: 'statistics', id: ch.channel_id })
+  const chData = await ytGet('/channels', { part: 'statistics', id: ch.channel_id }, token)
   const stats = chData.items?.[0]?.statistics
   if (!stats) return { error: `No channel data for ${ch.channel_id}` }
 
@@ -34,31 +32,33 @@ async function syncChannel(ch) {
   if (snapErr) return { error: `snapshot write failed: ${snapErr.message}` }
 
   // Update channel title/handle if missing
-  const chInfo = await ytGet('/channels', { part: 'snippet', id: ch.channel_id })
-  const snippet = chInfo.items?.[0]?.snippet
-  if (snippet && (!ch.title || !ch.handle)) {
-    await supabaseAdmin.from('yt_channels').update({
-      title: snippet.title || ch.title,
-      handle: snippet.customUrl || ch.handle,
-    }).eq('id', ch.id)
+  if (!ch.title || !ch.handle) {
+    const chInfo = await ytGet('/channels', { part: 'snippet', id: ch.channel_id }, token)
+    const snippet = chInfo.items?.[0]?.snippet
+    if (snippet) {
+      await supabaseAdmin.from('yt_channels').update({
+        title: snippet.title || ch.title,
+        handle: snippet.customUrl || ch.handle,
+      }).eq('id', ch.id)
+    }
   }
 
-  // 2. Recent videos (latest 15)
+  // 3. Recent videos (latest 15)
   const searchData = await ytGet('/search', {
     part: 'snippet',
     channelId: ch.channel_id,
     order: 'date',
     maxResults: 15,
     type: 'video',
-  })
+  }, token)
   const items = searchData.items || []
   if (!items.length) return { ok: true, videos: 0 }
 
   const videoIds = items.map(v => v.id.videoId).filter(Boolean).join(',')
   if (!videoIds) return { ok: true, videos: 0 }
 
-  // 3. Video statistics
-  const vidData = await ytGet('/videos', { part: 'statistics,snippet', id: videoIds })
+  // 4. Video statistics
+  const vidData = await ytGet('/videos', { part: 'statistics,snippet', id: videoIds }, token)
 
   let saved = 0
   const writeErrors = []
@@ -89,7 +89,8 @@ async function syncChannel(ch) {
 }
 
 export async function runYtDaily() {
-  if (!process.env.YOUTUBE_API_KEY) return { skipped: 'YOUTUBE_API_KEY not configured' }
+  let token
+  try { token = await getGoogleToken() } catch (e) { return { skipped: e.message } }
 
   const { data: channels, error } = await supabaseAdmin
     .from('yt_channels')
@@ -101,7 +102,7 @@ export async function runYtDaily() {
   const results = []
   for (const ch of channels) {
     try {
-      results.push({ channel: ch.channel_id, ...(await syncChannel(ch)) })
+      results.push({ channel: ch.channel_id, ...(await syncChannel(ch, token)) })
     } catch (e) {
       results.push({ channel: ch.channel_id, error: e.message })
     }

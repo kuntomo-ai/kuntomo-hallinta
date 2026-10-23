@@ -1,28 +1,8 @@
-// Google Search Console weekly sync.
-// Vaatii OAuth2: GSC_CLIENT_ID, GSC_CLIENT_SECRET, GSC_REFRESH_TOKEN.
-// Hakee edellisen viikon klikkaukset, näyttökerrat, CTR, sijoitukset ja top-kyselyt.
+// Google Search Console weekly sync via shared Google OAuth token.
+// Fetches previous week's summary + top 25 queries per active property.
 import { supabaseAdmin } from '../../lib/supabaseAdmin.js'
 import { requireCron } from '../_lib/auth.js'
-
-async function getAccessToken() {
-  const { GSC_CLIENT_ID, GSC_CLIENT_SECRET, GSC_REFRESH_TOKEN } = process.env
-  if (!GSC_CLIENT_ID || !GSC_CLIENT_SECRET || !GSC_REFRESH_TOKEN) {
-    throw new Error('GSC_CLIENT_ID, GSC_CLIENT_SECRET tai GSC_REFRESH_TOKEN puuttuu')
-  }
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: GSC_CLIENT_ID,
-      client_secret: GSC_CLIENT_SECRET,
-      refresh_token: GSC_REFRESH_TOKEN,
-      grant_type: 'refresh_token',
-    }),
-  })
-  const data = await res.json()
-  if (!data.access_token) throw new Error(`Token refresh epäonnistui: ${JSON.stringify(data)}`)
-  return data.access_token
-}
+import { getGoogleToken } from '../_lib/googleOAuth.js'
 
 async function gscQuery(token, siteUrl, payload) {
   const url = `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`
@@ -100,16 +80,13 @@ async function syncProperty(property, token) {
 }
 
 export async function runGscWeekly() {
-  const missing = ['GSC_CLIENT_ID', 'GSC_CLIENT_SECRET', 'GSC_REFRESH_TOKEN'].filter(k => !process.env[k])
-  if (missing.length) return { skipped: `Puuttuvat ympäristömuuttujat: ${missing.join(', ')}` }
+  let token
+  try { token = await getGoogleToken() } catch (e) { return { skipped: e.message } }
 
   const { data: properties, error } = await supabaseAdmin
     .from('gsc_properties').select('*').eq('is_active', true)
   if (error) return { error: error.message }
   if (!properties?.length) return { skipped: 'no active gsc_properties' }
-
-  let token
-  try { token = await getAccessToken() } catch (e) { return { error: e.message } }
 
   const results = []
   for (const prop of properties) {
