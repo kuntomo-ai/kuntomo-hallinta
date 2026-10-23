@@ -37,7 +37,7 @@ import RaportointiOma from './pages/Reporting/RaportointiOma'
 import RaportointiJasenyydet from './pages/Reporting/RaportointiJasenyydet'
 import Yritykset from './pages/Customers/Yritykset'
 import SportHockey from './pages/Customers/SportHockey'
-import Instagram from './pages/Instagram'
+import Some from './pages/Some'
 import UserSettings from './pages/UserSettings'
 import ResetPassword from './pages/ResetPassword'
 
@@ -133,7 +133,8 @@ function AppRoutes() {
               <Route path="/customers/yritykset" element={<RoleRoute><Yritykset /></RoleRoute>} />
               <Route path="/customers/sport-hockey" element={<RoleRoute><SportHockey /></RoleRoute>} />
 
-              <Route path="/instagram" element={<RoleRoute><Instagram /></RoleRoute>} />
+              <Route path="/some" element={<RoleRoute><Some /></RoleRoute>} />
+              <Route path="/instagram" element={<Navigate to="/some" replace />} />
 
               <Route path="/settings" element={<UserSettings />} />
 

@@ -41,7 +41,7 @@ const NAV = [
   { label: 'Raportointi',    href: '/finance/raportointi',      icon: TrendingUp,    roles: TALOUS },
   { label: 'Raportointi',    href: '/finance/raportointi/oma',  icon: TrendingUp,    exactRoles: OMA_RAPORTI },
   { label: 'MobilePay',      href: '/finance/raportointi/mobilepay', icon: TrendingUp, exactRoles: ['respa'] },
-  { label: 'Instagram',      href: '/instagram',                icon: Camera,        exactRoles: ['admin', 'respa'] },
+  { label: 'SOME',           href: '/some',                     icon: Camera,        exactRoles: ['admin', 'respa'] },
 
   { section: 'Hallinto' },
   // Admin/manager: one Henkilöstö link (sub-nav inside covers Kausityöntekijät + Kyselyt).

@@ -118,6 +118,17 @@ async function fetchLaskutettuViikolla(week) {
   )
 }
 
+async function fetchValmennusLaskut() {
+  return safeFetch(
+    supabaseAdmin
+      .from('valmennusmyynti')
+      .select('id, visit_date, customer_name, service, price, seller_id, employee_name, payment_method')
+      .eq('payment_method', 'Lasku')
+      .order('visit_date', { ascending: true })
+      .limit(500)
+  )
+}
+
 async function fetchLahjakorttiSelvitettavat() {
   const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
   return safeFetch(
@@ -258,7 +269,7 @@ async function fetchSellerNames(sellerIds) {
 
 async function generateAiContent(week, data) {
   if (!process.env.ANTHROPIC_API_KEY) return null
-  const { tunnusluvut: t, tasks, laskutettavat, ig } = data
+  const { tunnusluvut: t, tasks, laskutettavat, valmennusLaskut, ig } = data
   const bestPostInfo = ig.bestPost
     ? `Paras posti: "${(ig.bestPost.caption || '').slice(0, 80)}..." (reach ${ig.bestPost.reach}, likes ${ig.bestPost.likes || 0}), linkki: ${ig.bestPost.permalink || '—'}`
     : 'Ei julkaisuja viikolla.'
@@ -275,7 +286,8 @@ VIIME VIIKON TILASTOT (aggregaatit, ei nimiä):
 - Valmennusmyynti: ${eur(t.valmennus.eur)}, ${t.valmennus.kpl} kpl
 - Jäsenmyynti: ${eur(t.jasen.eur)}, ${t.jasen.kpl} kpl
 - MobilePay: ${eur(t.mobilepay.eur)}, ${t.mobilepay.kpl} kpl
-- Laskuttamatta: ${laskutettavat.length} kpl (vanhin ${laskutettavat.length ? `${daysSince(laskutettavat[0].visit_date)} pv sitten` : '—'})
+- Laskuttamatta (terapia): ${laskutettavat.length} kpl (vanhin ${laskutettavat.length ? `${daysSince(laskutettavat[0].visit_date)} pv sitten` : '—'})
+- Laskuttamatta (valmennus): ${valmennusLaskut.length} kpl (vanhin ${valmennusLaskut.length ? `${daysSince(valmennusLaskut[0].visit_date)} pv sitten` : '—'})
 - Myöhässä tehtäviä: ${tasks.lateTasks.length} kpl
 INSTAGRAM: ${bestPostInfo}
 
@@ -368,6 +380,43 @@ function buildLaskutettavatSection(rows, laskutettuViikolla, sellers) {
         <th style="padding:6px 8px;font-size:11px;text-align:left;color:#6b7280;font-weight:600">Palvelu</th>
         <th style="padding:6px 8px;font-size:11px;text-align:right;color:#6b7280;font-weight:600">Hinta</th>
         <th style="padding:6px 8px;font-size:11px;text-align:left;color:#6b7280;font-weight:600">Terapeutti</th>
+        <th></th>
+      </tr>${tableRows}
+    </table>
+  </td></tr>`
+}
+
+function buildValmennusLaskutSection(rows, sellers) {
+  if (!rows.length) {
+    return `<tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:12px 16px;color:#166534;font-size:14px">✓ Ei laskuttamattomia valmennusmyyntejä</td></tr>`
+  }
+  const totalEur = rows.reduce((s, r) => s + (parseFloat(r.price) || 0), 0)
+  const oldest = daysSince(rows[0].visit_date)
+  const summary = `<tr><td style="font-size:13px;color:#374151;padding-bottom:8px">
+    <strong>${rows.length} kpl</strong> · Yhteensä <strong>${eur(totalEur)}</strong> · Vanhin <strong>${oldest} pv</strong>
+  </td></tr>`
+  const tableRows = rows.map(r => {
+    const age = daysSince(r.visit_date)
+    const overdue = age > 14
+    const bg = overdue ? '#fef2f2' : '#ffffff'
+    const nameDisplay = r.employee_name || sellers[r.seller_id] || '—'
+    return `<tr style="background:${bg}">
+      <td style="padding:6px 8px;font-size:13px;border-bottom:1px solid #f3f4f6">${escape(fiDate(r.visit_date))}</td>
+      <td style="padding:6px 8px;font-size:13px;border-bottom:1px solid #f3f4f6"><strong>${escape(r.customer_name || '—')}</strong></td>
+      <td style="padding:6px 8px;font-size:13px;border-bottom:1px solid #f3f4f6">${escape(r.service || '—')}</td>
+      <td style="padding:6px 8px;font-size:13px;border-bottom:1px solid #f3f4f6;text-align:right">${eur(r.price)}</td>
+      <td style="padding:6px 8px;font-size:13px;border-bottom:1px solid #f3f4f6">${escape(nameDisplay)}</td>
+      ${overdue ? '<td style="padding:6px 8px;font-size:11px;color:#dc2626;border-bottom:1px solid #f3f4f6">⚠ Yli 14 pv</td>' : '<td style="border-bottom:1px solid #f3f4f6"></td>'}
+    </tr>`
+  }).join('')
+  return summary + `<tr><td>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px;border-collapse:separate;overflow:hidden">
+      <tr style="background:#f9fafb">
+        <th style="padding:6px 8px;font-size:11px;text-align:left;color:#6b7280;font-weight:600">Pvm</th>
+        <th style="padding:6px 8px;font-size:11px;text-align:left;color:#6b7280;font-weight:600">Asiakas</th>
+        <th style="padding:6px 8px;font-size:11px;text-align:left;color:#6b7280;font-weight:600">Palvelu</th>
+        <th style="padding:6px 8px;font-size:11px;text-align:right;color:#6b7280;font-weight:600">Hinta</th>
+        <th style="padding:6px 8px;font-size:11px;text-align:left;color:#6b7280;font-weight:600">Ohjaaja</th>
         <th></th>
       </tr>${tableRows}
     </table>
@@ -495,7 +544,7 @@ function mdToHtml(md) {
 }
 
 function buildEmail(week, sections, subject) {
-  const { laskutettavatHtml, lahjakorttiHtml, tasksHtml, tunnusluvutHtml, igHtml, aiHtml, errorBanner = '' } = sections
+  const { laskutettavatHtml, valmennusLaskutHtml, lahjakorttiHtml, tasksHtml, tunnusluvutHtml, igHtml, aiHtml, errorBanner = '' } = sections
   return `<!DOCTYPE html><html lang="fi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(subject)}</title></head>
 <body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:24px 16px">
@@ -514,8 +563,11 @@ function buildEmail(week, sections, subject) {
 
     ${errorBanner}
 
-    ${sectionHeader('1. Laskutettavat terapiamyynnit', `${BASE_URL}/sales`, 'Avaa Myynti →')}
+    ${sectionHeader('1. Laskuttamattomat myynnit', `${BASE_URL}/sales`, 'Avaa Myynti →')}
+    <tr><td style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:4px 0 2px">Terapiamyynti (Laskutus)</td></tr>
     ${laskutettavatHtml}
+    <tr><td style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;padding:12px 0 2px">Valmennusmyynti (Lasku)</td></tr>
+    ${valmennusLaskutHtml}
 
     ${sectionHeader('2. Selvitettävät lahjakortit', `${BASE_URL}/sales`, 'Avaa Myynti →')}
     ${lahjakorttiHtml}
@@ -554,9 +606,10 @@ export default async function handler(req, res) {
   const isDryRun = req.query?.dryRun === '1'
 
   // Fetch all data in parallel
-  const [laskRes, laskVkRes, lahjaRes, tasks, tunnusluvut, ig] = await Promise.all([
+  const [laskRes, laskVkRes, valmennusLaskutRes, lahjaRes, tasks, tunnusluvut, ig] = await Promise.all([
     fetchLaskutettavat(),
     fetchLaskutettuViikolla(week),
+    fetchValmennusLaskut(),
     fetchLahjakorttiSelvitettavat(),
     fetchTasks(week),
     fetchTunnusluvut(week),
@@ -564,24 +617,29 @@ export default async function handler(req, res) {
   ])
   const laskutettavat = laskRes.data
   const laskutettuViikolla = laskVkRes.data
+  const valmennusLaskut = valmennusLaskutRes.data
   const lahjakortit = lahjaRes.data
 
   // Collect any DB errors for display at top of report
   const dbErrors = [
-    laskRes.fetchError       && `Laskutettavat: ${laskRes.fetchError}`,
-    laskVkRes.fetchError     && `Laskutettu viikolla: ${laskVkRes.fetchError}`,
-    lahjaRes.fetchError      && `Lahjakortit: ${lahjaRes.fetchError}`,
-    tasks.fetchError         && `Tehtävät: ${tasks.fetchError}`,
-    ig.fetchError            && `Instagram: ${ig.fetchError}`,
+    laskRes.fetchError            && `Laskutettavat: ${laskRes.fetchError}`,
+    laskVkRes.fetchError          && `Laskutettu viikolla: ${laskVkRes.fetchError}`,
+    valmennusLaskutRes.fetchError && `Valmennuslaskut: ${valmennusLaskutRes.fetchError}`,
+    lahjaRes.fetchError           && `Lahjakortit: ${lahjaRes.fetchError}`,
+    tasks.fetchError              && `Tehtävät: ${tasks.fetchError}`,
+    ig.fetchError                 && `Instagram: ${ig.fetchError}`,
     ...(tunnusluvut.fetchErrors || []),
   ].filter(Boolean)
 
-  // Seller name lookup
-  const sellerIds = [...new Set(laskutettavat.map(r => r.seller_id).filter(Boolean))]
+  // Seller name lookup (terapia + valmennus)
+  const sellerIds = [...new Set([
+    ...laskutettavat.map(r => r.seller_id),
+    ...valmennusLaskut.map(r => r.seller_id),
+  ].filter(Boolean))]
   const sellers = await fetchSellerNames(sellerIds)
 
   // AI content
-  const aiMd = await generateAiContent(week, { tunnusluvut, tasks, laskutettavat, ig })
+  const aiMd = await generateAiContent(week, { tunnusluvut, tasks, laskutettavat, valmennusLaskut, ig })
 
   // Build sections
   const errorBanner = dbErrors.length
@@ -590,6 +648,7 @@ export default async function handler(req, res) {
 
   const sections = {
     laskutettavatHtml: buildLaskutettavatSection(laskutettavat, laskutettuViikolla, sellers),
+    valmennusLaskutHtml: buildValmennusLaskutSection(valmennusLaskut, sellers),
     lahjakorttiHtml: buildLahjakorttiSection(lahjakortit),
     tasksHtml: buildTasksSection(tasks),
     tunnusluvutHtml: buildTunnusluvutSection(tunnusluvut),
@@ -597,7 +656,12 @@ export default async function handler(req, res) {
     aiHtml: mdToHtml(aiMd),
   }
 
-  const subject = `Kuntomo vko ${week.weekNum} – laskutettavaa ${eur(laskutettavat.reduce((s, r) => s + (parseFloat(r.price) || 0), 0))} (${laskutettavat.length} kpl), ${tasks.lateTasks.length} tehtävää myöhässä`
+  const totalUnbilled = laskutettavat.length + valmennusLaskut.length
+  const totalUnbilledEur = [
+    ...laskutettavat.map(r => parseFloat(r.price) || 0),
+    ...valmennusLaskut.map(r => parseFloat(r.price) || 0),
+  ].reduce((s, v) => s + v, 0)
+  const subject = `Kuntomo vko ${week.weekNum} – laskuttamatta ${eur(totalUnbilledEur)} (${totalUnbilled} kpl), ${tasks.lateTasks.length} tehtävää myöhässä`
   const html = buildEmail(week, { ...sections, errorBanner }, subject)
 
   if (isDryRun) {
