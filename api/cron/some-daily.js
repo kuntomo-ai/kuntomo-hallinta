@@ -1,7 +1,7 @@
 // Yhdistetty SOME-cron: YouTube päivittäin, GSC maanantaisin.
 import { requireCron } from '../_lib/auth.js'
 import { runYtDaily } from './yt-daily.js'
-import { runGscWeekly } from './gsc-weekly.js'
+import { runGscWeekly } from './_gsc-weekly.js'
 
 export default async function handler(req, res) {
   if (!requireCron(req, res)) return
