@@ -53,7 +53,7 @@ export default async function handler(req, res) {
       }),
     })
     tokens = await tokenRes.json()
-  } catch (e) {
+  } catch {
     return res.redirect(302, `${frontendBase}/some?google_error=token_request_failed`)
   }
 
