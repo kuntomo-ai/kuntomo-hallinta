@@ -8,7 +8,8 @@ const ROUTE_PERMISSIONS = {
   '/timelog':                  ['myynti', 'terapia_valmennus', 'huolto', 'sport', 'respa'],
   '/employees':                [],  // admin/manager only
   '/inventory':                ['respa'],
-  '/laiteluettelo':            ['respa', 'huolto'],
+  '/huolto/laitteet':          ['respa', 'huolto'],
+  '/huolto/siivous':           ['siivooja', 'valvoja', 'respa', 'huolto'],
   '/finance/myynti':           ['myynti', 'terapia_valmennus', 'sport', 'respa'],
   '/finance/lahjakortit':      ['terapia_valmennus', 'respa'],
   '/finance/kirjanpito':       ['hallitus'],
@@ -84,6 +85,10 @@ export function AuthProvider({ children }) {
 
   function canAccess(path) {
     if (roles.length === 0) return false
+    // Siivooja/valvoja (ei admin/manager): pääsy vain Siivous-osioon ja asetuksiin
+    if ((hasRole('siivooja') || hasRole('valvoja')) && !isAdmin) {
+      return path === '/' || path.startsWith('/huolto/siivous') || path.startsWith('/settings')
+    }
     // Strict routes — admin/manager bypass does not apply.
     if (path.startsWith('/instagram')) return hasRole('admin') || hasRole('respa')
     // Kyselyt ja ohjeet lives under /employees but should remain open to all roles.
@@ -98,8 +103,11 @@ export function AuthProvider({ children }) {
     return hasAnyRole(allowed)
   }
 
+  const isSiivooja = hasRole('siivooja') && !isAdmin
+  const isValvoja  = hasRole('valvoja')  && !isAdmin
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, role, roles, hasRole, hasAnyRole, isAdmin, isHallitus, canAccess }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, role, roles, hasRole, hasAnyRole, isAdmin, isHallitus, isSiivooja, isValvoja, canAccess }}>
       {children}
     </AuthContext.Provider>
   )

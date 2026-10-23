@@ -356,7 +356,7 @@ function DeviceAlertsWidget({ devices, loading }) {
         <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
           <Wrench size={15} style={{ color: 'var(--red)' }} /> Huoltopyynnöt
         </h3>
-        <Link to="/laiteluettelo" style={{ fontSize: '.75rem', color: 'var(--violet)', fontWeight: 600 }}>Laiteluettelo →</Link>
+        <Link to="/huolto/laitteet" style={{ fontSize: '.75rem', color: 'var(--violet)', fontWeight: 600 }}>Laitteet →</Link>
       </div>
       {loading ? <p style={{ color: 'var(--text3)', fontSize: '.82rem' }}>Ladataan...</p> :
         devices.length === 0

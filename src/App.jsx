@@ -15,6 +15,8 @@ import Inventory from './pages/Inventory'
 import Laiteluettelo from './pages/Laiteluettelo'
 import LaiteVika from './pages/LaiteVika'
 import Kaapit from './pages/Kaapit'
+import SiivousIndex from './pages/Huolto/SiivousIndex'
+import SiivousLocation from './pages/Huolto/SiivousLocation'
 import Documents from './pages/Documents'
 import Lahjakortit from './pages/Finance/Lahjakortit'
 import Sales from './pages/Finance/Sales'
@@ -61,6 +63,11 @@ function useReloadOnResume(thresholdMs = 3 * 60 * 1000) {
   }, [])
 }
 
+function LaiteluetteloRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={`/huolto/laitteet${search}`} replace />
+}
+
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', color:'var(--text3)' }}>Ladataan...</div>
@@ -101,8 +108,12 @@ function AppRoutes() {
               <Route path="/employees/kausityontekijat" element={<RoleRoute><Kausityontekijat /></RoleRoute>} />
               <Route path="/employees/kyselyt-ja-ohjeet" element={<RoleRoute><Surveys /></RoleRoute>} />
               <Route path="/inventory" element={<RoleRoute><Inventory /></RoleRoute>} />
-              <Route path="/laiteluettelo" element={<RoleRoute><Laiteluettelo /></RoleRoute>} />
-              <Route path="/laiteluettelo/kaapit" element={<RoleRoute><Kaapit /></RoleRoute>} />
+              <Route path="/huolto/laitteet" element={<RoleRoute><Laiteluettelo /></RoleRoute>} />
+              <Route path="/huolto/laitteet/kaapit" element={<RoleRoute><Kaapit /></RoleRoute>} />
+              <Route path="/laiteluettelo" element={<LaiteluetteloRedirect />} />
+              <Route path="/laiteluettelo/kaapit" element={<Navigate to="/huolto/laitteet/kaapit" replace />} />
+              <Route path="/huolto/siivous" element={<RoleRoute><SiivousIndex /></RoleRoute>} />
+              <Route path="/huolto/siivous/:locationSlug" element={<RoleRoute><SiivousLocation /></RoleRoute>} />
 
               <Route path="/finance/myynti" element={<RoleRoute><Sales /></RoleRoute>} />
               <Route path="/finance/myynti/terapiamyynti" element={<Navigate to="/finance/myynti" replace />} />

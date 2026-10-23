@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, Calendar, Car, Stethoscope, Dumbbell, Users2,
   Gift, Building2, ClipboardList, CheckSquare, MessageSquare,
-  FileText, Package, TrendingUp, BookOpen, LogOut, Menu, Wrench, Settings, Calculator, Camera
+  FileText, Package, TrendingUp, BookOpen, LogOut, Menu, Wrench, Settings, Calculator, Camera, SprayCan
 } from 'lucide-react'
 import logo from '../../logo.svg'
 
@@ -18,6 +18,7 @@ const TALOUS      = ['hallitus']
 const HENK        = [] // admin/manager only — empty = blocked for non-admins
 const VARASTO     = ['respa']
 const LAITE       = ['respa', 'huolto']
+const SIIVOUS     = ['siivooja', 'valvoja', 'respa', 'huolto']
 const OMA_RAPORTI = ['myynti', 'terapia_valmennus']
 
 const NAV = [
@@ -51,7 +52,8 @@ const NAV = [
   // Everyone else: Kyselyt ja ohjeet is the only accessible sub-page in this group.
   { label: 'Kyselyt ja ohjeet',  href: '/employees/kyselyt-ja-ohjeet',      icon: ClipboardList, adminHide: true },
   { label: 'Inventaario',    href: '/inventory',                icon: Package,       roles: VARASTO },
-  { label: 'Laiteluettelo',  href: '/laiteluettelo',            icon: Wrench,        roles: LAITE },
+  { label: 'Laitteet',       href: '/huolto/laitteet',          icon: Wrench,        roles: LAITE },
+  { label: 'Siivous',        href: '/huolto/siivous',           icon: SprayCan,      roles: SIIVOUS },
   { label: 'Dokumentit',     href: '/documents',                icon: FileText },
 ]
 
@@ -61,6 +63,11 @@ export default function Sidebar({ mobOpen, onClose }) {
   const isPrivileged = isAdmin
 
   function canSee(item) {
+    // Siivooja/valvoja (ei admin/manager) näkee vain kohteet joissa on kyseinen rooli
+    if ((hasRole('siivooja') || hasRole('valvoja')) && !isAdmin) {
+      if (item.exactRoles) return item.exactRoles.includes('siivooja') || item.exactRoles.includes('valvoja')
+      return !!(item.roles?.includes('siivooja') || item.roles?.includes('valvoja'))
+    }
     if (item.exactRoles) return item.exactRoles.some(r => roles.includes(r))  // strict: any matching role
     if (item.adminHide && isPrivileged) return false
     if (isPrivileged) return true

@@ -179,7 +179,7 @@ export default function Laiteluettelo() {
       assigned_to: assigned.join(', '),
     }
     // Linkki laitteen tietoihin + vikailmoitukseen
-    const link = `/laiteluettelo?device=${editing}`
+    const link = `/huolto/laitteet?device=${editing}`
     let { error: taskErr } = await supabase.from('tasks').insert({ ...task, link })
     // Varmuus: jos link-saraketta ei vielä ole kannassa, luo tehtävä ilman sitä
     if (taskErr) {
@@ -290,11 +290,11 @@ export default function Laiteluettelo() {
     <div>
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">Laiteluettelo</h1>
+          <h1 className="page-title">Laitteet</h1>
           <p className="page-subtitle">Kuntosalin laitteet ja varusteet</p>
         </div>
         <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center' }}>
-          <Link to="/laiteluettelo/kaapit">
+          <Link to="/huolto/laitteet/kaapit">
             <button className="btn btn-ghost">Pukukaapit</button>
           </Link>
           {isAdmin && (
