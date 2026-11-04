@@ -154,6 +154,13 @@ tr:hover td { background: var(--bg2); }
 /* Prevent grid children from overflowing their cell */
 .grid-cols-2 > *, .grid-cols-3 > *, .grid-cols-4 > *,
 .grid-sidebar-main > *, .grid-main-aside > *, .grid-responsive-2 > * { min-width: 0; }
+
+/* Venyttää lohkon page-contentin horisontaalisen paddingin ohi, reunasta reunaan. */
+.page-full-bleed { margin-left: -2rem; margin-right: -2rem; }
+
+/* Tiiviimpi taulukko pitkille listoille, jotta useampi rivi mahtuu näkymään. */
+.table-compact th { padding: .5rem .75rem; }
+.table-compact td { padding: .45rem .75rem; font-size: .78rem; }
 .sub-tab { padding: .4rem .85rem; font-size: .78rem; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; transition: all .15s; font-family: inherit; background: transparent; color: var(--text3); }
 .sub-tab.active { background: var(--white); color: var(--violet); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
 
@@ -174,6 +181,7 @@ tr:hover td { background: var(--bg2); }
   .grid-cols-4 { grid-template-columns: 1fr 1fr !important; }
   .grid-sidebar-main { grid-template-columns: 1fr; }
   .grid-main-aside { grid-template-columns: 1fr !important; }
+  .page-full-bleed { margin-left: -1rem; margin-right: -1rem; }
   .grid-responsive-2 { grid-template-columns: 1fr !important; }
   .calendar-grid { font-size: .6rem; }
   .calendar-cell { height: 60px !important; padding: 2px 3px !important; }

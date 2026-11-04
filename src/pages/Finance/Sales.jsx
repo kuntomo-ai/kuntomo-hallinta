@@ -1281,7 +1281,8 @@ export default function Sales() {
 
       {tab === 'provisio' && <Provisio />}
 
-      <div className="grid-sidebar-main" style={{ alignItems: 'start', display: tab === 'provisio' ? 'none' : undefined }}>
+      <div className="page-full-bleed" style={{ display: tab === 'provisio' ? 'none' : undefined }}>
+      <div className="grid-sidebar-main" style={{ alignItems: 'start' }}>
 
         {tab === 'terapia' && <TerapiaForm onSaved={fetchTerapia} />}
         {tab === 'valmennus' && <ValmennusForm onSaved={() => fetchOther('valmennus')} />}
@@ -1345,7 +1346,7 @@ export default function Sales() {
                   <input className="search-input" placeholder="Hae asiakkaalla..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
               </div>
-              <div className="table-wrap">
+              <div className="table-wrap table-compact">
             <table>
               <thead>
                 <tr>
@@ -1528,6 +1529,7 @@ export default function Sales() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {editRow && (
