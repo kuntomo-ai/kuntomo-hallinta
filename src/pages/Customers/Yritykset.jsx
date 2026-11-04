@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Search, Trash2, ChevronLeft, ChevronRight, Upload, FileText } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { addKuntomoHeader, addKuntomoFooter, kuntomoTableStyles } from '../../lib/pdfBranding'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/AuthContext'
@@ -226,13 +227,18 @@ export default function Yritykset() {
     fetchCompanyData(selected.id, viewYear)
   }
 
-  function exportPDF() {
+  async function exportPDF() {
     if (!selected) return
     const doc = new jsPDF()
-    doc.setFontSize(15)
-    doc.text(`${selected.name} — käyntiraportti ${viewYear}`, 14, 16)
+    const headerY = await addKuntomoHeader(
+      doc,
+      `${selected.name} — käyntiraportti`,
+      `Vuosi ${viewYear}`,
+    )
+    const brand = kuntomoTableStyles()
+
     doc.setFontSize(9)
-    let y = 24
+    let y = headerY
     if (selected.contact_person) { doc.text(`Yhteyshenkilö: ${selected.contact_person}`, 14, y); y += 5 }
     if (selected.email)          { doc.text(`Sähköposti: ${selected.email}`, 14, y); y += 5 }
     if (selected.phone)          { doc.text(`Puhelin: ${selected.phone}`, 14, y); y += 5 }
@@ -253,9 +259,9 @@ export default function Yritykset() {
       startY: y + 8,
       head: [['Pvm', 'Henkilö', 'Palvelu', 'Hieroja', 'Hinta', 'Tila']],
       body: detailBody.length ? detailBody : [['—', '—', 'Ei käyntejä valittuna vuonna', '—', '—', '—']],
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [124, 58, 237] },
-      alternateRowStyles: { fillColor: [245, 243, 255] },
+      styles: { ...brand.styles, fontSize: 8 },
+      headStyles: { ...brand.headStyles, fontSize: 8 },
+      alternateRowStyles: brand.alternateRowStyles,
     })
 
     const monthTotals = Array.from({ length: 12 }, () => ({ count: 0, total: 0, invoiced: 0, open: 0 }))
@@ -276,9 +282,9 @@ export default function Yritykset() {
         m.invoiced.toFixed(2) + ' €',
         m.open.toFixed(2) + ' €',
       ]),
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [124, 58, 237] },
-      alternateRowStyles: { fillColor: [245, 243, 255] },
+      styles: { ...brand.styles, fontSize: 8 },
+      headStyles: { ...brand.headStyles, fontSize: 8 },
+      alternateRowStyles: brand.alternateRowStyles,
     })
 
     if (notes) {
@@ -287,6 +293,7 @@ export default function Yritykset() {
       doc.setFontSize(9); doc.text(doc.splitTextToSize(notes, 180), 14, finalY + 5)
     }
 
+    addKuntomoFooter(doc)
     doc.save(`${selected.name.replace(/[^a-zA-Z0-9]/g, '_')}_kaynnit_${viewYear}.pdf`)
   }
 

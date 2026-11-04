@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase'
 import ExcelJS from 'exceljs'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { addKuntomoHeader, addKuntomoFooter, kuntomoTableStyles } from '../../lib/pdfBranding'
 
 // ── Oletusarvot ───────────────────────────────────────────────────────────────
 const DEFAULTS = {
@@ -267,17 +268,20 @@ export default function Kassavirta() {
     URL.revokeObjectURL(url)
   }
 
-  function exportPDF() {
+  async function exportPDF() {
     const doc = new jsPDF()
-    doc.setFontSize(15); doc.text('Kassavirta-ennuste — Kuntomo Oy', 14, 16)
-    doc.setFontSize(8)
+    const subtitle = `Ennuste · ${new Date().toLocaleDateString('fi-FI')}`
+    const startY = await addKuntomoHeader(doc, 'Kassavirta-ennuste', subtitle)
+    const brand = kuntomoTableStyles()
     autoTable(doc, {
-      startY: 30,
+      startY,
       head: [['Kk', 'Liikevaihto', 'Ulkopuol.', 'Kiinteät', 'Kulut yht.', 'Kassavirta', 'Kumulat.']],
       body: months.map(m => [m.label, fmt(m.liikevaihto), fmt(m.ulkopuoliset), fmt(m.kiinteat), fmt(m.totalCosts), fmt(m.kassavirta), fmt(m.kumulatiivinen)]),
-      styles: { fontSize: 7 }, headStyles: { fillColor: [124, 58, 237] },
-      alternateRowStyles: { fillColor: [245, 243, 255] },
+      styles: { ...brand.styles, fontSize: 7 },
+      headStyles: { ...brand.headStyles, fontSize: 7 },
+      alternateRowStyles: brand.alternateRowStyles,
     })
+    addKuntomoFooter(doc)
     doc.save('kassavirta_ennuste.pdf')
   }
 
