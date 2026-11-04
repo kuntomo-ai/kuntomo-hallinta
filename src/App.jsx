@@ -33,6 +33,7 @@ import Raportointi from './pages/Reporting/Raportointi'
 import RaportointiTerapia from './pages/Reporting/RaportointiTerapia'
 import RaportointiValmennus from './pages/Reporting/RaportointiValmennus'
 import RaportointiJasen from './pages/Reporting/RaportointiJasen'
+import RaportointiKuukausi from './pages/Reporting/RaportointiKuukausi'
 import RaportointiLahjakortit from './pages/Reporting/RaportointiLahjakortit'
 import RaportointiMobilePay from './pages/Reporting/RaportointiMobilePay'
 import RaportointiOma from './pages/Reporting/RaportointiOma'
@@ -137,6 +138,7 @@ function AppRoutes() {
               <Route path="/finance/raportointi/terapiamyynti" element={<RoleRoute><RaportointiTerapia /></RoleRoute>} />
               <Route path="/finance/raportointi/valmennusmyynti" element={<RoleRoute><RaportointiValmennus /></RoleRoute>} />
               <Route path="/finance/raportointi/jasenmyynti" element={<RoleRoute><RaportointiJasen /></RoleRoute>} />
+              <Route path="/finance/raportointi/kuukausiraportti" element={<RoleRoute><RaportointiKuukausi /></RoleRoute>} />
               <Route path="/finance/raportointi/lahjakortit" element={<RoleRoute><RaportointiLahjakortit /></RoleRoute>} />
               <Route path="/finance/raportointi/mobilepay" element={<RoleRoute><RaportointiMobilePay /></RoleRoute>} />
               <Route path="/finance/raportointi/jasenyydet" element={<RoleRoute><RaportointiJasenyydet /></RoleRoute>} />

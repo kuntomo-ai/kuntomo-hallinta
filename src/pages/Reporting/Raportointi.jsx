@@ -119,7 +119,7 @@ function CustomTooltip({ active, payload, label }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Raportointi() {
-  const { isAdmin, isHallitus, role } = useAuth()
+  const { isAdmin, isHallitus, role, canAccess } = useAuth()
   const showMembership = isAdmin || isHallitus || role === 'respa'
 
   const [period, setPeriod]       = useState('month')
@@ -234,6 +234,17 @@ export default function Raportointi() {
               </div>
               <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.4rem' }}>Viimeisin kirjaus</div>
               <div style={{ marginTop: '1rem', fontSize: '.78rem', color: 'var(--teal, #0D9488)', fontWeight: 600 }}>Avaa raportti →</div>
+            </div>
+          </Link>
+        )}
+        {canAccess('/finance/raportointi/kuukausiraportti') && (
+          <Link to="/finance/raportointi/kuukausiraportti" style={{ textDecoration: 'none' }}>
+            <div className="card" style={{ cursor: 'pointer', borderTop: '3px solid var(--violet)', transition: 'box-shadow .15s', height: '100%' }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = ''}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', marginBottom: '.5rem' }}>Kuukausiraportti</div>
+              <div style={{ fontSize: '.72rem', color: 'var(--text3)', marginTop: '.4rem' }}>Työajat ja jäsenmyynnit, lataa PDF</div>
+              <div style={{ marginTop: '1rem', fontSize: '.78rem', color: 'var(--violet)', fontWeight: 600 }}>Avaa raportti →</div>
             </div>
           </Link>
         )}

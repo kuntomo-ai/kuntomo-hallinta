@@ -27,6 +27,7 @@ const PAGE_TITLES = {
   '/finance/raportointi/terapiamyynti': 'Terapia – Raportti',
   '/finance/raportointi/valmennusmyynti': 'Valmennus – Raportti',
   '/finance/raportointi/jasenmyynti': 'Jäsenmyynti – Raportti',
+  '/finance/raportointi/kuukausiraportti': 'Kuukausiraportti',
   '/finance/raportointi/lahjakortit': 'Lahjakortit – Raportti',
   '/customers/yritykset': 'Yritykset',
   '/customers/sport-hockey': 'Sport & Hockey',

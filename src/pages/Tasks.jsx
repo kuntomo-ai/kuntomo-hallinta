@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Plus, CheckCircle, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -182,6 +183,7 @@ export default function Tasks() {
                 <td>
                   <div style={{ fontWeight: 600 }}>{r.title}</div>
                   {r.description && <div style={{ fontSize: '.75rem', color: 'var(--text3)', marginTop: '.2rem' }}>{r.description}</div>}
+                  {r.link && <Link to={r.link} style={{ display: 'inline-block', fontSize: '.78rem', fontWeight: 600, color: 'var(--violet)', marginTop: '.25rem' }}>Avaa →</Link>}
                 </td>
                 <td>{priorityBadge(r.priority)}</td>
                 <td>{statusBadge(r.computedStatus)}</td>
