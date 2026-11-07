@@ -103,6 +103,8 @@ export default function Lahjakortit() {
   // Jaksonvalitsin
   const [period, setPeriod] = useState('month')
   const [periodDate, setPeriodDate] = useState(new Date())
+  const [rangeStart, setRangeStart] = useState(() => { const d = new Date(); d.setDate(1); return d })
+  const [rangeEnd, setRangeEnd] = useState(() => new Date())
 
   useEffect(() => { fetchData() }, [])
 
@@ -275,6 +277,11 @@ export default function Lahjakortit() {
       if (period === 'day') return r.sale_date === periodDate.toISOString().slice(0, 10)
       if (period === 'month') return d.getFullYear() === periodDate.getFullYear() && d.getMonth() === periodDate.getMonth()
       if (period === 'year') return d.getFullYear() === periodDate.getFullYear()
+      if (period === 'range') {
+        const start = new Date(rangeStart); start.setHours(0, 0, 0, 0)
+        const end = new Date(rangeEnd); end.setHours(23, 59, 59, 999)
+        return d >= start && d <= end
+      }
       return true
     })
   }
@@ -283,10 +290,18 @@ export default function Lahjakortit() {
     if (period === 'all') return null
     if (period === 'day') return periodDate.toLocaleDateString('fi-FI')
     if (period === 'month') return periodDate.toLocaleDateString('fi-FI', { month: 'long', year: 'numeric' })
+    if (period === 'range') return `${rangeStart.toLocaleDateString('fi-FI')} – ${rangeEnd.toLocaleDateString('fi-FI')}`
     return String(periodDate.getFullYear())
   }
 
   function navigate(dir) {
+    if (period === 'range') {
+      const span = Math.max(1, Math.round((rangeEnd - rangeStart) / 86400000) + 1)
+      const s = new Date(rangeStart); s.setDate(s.getDate() + dir * span)
+      const e = new Date(rangeEnd);   e.setDate(e.getDate() + dir * span)
+      setRangeStart(s); setRangeEnd(e)
+      return
+    }
     const d = new Date(periodDate)
     if (period === 'day') d.setDate(d.getDate() + dir)
     else if (period === 'month') d.setMonth(d.getMonth() + dir)
@@ -325,10 +340,17 @@ export default function Lahjakortit() {
 
       {/* Jaksonvalitsin */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        {['day', 'month', 'year', 'all'].map(p => (
+        {['day', 'month', 'year', 'range', 'all'].map(p => (
           <button
             key={p}
-            onClick={() => { setPeriod(p); setPeriodDate(new Date()) }}
+            onClick={() => {
+              setPeriod(p)
+              if (p === 'range') {
+                const s = new Date(); s.setDate(1); setRangeStart(s); setRangeEnd(new Date())
+              } else {
+                setPeriodDate(new Date())
+              }
+            }}
             style={{
               padding: '0.4rem 1rem',
               borderRadius: 20,
@@ -341,7 +363,7 @@ export default function Lahjakortit() {
               fontSize: '.9rem',
             }}
           >
-            {p === 'day' ? 'Päivä' : p === 'month' ? 'Kuukausi' : p === 'year' ? 'Vuosi' : 'Kaikki'}
+            {p === 'day' ? 'Päivä' : p === 'month' ? 'Kuukausi' : p === 'year' ? 'Vuosi' : p === 'range' ? 'Aikaväli' : 'Kaikki'}
           </button>
         ))}
         {period !== 'all' && (
@@ -380,6 +402,29 @@ export default function Lahjakortit() {
                     onChange={e => { const [y, m] = e.target.value.split('-').map(Number); setPeriodDate(new Date(y, m - 1, 1)) }}
                     style={inputStyle}
                   />
+                )
+              }
+              if (period === 'range') {
+                const toIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+                return (
+                  <>
+                    <input
+                      type="date"
+                      value={toIso(rangeStart)}
+                      max={toIso(rangeEnd)}
+                      onChange={e => e.target.value && setRangeStart(parse(e.target.value))}
+                      style={{ ...inputStyle, minWidth: 130 }}
+                    />
+                    <span style={{ color: 'var(--text3)', fontWeight: 600 }}>–</span>
+                    <input
+                      type="date"
+                      value={toIso(rangeEnd)}
+                      min={toIso(rangeStart)}
+                      onChange={e => e.target.value && setRangeEnd(parse(e.target.value))}
+                      style={{ ...inputStyle, minWidth: 130 }}
+                    />
+                  </>
                 )
               }
               return (
