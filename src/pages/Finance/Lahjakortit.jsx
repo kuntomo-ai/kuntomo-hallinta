@@ -300,7 +300,7 @@ export default function Lahjakortit() {
   const periodCount = pRows.length
   const periodAvg = periodCount > 0 ? periodTotal / periodCount : 0
 
-  const filtered = rows.filter(r =>
+  const filtered = pRows.filter(r =>
     r.code?.toLowerCase().includes(search.toLowerCase()) ||
     r.seller_name?.toLowerCase().includes(search.toLowerCase()) ||
     r.service?.toLowerCase().includes(search.toLowerCase())
@@ -419,7 +419,9 @@ export default function Lahjakortit() {
             {loading ? (
               <tr><td colSpan={11} className="table-empty">Ladataan...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={11} className="table-empty">Ei lahjakortteja.</td></tr>
+              <tr><td colSpan={11} className="table-empty">
+                {period === 'all' ? 'Ei lahjakortteja.' : `Ei lahjakortteja jaksolla ${periodLabel()}.`}
+              </td></tr>
             ) : filtered.map(r => {
               const remaining = Math.max(0, (r.price || 0) - (r.used_amount || 0))
               const isFullyUsed = (r.used_amount || 0) >= (r.price || 0) && (r.price || 0) > 0
