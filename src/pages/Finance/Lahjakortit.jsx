@@ -347,7 +347,52 @@ export default function Lahjakortit() {
         {period !== 'all' && (
           <>
             <button onClick={() => navigate(-1)} style={{ background: 'var(--white, #fff)', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>‹</button>
-            <span style={{ fontWeight: 600, minWidth: 130, textAlign: 'center', fontSize: '.9rem' }}>{periodLabel()}</span>
+            {(() => {
+              const inputStyle = {
+                background: 'var(--white, #fff)',
+                border: 'none',
+                borderRadius: 20,
+                boxShadow: '0 1px 4px rgba(0,0,0,.12)',
+                padding: '0.4rem 0.9rem',
+                fontSize: '.9rem',
+                fontWeight: 600,
+                color: 'var(--text)',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                textAlign: 'center',
+                minWidth: 140,
+              }
+              if (period === 'day') {
+                return (
+                  <input
+                    type="date"
+                    value={periodDate.toISOString().slice(0, 10)}
+                    onChange={e => { const [y, m, d] = e.target.value.split('-').map(Number); setPeriodDate(new Date(y, m - 1, d)) }}
+                    style={inputStyle}
+                  />
+                )
+              }
+              if (period === 'month') {
+                return (
+                  <input
+                    type="month"
+                    value={`${periodDate.getFullYear()}-${String(periodDate.getMonth() + 1).padStart(2, '0')}`}
+                    onChange={e => { const [y, m] = e.target.value.split('-').map(Number); setPeriodDate(new Date(y, m - 1, 1)) }}
+                    style={inputStyle}
+                  />
+                )
+              }
+              return (
+                <input
+                  type="number"
+                  value={periodDate.getFullYear()}
+                  min={2000}
+                  max={2100}
+                  onChange={e => { const y = Number(e.target.value); if (y >= 2000 && y <= 2100) { const d = new Date(periodDate); d.setFullYear(y); setPeriodDate(d) } }}
+                  style={{ ...inputStyle, minWidth: 90 }}
+                />
+              )
+            })()}
             <button onClick={() => navigate(1)} style={{ background: 'var(--white, #fff)', border: 'none', borderRadius: 20, width: 32, height: 32, cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem' }}>›</button>
           </>
         )}
