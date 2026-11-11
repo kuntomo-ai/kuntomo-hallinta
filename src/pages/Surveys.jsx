@@ -590,6 +590,10 @@ export default function Surveys() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.85rem' }}>
               {[
                 {
+                  nimi: 'hallinta.kuntomo.com',
+                  kuvaus: 'Kuntomon toiminnanohjausjärjestelmä. Sieltä löytyvät mm. myynnit, henkilökunnan ohjeistukset ja yleinen toiminnanohjaus (työvuorokirjaukset, tehtävät, laiteluettelo jne.). Kirjaudu omilla tunnuksillasi.',
+                },
+                {
                   nimi: 'Sähköposti (Gmail)',
                   kuvaus: 'Käyttäjätunnus: etunimi.sukunimi@kuntomo.fi. Salasana toimitetaan erikseen.',
                 },
@@ -615,6 +619,14 @@ export default function Surveys() {
             <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
               Tiedottaminen ja ryhmät
             </h3>
+            <div style={{ padding: '.75rem 1rem', background: 'var(--violet-subtle)', border: '1px solid var(--violet-border)', borderRadius: 'var(--radius)', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--violet)', marginBottom: '.25rem' }}>
+                Virallinen tiedotuskanava
+              </div>
+              <div style={{ fontSize: '.88rem', color: 'var(--text)', lineHeight: 1.55 }}>
+                <strong>WhatsApp-ryhmä &ldquo;Kuntomo Tiedotus&rdquo;</strong> on henkilökunnan virallinen tiedotuskanava. Kaikki henkilökuntaa koskevat tiedotteet julkaistaan siellä — seuraa ryhmää aktiivisesti.
+              </div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: '.85rem', marginBottom: '.5rem' }}>WhatsApp-ryhmät</div>
@@ -647,7 +659,29 @@ export default function Surveys() {
             </div>
           </section>
 
-          {/* 6. Asiakkaan polku */}
+          {/* 6. Vastuualueet */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Vastuualueet
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+              {[
+                { alue: 'Kempeleen kuntosali (salivastaava)', henkilo: 'Valtteri Haanela', milloin: 'Kaikki Kempeleen kuntosaliin liittyvät asiat ja tiedot' },
+                { alue: 'Etu-Lyötyn kuntosali (salivastaava)', henkilo: 'Niko Isopahkala', milloin: 'Kaikki Etu-Lyötyn kuntosaliin liittyvät asiat ja tiedot' },
+                { alue: 'Linnakankaan kuntosali (salivastaava)', henkilo: 'Jussi Lotvonen', milloin: 'Kaikki Linnakankaaseen liittyvät asiat' },
+                { alue: 'Sosiaalinen media (somevastaava)', henkilo: 'Valtteri Haanela', milloin: 'Kaikki someen liittyvät asiat' },
+                { alue: 'Päivittäiset hankinnat', henkilo: 'Heikki Syrjälä', milloin: 'Tieto peruskulutustarvikkeiden hankintatarpeista (esim. tarvikkeiden loppuminen)' },
+              ].map(v => (
+                <div key={v.alue} style={{ padding: '.65rem 1rem', background: 'var(--bg2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text3)', marginBottom: '.2rem' }}>{v.alue}</div>
+                  <div style={{ fontWeight: 700, fontSize: '.92rem', marginBottom: '.2rem' }}>{v.henkilo}</div>
+                  <div style={{ fontSize: '.83rem', color: 'var(--text2)', lineHeight: 1.5 }}>{v.milloin}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* 7. Asiakkaan polku */}
           <section style={{ marginBottom: '2rem' }}>
             <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
               Asiakkaan polku Kuntomossa
@@ -709,6 +743,20 @@ export default function Surveys() {
                 <li key={item} style={{ fontSize: '.88rem', color: 'var(--text2)', lineHeight: 1.55 }}>{item}</li>
               ))}
             </ul>
+          </section>
+
+          {/* 10. Laskutus */}
+          <section style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.75rem', paddingBottom: '.4rem', borderBottom: '2px solid var(--border)' }}>
+              Laskutus
+            </h3>
+            <p style={{ color: 'var(--text2)', lineHeight: 1.65, fontSize: '.9rem' }}>
+              Ajantasaiset laskutustiedot (y-tunnus, verkkolaskuosoite, operaattori, sähköpostilaskut ja paperilaskujen osoite) löydät täältä:{' '}
+              <a href="https://kuntomo.fi/fi-fi/kuntomo/laskutusohje/49/" target="_blank" rel="noopener noreferrer"
+                style={{ color: 'var(--violet)', fontWeight: 600 }}>
+                kuntomo.fi/fi-fi/kuntomo/laskutusohje/49/
+              </a>.
+            </p>
           </section>
 
         </div>
