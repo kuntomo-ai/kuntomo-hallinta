@@ -8,7 +8,7 @@ const LINKS = [
   { label: 'Ennuste',       to: '/finance/kirjanpito/ennuste' },
   { label: 'Tilinpäätös',   to: '/finance/kirjanpito/tilinpaatos' },
   { label: 'Investoinnit',  to: '/finance/kirjanpito/investoinnit' },
-  { label: 'Tuo CSV',       to: '/finance/kirjanpito/tuonti' },
+  { label: 'Tuo tiedosto',  to: '/finance/kirjanpito/tuonti' },
   { label: 'Liitteet',      to: '/finance/kirjanpito/liitteet' },
 ]
 

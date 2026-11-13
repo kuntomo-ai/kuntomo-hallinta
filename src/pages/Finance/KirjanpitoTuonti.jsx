@@ -70,6 +70,101 @@ function mapToTulosRow(dataRows, period) {
   return row
 }
 
+// ── XLSX → teksti ──────────────────────────────────────────────────────────
+// Lukee Excel-tiedoston ensimmäisen taulukon ja palauttaa ;-erotellun tekstin
+// joka voidaan syöttää parseNetvisorCSV:lle.
+async function readXlsxAsText(file) {
+  const ExcelJS = (await import('exceljs')).default
+  const buffer = await file.arrayBuffer()
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(buffer)
+  const sheet = workbook.worksheets[0]
+  if (!sheet) return ''
+
+  const cellText = v => {
+    if (v == null) return ''
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v)
+    if (v instanceof Date) {
+      const dd = String(v.getDate()).padStart(2, '0')
+      const mm = String(v.getMonth() + 1).padStart(2, '0')
+      return `${dd}.${mm}.${v.getFullYear()}`
+    }
+    if (v.text) return v.text
+    if (v.richText) return v.richText.map(r => r.text).join('')
+    if (v.result != null) return String(v.result)
+    if (v.formula) return ''
+    return String(v)
+  }
+
+  const lines = []
+  sheet.eachRow({ includeEmpty: false }, row => {
+    const cells = []
+    row.eachCell({ includeEmpty: true }, cell => cells.push(cellText(cell.value).trim()))
+    lines.push(cells.join(';'))
+  })
+  return lines.join('\n')
+}
+
+// ── PDF → teksti ───────────────────────────────────────────────────────────
+// Ryhmittelee tekstielementit riveiksi y-koordinaatin mukaan ja järjestää
+// kunkin rivin solut x-koordinaatin mukaan → ;-eroteltu label;arvo-muoto.
+async function readPdfAsText(file) {
+  const pdfjs = await import('pdfjs-dist/build/pdf.mjs')
+  const workerUrl = (await import('pdfjs-dist/build/pdf.worker.mjs?url')).default
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+  const buffer = await file.arrayBuffer()
+  const pdf = await pdfjs.getDocument({ data: buffer }).promise
+
+  const allLines = []
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const content = await page.getTextContent()
+    const rowMap = new Map()
+    for (const item of content.items) {
+      if (!item.str) continue
+      const y = Math.round(item.transform[5])
+      if (!rowMap.has(y)) rowMap.set(y, [])
+      rowMap.get(y).push({ x: item.transform[4], text: item.str })
+    }
+    const ys = [...rowMap.keys()].sort((a, b) => b - a)
+    for (const y of ys) {
+      const cells = rowMap.get(y).sort((a, b) => a.x - b.x).map(c => c.text.trim()).filter(Boolean)
+      if (cells.length) allLines.push(cells.join(';'))
+    }
+    page.cleanup()
+  }
+  return allLines.join('\n')
+}
+
+// Täydentää tekstiin "Kirjanpitoraportin tyyppi" -rivin ja mahdollisen
+// Tositepvm-rivin jos ne puuttuvat — jolloin ei-CSV lähteet (xlsx/pdf) joissa
+// metarivit on taulukon ulkopuolella saadaan silti tunnistetuksi.
+function enrichParsedText(text) {
+  const lower = text.toLowerCase()
+  const extra = []
+
+  if (!/kirjanpitoraportin tyyppi/i.test(text)) {
+    if (lower.includes('tuloslaskelma')) extra.push('Kirjanpitoraportin tyyppi;tuloslaskelma')
+    else if (lower.includes('kassavirta')) extra.push('Kirjanpitoraportin tyyppi;kassavirta')
+  }
+
+  if (!/^tositepvm/im.test(text)) {
+    const range = text.match(/(\d{2})\.(\d{2})\.(\d{4})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/)
+    if (range) extra.push(`Tositepvm;${range[0]}`)
+  }
+
+  return extra.length ? extra.join('\n') + '\n' + text : text
+}
+
+// Tunnistaa tiedostotyypin nimen/mime:n perusteella
+function detectKind(file) {
+  const name = (file.name || '').toLowerCase()
+  const type = (file.type || '').toLowerCase()
+  if (name.endsWith('.xlsx') || type.includes('spreadsheetml')) return 'xlsx'
+  if (name.endsWith('.pdf') || type === 'application/pdf') return 'pdf'
+  return 'csv'
+}
+
 // ── Pääkomponentti ─────────────────────────────────────────────────────────
 
 export default function KirjanpitoTuonti() {
@@ -85,7 +180,9 @@ export default function KirjanpitoTuonti() {
     setStatus('importing')
     setResult(null)
 
-    const tryParse = (encoding) => new Promise((resolve, reject) => {
+    const kind = detectKind(file)
+
+    const tryParseCsv = (encoding) => new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = e => resolve(e.target.result)
       reader.onerror = reject
@@ -94,24 +191,35 @@ export default function KirjanpitoTuonti() {
 
     let text
     try {
-      // Kokeile ensin latin-1 (Netvisor-oletusenkoodaus), sitten UTF-8
-      text = await tryParse('windows-1252')
-    } catch {
-      text = await tryParse('UTF-8')
+      if (kind === 'xlsx') {
+        text = await readXlsxAsText(file)
+      } else if (kind === 'pdf') {
+        text = await readPdfAsText(file)
+      } else {
+        // Kokeile ensin latin-1 (Netvisor-oletusenkoodaus), sitten UTF-8
+        try { text = await tryParseCsv('windows-1252') }
+        catch { text = await tryParseCsv('UTF-8') }
+      }
+    } catch (e) {
+      setResult({ ok: false, message: `Tiedoston luku epäonnistui: ${e.message || e}` })
+      setStatus('error')
+      return
     }
 
-    const { reportType, period, dataRows } = parseNetvisorCSV(text)
+    text = enrichParsedText(text)
+    let { reportType, period, dataRows } = parseNetvisorCSV(text)
+
+    if (!reportType && kind === 'csv') {
+      // Ei tunnistettu Netvisor-formaatiksi – yritä UTF-8
+      const text2 = enrichParsedText(await tryParseCsv('UTF-8'))
+      const parsed2 = parseNetvisorCSV(text2)
+      if (parsed2.reportType) ({ reportType, period, dataRows } = parsed2)
+    }
 
     if (!reportType) {
-      // Ei tunnistettu Netvisor-formaatiksi – yritä UTF-8
-      const text2 = await tryParse('UTF-8')
-      const parsed2 = parseNetvisorCSV(text2)
-      if (!parsed2.reportType) {
-        setResult({ ok: false, message: 'Tiedostoa ei tunnistettu Netvisor-CSV-formaatiksi. Varmista, että tiedosto on Netvisor-tuloslaskelma tai -kassavirta.' })
-        setStatus('error')
-        return
-      }
-      Object.assign({ reportType, period, dataRows }, parsed2)
+      setResult({ ok: false, message: 'Tiedostoa ei tunnistettu Netvisor-tulos- tai -kassavirtaraportiksi. Varmista, että tiedosto sisältää tuloslaskelman tai kassavirran.' })
+      setStatus('error')
+      return
     }
 
     if (!period) {
@@ -151,8 +259,8 @@ export default function KirjanpitoTuonti() {
 
       <div className="page-header">
         <div className="page-header-left">
-          <h1 className="page-title">Tuo CSV</h1>
-          <p className="page-subtitle">Tuo Netvisor-tuloslaskelma suoraan kannasta</p>
+          <h1 className="page-title">Tuo tiedosto</h1>
+          <p className="page-subtitle">Tuo Netvisor-tuloslaskelma — CSV, XLSX tai PDF</p>
         </div>
       </div>
 
@@ -175,16 +283,18 @@ export default function KirjanpitoTuonti() {
           >
             <Upload size={32} style={{ color: 'var(--violet)', marginBottom: '1rem' }} />
             <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '.4rem' }}>
-              {status === 'importing' ? `Tuodaan ${fileName}…` : 'Pudota Netvisor-CSV tähän'}
+              {status === 'importing' ? `Tuodaan ${fileName}…` : 'Pudota Netvisor-tiedosto tähän'}
             </div>
             <div style={{ fontSize: '.82rem', color: 'var(--text3)' }}>
-              {status === 'importing' ? 'Odota hetki…' : 'tai klikkaa valitaksesi tiedosto · Tuloslaskelma (CSV)'}
+              {status === 'importing' ? 'Odota hetki…' : 'tai klikkaa valitaksesi tiedosto · Tuloslaskelma CSV, XLSX tai PDF'}
             </div>
-            <input ref={fileRef} type="file" accept=".csv,text/csv,.txt" style={{ display: 'none' }} onChange={onFileChange} />
+            <input ref={fileRef} type="file"
+              accept=".csv,text/csv,.txt,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pdf,application/pdf"
+              style={{ display: 'none' }} onChange={onFileChange} />
           </div>
 
           <div style={{ marginTop: '1.25rem', background: 'var(--bg3)', borderRadius: 'var(--radius)', padding: '.85rem 1rem', fontSize: '.8rem', color: 'var(--text3)' }}>
-            <strong style={{ color: 'var(--text2)' }}>Tuettu formaatti:</strong> Netvisor-tuloslaskelma, erottimet <code>;</code>, enkoodaus Windows-1252 tai UTF-8.<br />
+            <strong style={{ color: 'var(--text2)' }}>Tuetut formaatit:</strong> Netvisor-tuloslaskelma CSV:nä (<code>;</code>, Windows-1252 / UTF-8), XLSX-työkirjana tai PDF-raporttina.<br />
             Tiedosto tallennetaan automaattisesti jakson mukaan (esim. toukokuu 2025). Jos sama jakso on jo kannassa, se päivitetään.
           </div>
         </div>

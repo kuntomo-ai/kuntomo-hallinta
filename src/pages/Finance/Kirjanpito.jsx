@@ -107,8 +107,8 @@ export default function Kirjanpito() {
               <div className="card" style={{ cursor: 'pointer', transition: 'border-color .15s, box-shadow .15s', display: 'inline-block', minWidth: 200 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--violet)'; e.currentTarget.style.boxShadow = '0 0 0 3px var(--violet-subtle)' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.boxShadow = '' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.35rem' }}>Tuo CSV</div>
-                <div style={{ fontSize: '.8rem', color: 'var(--text3)' }}>Tuo Netvisor-raportit</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', marginBottom: '.35rem' }}>Tuo tiedosto</div>
+                <div style={{ fontSize: '.8rem', color: 'var(--text3)' }}>Netvisor-raportit (CSV, XLSX tai PDF)</div>
               </div>
             </a>
           </div>
