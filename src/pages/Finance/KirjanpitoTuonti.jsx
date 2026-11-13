@@ -87,13 +87,13 @@ function parseNetvisorCSV(text) {
 
 // Netvisor tuloslaskelma label → tulos_kuukausiraportti kenttä
 const TULOS_MAP = [
-  { field: 'liikevaihto',                  patterns: ['liikevaihto'] },
-  { field: 'materiaalit_palvelut',          patterns: ['materiaalit ja palvelut', 'materiaalit, tarvikkeet ja tavarat', 'ulkopuoliset palvelut', 'materiaalit'] },
-  { field: 'henkilostokulut',               patterns: ['henkilöstökulut', 'henkilostokulut', 'palkat ja palkkiot', 'palkat'] },
-  { field: 'liiketoiminnan_muut_kulut',     patterns: ['liiketoiminnan muut kulut', 'muut kulut'] },
-  { field: 'liikevoitto',                   patterns: ['liikevoitto/-tappio', 'liikevoitto', 'liikevoitto / -tappio'] },
-  { field: 'rahoituskulut',                 patterns: ['rahoitustuotot ja -kulut', 'rahoitustuotot ja kulut', 'rahoituskulut', 'korkokulut'] },
-  { field: 'tilikauden_voitto',             patterns: ['tilikauden voitto/tappio', 'tilikauden voitto', 'tilikauden tulos', 'voitto ennen veroja', 'tulos ennen veroja'] },
+  { field: 'liikevaihto',            patterns: ['liikevaihto'] },
+  { field: 'materiaalit_palvelut',   patterns: ['materiaalit ja palvelut', 'materiaalit, tarvikkeet ja tavarat', 'ulkopuoliset palvelut', 'materiaalit'] },
+  { field: 'henkilostokulut',        patterns: ['henkilöstökulut', 'henkilostokulut', 'palkat ja palkkiot', 'palkat'] },
+  { field: 'muut_kulut',             patterns: ['liiketoiminnan muut kulut', 'muut kulut'] },
+  { field: 'liikevoitto',            patterns: ['liikevoitto/-tappio', 'liikevoitto', 'liikevoitto / -tappio'] },
+  { field: 'rahoitustuotot_kulut',   patterns: ['rahoitustuotot ja -kulut', 'rahoitustuotot ja kulut', 'rahoituskulut', 'korkokulut'] },
+  { field: 'tilikauden_voitto',      patterns: ['tilikauden voitto/tappio', 'tilikauden voitto', 'tilikauden tulos', 'voitto ennen veroja', 'tulos ennen veroja'] },
 ]
 
 function mapToTulosRow(dataRows, period) {
