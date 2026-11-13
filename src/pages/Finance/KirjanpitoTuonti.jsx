@@ -13,6 +13,8 @@ function parseNetvisorAmount(v) {
 }
 
 // Palauttaa { type: 'tulos'|'kassavirta'|null, period, rows: [{label, value}] }
+// Hyväksyy useita sarakemalleja: Netvisor-CSV (key;value), XLSX/PDF jossa luku
+// voi olla rivin viimeisessä sarakkeessa ja label koostua useammasta solusta.
 function parseNetvisorCSV(text) {
   const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.trim())
 
@@ -21,28 +23,37 @@ function parseNetvisorCSV(text) {
   const dataRows = []
 
   for (const line of lines) {
-    const parts = line.split(';')
-    const key = (parts[0] || '').trim()
-    const val = (parts[1] || '').trim()
+    const parts = line.split(';').map(p => p.trim())
+    const key = parts[0] || ''
 
     if (key === 'Kirjanpitoraportin tyyppi') {
+      const val = parts[1] || ''
       if (val.toLowerCase().includes('tulos')) reportType = 'tulos'
       else if (val.toLowerCase().includes('kassavirta')) reportType = 'kassavirta'
+      continue
     }
 
-    if (key === 'Tositepvm' && val.includes(' - ')) {
+    if (key === 'Tositepvm') {
       // "01.05.2025 - 31.05.2025" → period = "2025-05"
-      const match = val.match(/(\d{2})\.(\d{2})\.(\d{4})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/)
-      if (match) {
-        period = `${match[6]}-${match[5].padStart(2, '0')}`
-      }
+      const val = parts.slice(1).join(' ')
+      const match = val.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})\s*[-–]\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/)
+      if (match) period = `${match[6]}-${match[5].padStart(2, '0')}`
+      continue
     }
 
-    // Datasarakkeet: Key;Value (skip header/meta rows)
-    const amount = parseNetvisorAmount(val)
-    if (amount !== null && key && key !== 'Kirjanpitoraportin tyyppi' && key !== 'Tositepvm') {
-      dataRows.push({ label: key, value: amount })
+    // Etsi rivin viimeinen numeerinen arvo (tukee useita sarakkeita)
+    let amount = null
+    let lastNumericIdx = -1
+    for (let i = parts.length - 1; i >= 1; i--) {
+      const n = parseNetvisorAmount(parts[i])
+      if (n !== null) { amount = n; lastNumericIdx = i; break }
     }
+    if (amount === null) continue
+
+    // Label = ei-numeeriset solut ennen arvoa, erotettuna välilyönnillä
+    const labelParts = parts.slice(0, lastNumericIdx).filter(p => p && parseNetvisorAmount(p) === null)
+    const label = labelParts.join(' ').trim()
+    if (label) dataRows.push({ label, value: amount })
   }
 
   return { reportType, period, dataRows }
@@ -136,21 +147,52 @@ async function readPdfAsText(file) {
   return allLines.join('\n')
 }
 
+const FI_MONTHS = ['tammikuu','helmikuu','maaliskuu','huhtikuu','toukokuu','kesäkuu','heinäkuu','elokuu','syyskuu','lokakuu','marraskuu','joulukuu']
+
 // Täydentää tekstiin "Kirjanpitoraportin tyyppi" -rivin ja mahdollisen
 // Tositepvm-rivin jos ne puuttuvat — jolloin ei-CSV lähteet (xlsx/pdf) joissa
 // metarivit on taulukon ulkopuolella saadaan silti tunnistetuksi.
-function enrichParsedText(text) {
-  const lower = text.toLowerCase()
+// Jos selkeää metariviä ei löydy mutta sisältö näyttää tulos/kassavirralta,
+// lisätään synteettinen tyyppirivi.
+function enrichParsedText(text, fileName = '') {
+  const lower = (text + ' ' + fileName).toLowerCase()
   const extra = []
 
   if (!/kirjanpitoraportin tyyppi/i.test(text)) {
-    if (lower.includes('tuloslaskelma')) extra.push('Kirjanpitoraportin tyyppi;tuloslaskelma')
-    else if (lower.includes('kassavirta')) extra.push('Kirjanpitoraportin tyyppi;kassavirta')
+    const isTulos = /tuloslaske|liikevaihto|tilikauden (voitto|tulos)/i.test(lower)
+    const isKassa = /kassavirta/i.test(lower)
+    if (isTulos && !isKassa) extra.push('Kirjanpitoraportin tyyppi;tuloslaskelma')
+    else if (isKassa) extra.push('Kirjanpitoraportin tyyppi;kassavirta')
   }
 
   if (!/^tositepvm/im.test(text)) {
-    const range = text.match(/(\d{2})\.(\d{2})\.(\d{4})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/)
-    if (range) extra.push(`Tositepvm;${range[0]}`)
+    // 1) Päivämääräväli: "01.05.2025 - 31.05.2025" (myös en-dash, yksinumeroiset)
+    let range = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})\s*[-–]\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/)
+    if (range) {
+      extra.push(`Tositepvm;${range[0]}`)
+    } else {
+      // 2) Yksittäinen päivä: "31.05.2025" → oleta kuukauden loppuun
+      const single = text.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/)
+      if (single) {
+        extra.push(`Tositepvm;01.${single[2].padStart(2,'0')}.${single[3]} - ${single[1].padStart(2,'0')}.${single[2].padStart(2,'0')}.${single[3]}`)
+      } else {
+        // 3) "Toukokuu 2025" tai "toukokuu / 2025"
+        const named = lower.match(new RegExp(`(${FI_MONTHS.join('|')})\\s*\\/?\\s*(\\d{4})`))
+        if (named) {
+          const m = FI_MONTHS.indexOf(named[1]) + 1
+          const y = named[2]
+          extra.push(`Tositepvm;01.${String(m).padStart(2,'0')}.${y} - 28.${String(m).padStart(2,'0')}.${y}`)
+        } else {
+          // 4) "05/2025" tai "2025-05"
+          const num = text.match(/\b(0[1-9]|1[0-2])[\/-](\d{4})\b|\b(\d{4})[-\/](0[1-9]|1[0-2])\b/)
+          if (num) {
+            const m = num[1] || num[4]
+            const y = num[2] || num[3]
+            extra.push(`Tositepvm;01.${m}.${y} - 28.${m}.${y}`)
+          }
+        }
+      }
+    }
   }
 
   return extra.length ? extra.join('\n') + '\n' + text : text
@@ -206,24 +248,34 @@ export default function KirjanpitoTuonti() {
       return
     }
 
-    text = enrichParsedText(text)
+    text = enrichParsedText(text, file.name)
     let { reportType, period, dataRows } = parseNetvisorCSV(text)
 
     if (!reportType && kind === 'csv') {
       // Ei tunnistettu Netvisor-formaatiksi – yritä UTF-8
-      const text2 = enrichParsedText(await tryParseCsv('UTF-8'))
+      const text2 = enrichParsedText(await tryParseCsv('UTF-8'), file.name)
       const parsed2 = parseNetvisorCSV(text2)
       if (parsed2.reportType) ({ reportType, period, dataRows } = parsed2)
     }
 
+    const preview = text.split('\n').slice(0, 20).join('\n')
+
     if (!reportType) {
-      setResult({ ok: false, message: 'Tiedostoa ei tunnistettu Netvisor-tulos- tai -kassavirtaraportiksi. Varmista, että tiedosto sisältää tuloslaskelman tai kassavirran.' })
+      setResult({
+        ok: false,
+        message: 'Tiedostoa ei tunnistettu Netvisor-tulos- tai -kassavirtaraportiksi. Varmista, että tiedosto sisältää tuloslaskelman tai kassavirran.',
+        preview,
+      })
       setStatus('error')
       return
     }
 
     if (!period) {
-      setResult({ ok: false, message: 'Jakson päivämäärää ei löydetty. Varmista, että CSV sisältää Tositepvm-rivin.' })
+      setResult({
+        ok: false,
+        message: `Jakson päivämäärää ei löydetty. Varmista, että tiedosto sisältää raportin ajanjakson (esim. "01.05.2025 - 31.05.2025" tai "Toukokuu 2025").`,
+        preview,
+      })
       setStatus('error')
       return
     }
@@ -334,6 +386,16 @@ export default function KirjanpitoTuonti() {
           <div style={{ background: 'var(--bg3)', borderRadius: 'var(--radius)', padding: '.75rem 1rem', color: 'var(--red)', fontSize: '.85rem', marginBottom: '1.25rem', textAlign: 'left' }}>
             {result.message}
           </div>
+          {result.preview && (
+            <div style={{ textAlign: 'left', marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text3)', marginBottom: '.35rem' }}>
+                Mitä parseri näki (20 ensimmäistä riviä)
+              </div>
+              <pre style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '.75rem 1rem', fontSize: '.72rem', color: 'var(--text2)', overflow: 'auto', maxHeight: 260, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {result.preview}
+              </pre>
+            </div>
+          )}
           <button className="btn btn-ghost" onClick={reset}>Yritä uudelleen</button>
         </div>
       )}
