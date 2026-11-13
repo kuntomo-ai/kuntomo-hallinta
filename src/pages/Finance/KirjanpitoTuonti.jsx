@@ -6,10 +6,36 @@ import KirjanpitoNav from '../../components/KirjanpitoNav'
 // ── Netvisor CSV-tunnistus ja jäsennys ──────────────────────────────────────
 
 function parseNetvisorAmount(v) {
-  if (!v) return null
-  const s = String(v).trim().replace(/\s/g, '').replace(',', '.')
+  if (v == null || v === '') return null
+  // Netvisor-PDF käyttää unicode-miinusta (U+2212) ja välilyöntejä tuhateroittimena
+  const s = String(v).trim()
+    .replace(/[−–—]/g, '-')
+    .replace(/\s/g, '')
+    .replace(',', '.')
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return null
   const n = parseFloat(s)
   return isNaN(n) ? null : n
+}
+
+// Yhdistää rivit joissa labelilla ei ole numeroita samalla rivillä (PDF-tyyliin
+// label menee joskus omalle rivilleen) viereisen numerorivin kanssa.
+function mergeLabelOnlyLines(text) {
+  const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.trim())
+  const out = []
+  for (let i = 0; i < lines.length; i++) {
+    const parts = lines[i].split(';').map(p => p.trim()).filter(Boolean)
+    const hasNumber = parts.some(p => parseNetvisorAmount(p) !== null)
+    const next = lines[i + 1] || ''
+    const nextParts = next.split(';').map(p => p.trim()).filter(Boolean)
+    const nextStartsWithNumber = nextParts.length && parseNetvisorAmount(nextParts[0]) !== null
+    if (!hasNumber && parts.length && nextStartsWithNumber) {
+      out.push(parts.join(' ') + ';' + nextParts.join(';'))
+      i++
+    } else {
+      out.push(lines[i])
+    }
+  }
+  return out.join('\n')
 }
 
 // Palauttaa { type: 'tulos'|'kassavirta'|null, period, rows: [{label, value}] }
@@ -81,6 +107,123 @@ function mapToTulosRow(dataRows, period) {
   return row
 }
 
+// Tase-PDF:n osiot → tase_snapshot.sub_section
+const TASE_MAP = [
+  { side: 'vastaavaa',   sub_section: 'aineettomat', patterns: ['aineettomat hyödykkeet'] },
+  { side: 'vastaavaa',   sub_section: 'aineelliset', patterns: ['aineelliset hyödykkeet'] },
+  { side: 'vastaavaa',   sub_section: 'sijoitukset', patterns: ['sijoitukset'] },
+  { side: 'vastaavaa',   sub_section: 'vaihto',      patterns: ['vaihto-omaisuus'] },
+  { side: 'vastaavaa',   sub_section: 'saamiset',    patterns: ['saamiset'] },
+  { side: 'vastaavaa',   sub_section: 'rahat',       patterns: ['rahat ja pankkisaamiset', 'rahoitusarvopaperit'] },
+  { side: 'vastattavaa', sub_section: 'oma_paaoma',  patterns: ['oma pääoma'] },
+  { side: 'vastattavaa', sub_section: 'vieras_pit',  patterns: ['pitkäaikainen vieras pääoma', 'pitkäaikainen vieraspääoma'] },
+  { side: 'vastattavaa', sub_section: 'vieras_lyh',  patterns: ['lyhytaikainen vieras pääoma', 'lyhytaikainen vieraspääoma'] },
+]
+const TASE_SKIP_PATTERNS = ['yhteensä', 'vastaavaa', 'vastattavaa', 'pysyvät', 'vaihtuvat', 'vieras pääoma yhteensä']
+
+// Rakentaa period→arvo-mapin kuukausierittelyn otsikkorivistä ja data-riveistä.
+// Otsikkorivi on esim. "2026-05;2026-06;...;2026-10;Budj. 2026-11;..."
+function parseKuukausierittely(text) {
+  const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.trim())
+  // Etsi otsikkorivi
+  let headerIdx = -1
+  let periods = []
+  for (let i = 0; i < lines.length; i++) {
+    const parts = lines[i].split(';').map(p => p.trim())
+    const matches = parts.map(p => {
+      const m = p.match(/^(?:Budj\.?\s*)?(\d{4})-(\d{2})/)
+      return m ? `${m[1]}-${m[2]}` : null
+    })
+    const nonNull = matches.filter(Boolean).length
+    if (nonNull >= 3) { headerIdx = i; periods = matches; break }
+  }
+  if (headerIdx < 0) return null
+
+  // Käy datarivit läpi otsikkorivin jälkeen
+  const rows = []  // [{label, values: {period: amount}}]
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const parts = lines[i].split(';').map(p => p.trim())
+    // Label voi koostua yhdestä tai useasta ei-numeerisesta solusta rivin alussa
+    const labelCells = []
+    let valueStartIdx = 0
+    for (let j = 0; j < parts.length; j++) {
+      if (parseNetvisorAmount(parts[j]) !== null) { valueStartIdx = j; break }
+      labelCells.push(parts[j])
+      valueStartIdx = j + 1
+    }
+    const label = labelCells.join(' ').trim()
+    if (!label) continue
+    // Sovita arvot periods-indeksin mukaan (parts-arrayn alku on label,
+    // numerot alkavat valueStartIdx:stä, mutta ne mapataan periods[0..]:iin)
+    const values = {}
+    for (let j = valueStartIdx, k = 0; j < parts.length; j++, k++) {
+      const p = periods[k]
+      const amt = parseNetvisorAmount(parts[j])
+      if (p && amt !== null) values[p] = amt
+    }
+    if (Object.keys(values).length) rows.push({ label, values })
+  }
+  return { periods: periods.filter(Boolean), rows }
+}
+
+function buildTulosRowForPeriod(kuukausi, period) {
+  const row = { period }
+  for (const { field, patterns } of TULOS_MAP) {
+    // Kuukausierittelyssä henkilöstökulut on jaettu "muuttuvat" + "kiinteät" —
+    // summataan kaikki osuvat rivit kokonaiseksi arvoksi.
+    const matches = kuukausi.rows.filter(r =>
+      patterns.some(p => r.label.toLowerCase().includes(p.toLowerCase()))
+    )
+    const sum = matches.reduce((acc, m) => m.values[period] != null ? acc + m.values[period] : acc, 0)
+    if (matches.length) row[field] = Math.round(sum * 100) / 100
+  }
+  return row
+}
+
+// Tase-PDF: palauttaa tase_snapshot-rivit annetulle jaksolle.
+function parseTase(text, period) {
+  const lines = text.split('\n').map(l => l.trimEnd()).filter(l => l.trim())
+  const rows = []
+  for (const line of lines) {
+    const parts = line.split(';').map(p => p.trim())
+    const labelCells = []
+    let valueStartIdx = 0
+    for (let j = 0; j < parts.length; j++) {
+      if (parseNetvisorAmount(parts[j]) !== null) { valueStartIdx = j; break }
+      labelCells.push(parts[j])
+      valueStartIdx = j + 1
+    }
+    const label = labelCells.join(' ').trim().toLowerCase()
+    if (!label) continue
+    if (TASE_SKIP_PATTERNS.some(sp => label.includes(sp))) continue
+    // startsWith estää "Saamiset" matchaamasta "Rahat ja pankkisaamiset" -riviin
+    const mapping = TASE_MAP.find(m => m.patterns.some(p => label.startsWith(p)))
+    if (!mapping) continue
+    const nums = parts.slice(valueStartIdx).map(parseNetvisorAmount).filter(n => n !== null)
+    if (nums.length < 3) continue
+    const [alkusaldo, muutos, loppusaldo] = nums
+    // Yhdistä samaan sub_sectioniin osuvat (esim. Rahat + Rahoitusarvopaperit)
+    const existing = rows.find(r => r.sub_section === mapping.sub_section)
+    if (existing) {
+      existing.alkusaldo = (existing.alkusaldo || 0) + alkusaldo
+      existing.muutos = (existing.muutos || 0) + muutos
+      existing.loppusaldo = (existing.loppusaldo || 0) + loppusaldo
+    } else {
+      rows.push({
+        period,
+        side: mapping.side,
+        section: mapping.sub_section,
+        sub_section: mapping.sub_section,
+        account_code: 'summary',
+        alkusaldo,
+        muutos,
+        loppusaldo,
+      })
+    }
+  }
+  return rows
+}
+
 // ── XLSX → teksti ──────────────────────────────────────────────────────────
 // Lukee Excel-tiedoston ensimmäisen taulukon ja palauttaa ;-erotellun tekstin
 // joka voidaan syöttää parseNetvisorCSV:lle.
@@ -148,6 +291,33 @@ async function readPdfAsText(file) {
 }
 
 const FI_MONTHS = ['tammikuu','helmikuu','maaliskuu','huhtikuu','toukokuu','kesäkuu','heinäkuu','elokuu','syyskuu','lokakuu','marraskuu','joulukuu']
+
+// Tunnistaa raportin perusmuodon tekstistä / tiedostonimestä.
+// 'kuukausi' = tuloslaskelman kuukausierittely (monisarakkeinen)
+// 'tase'     = tase (Perusraportti: alkusaldo/muutos/loppusaldo)
+// 'tulos'    = yksittäinen tuloslaskelma
+// 'kassa'    = kassavirta
+function detectReport(text, fileName = '') {
+  const lower = (text + ' ' + fileName).toLowerCase()
+  if (/tase\s*-\s*perusraportti|^tase\b|-tase\.(pdf|xlsx|csv)|loppusaldo/i.test(lower)) return 'tase'
+  if (/kuukausierittely/i.test(lower)) return 'kuukausi'
+  if (/kassavirta/i.test(lower)) return 'kassa'
+  if (/tuloslaske|liikevaihto|tilikauden (voitto|tulos)/i.test(lower)) return 'tulos'
+  return null
+}
+
+// Yrittää lukea raportin kohdejakson tekstistä tai tiedoston nimestä muodossa
+// YYYY-MM. Esim. "Tase - Perusraportti (EUR) - 2026-10" tai
+// "54340-2026-10-01-2026-10-31-tase.pdf" → "2026-10".
+function detectTargetPeriod(text, fileName = '') {
+  // Otsikkorivin "(EUR) - 2026-10"
+  const inTitle = text.match(/-\s*(\d{4})-(\d{2})\b/)
+  if (inTitle) return `${inTitle[1]}-${inTitle[2]}`
+  // Tiedoston nimen "YYYY-MM-DD"
+  const inName = fileName.match(/(\d{4})-(\d{2})-\d{2}/)
+  if (inName) return `${inName[1]}-${inName[2]}`
+  return null
+}
 
 // Täydentää tekstiin "Kirjanpitoraportin tyyppi" -rivin ja mahdollisen
 // Tositepvm-rivin jos ne puuttuvat — jolloin ei-CSV lähteet (xlsx/pdf) joissa
@@ -248,55 +418,114 @@ export default function KirjanpitoTuonti() {
       return
     }
 
+    // Yhdistä PDF:n label-only-rivit numerorivien kanssa
+    text = mergeLabelOnlyLines(text)
+
+    const detected = detectReport(text, file.name)
+    const targetPeriod = detectTargetPeriod(text, file.name)
+    const monthLabel = (p) => p ? new Date(p + '-01').toLocaleDateString('fi-FI', { month: 'long', year: 'numeric' }) : ''
+    const preview = text.split('\n').slice(0, 25).join('\n')
+
+    // ── Tase ───────────────────────────────────────────────────────────────
+    if (detected === 'tase') {
+      if (!targetPeriod) {
+        setResult({ ok: false, message: 'Jakson päivämäärää ei löydetty tase-tiedostosta.', preview })
+        setStatus('error'); return
+      }
+      const rows = parseTase(text, targetPeriod)
+      if (!rows.length) {
+        setResult({ ok: false, message: 'Tase-osioita ei tunnistettu PDF:stä.', preview })
+        setStatus('error'); return
+      }
+      // Poista jakson vanhat rivit ennen uusien upsertia
+      await supabase.from('tase_snapshot').delete().eq('period', targetPeriod).eq('account_code', 'summary')
+      const { error } = await supabase.from('tase_snapshot').insert(rows)
+      if (error) {
+        setResult({ ok: false, message: `Tallennus epäonnistui: ${error.message}`, preview })
+        setStatus('error')
+      } else {
+        setResult({
+          ok: true,
+          message: `Tase (${monthLabel(targetPeriod)}) tallennettu. ${rows.length} osiota.`,
+          fields: rows.map(r => r.sub_section),
+          period: targetPeriod,
+          kind: 'tase',
+        })
+        setStatus('done')
+      }
+      return
+    }
+
+    // ── Kuukausierittely (useita kuukausia samassa raportissa) ─────────────
+    if (detected === 'kuukausi') {
+      const parsed = parseKuukausierittely(text)
+      if (!parsed) {
+        setResult({ ok: false, message: 'Kuukausierittelyn sarakeotsikkoa ei tunnistettu.', preview })
+        setStatus('error'); return
+      }
+      const useP = targetPeriod || parsed.periods.at(-1)
+      if (!useP) {
+        setResult({ ok: false, message: 'Kohdekuukautta ei tunnistettu.', preview })
+        setStatus('error'); return
+      }
+      const row = buildTulosRowForPeriod(parsed, useP)
+      const fields = Object.keys(row).filter(k => k !== 'period')
+      if (!fields.length) {
+        setResult({ ok: false, message: `Kuukaudelle ${useP} ei löytynyt yhtään tunnettua kenttää.`, preview })
+        setStatus('error'); return
+      }
+      const { error } = await supabase.from('tulos_kuukausiraportti').upsert(row, { onConflict: 'period' })
+      if (error) {
+        setResult({ ok: false, message: `Tallennus epäonnistui: ${error.message}`, preview })
+        setStatus('error')
+      } else {
+        setResult({ ok: true, message: `Tuloslaskelma (${monthLabel(useP)}) tallennettu kuukausierittelystä.`, fields, period: useP })
+        setStatus('done')
+      }
+      return
+    }
+
+    // ── Yksi tuloslaskelma / kassavirta (CSV, yksinkertainen XLSX) ─────────
     text = enrichParsedText(text, file.name)
     let { reportType, period, dataRows } = parseNetvisorCSV(text)
 
     if (!reportType && kind === 'csv') {
-      // Ei tunnistettu Netvisor-formaatiksi – yritä UTF-8
       const text2 = enrichParsedText(await tryParseCsv('UTF-8'), file.name)
       const parsed2 = parseNetvisorCSV(text2)
       if (parsed2.reportType) ({ reportType, period, dataRows } = parsed2)
     }
 
-    const preview = text.split('\n').slice(0, 20).join('\n')
-
     if (!reportType) {
       setResult({
         ok: false,
-        message: 'Tiedostoa ei tunnistettu Netvisor-tulos- tai -kassavirtaraportiksi. Varmista, että tiedosto sisältää tuloslaskelman tai kassavirran.',
+        message: 'Tiedostoa ei tunnistettu Netvisor-raportiksi. Tuetut: tuloslaskelma, kuukausierittely, tase.',
         preview,
       })
-      setStatus('error')
-      return
+      setStatus('error'); return
     }
 
+    if (!period) period = targetPeriod
     if (!period) {
       setResult({
         ok: false,
-        message: `Jakson päivämäärää ei löydetty. Varmista, että tiedosto sisältää raportin ajanjakson (esim. "01.05.2025 - 31.05.2025" tai "Toukokuu 2025").`,
+        message: 'Jakson päivämäärää ei löydetty. Varmista, että tiedosto sisältää raportin ajanjakson.',
         preview,
       })
-      setStatus('error')
-      return
+      setStatus('error'); return
     }
 
     if (reportType === 'tulos') {
       const row = mapToTulosRow(dataRows, period)
-
-      const { error } = await supabase
-        .from('tulos_kuukausiraportti')
-        .upsert(row, { onConflict: 'period' })
-
+      const { error } = await supabase.from('tulos_kuukausiraportti').upsert(row, { onConflict: 'period' })
       if (error) {
-        setResult({ ok: false, message: `Tallennus epäonnistui: ${error.message}` })
+        setResult({ ok: false, message: `Tallennus epäonnistui: ${error.message}`, preview })
         setStatus('error')
       } else {
-        const monthLabel = new Date(period + '-01').toLocaleDateString('fi-FI', { month: 'long', year: 'numeric' })
-        setResult({ ok: true, message: `Tuloslaskelma (${monthLabel}) tallennettu.`, fields: Object.keys(row).filter(k => k !== 'period'), period })
+        setResult({ ok: true, message: `Tuloslaskelma (${monthLabel(period)}) tallennettu.`, fields: Object.keys(row).filter(k => k !== 'period'), period })
         setStatus('done')
       }
     } else {
-      setResult({ ok: false, message: `Kassavirta-CSV-tuontia ei ole vielä toteutettu automaattisesti.` })
+      setResult({ ok: false, message: `Kassavirta-tuontia ei ole vielä toteutettu automaattisesti.`, preview })
       setStatus('error')
     }
   }
@@ -345,9 +574,9 @@ export default function KirjanpitoTuonti() {
               style={{ display: 'none' }} onChange={onFileChange} />
           </div>
 
-          <div style={{ marginTop: '1.25rem', background: 'var(--bg3)', borderRadius: 'var(--radius)', padding: '.85rem 1rem', fontSize: '.8rem', color: 'var(--text3)' }}>
-            <strong style={{ color: 'var(--text2)' }}>Tuetut formaatit:</strong> Netvisor-tuloslaskelma CSV:nä (<code>;</code>, Windows-1252 / UTF-8), XLSX-työkirjana tai PDF-raporttina.<br />
-            Tiedosto tallennetaan automaattisesti jakson mukaan (esim. toukokuu 2025). Jos sama jakso on jo kannassa, se päivitetään.
+          <div style={{ marginTop: '1.25rem', background: 'var(--bg3)', borderRadius: 'var(--radius)', padding: '.85rem 1rem', fontSize: '.8rem', color: 'var(--text3)', lineHeight: 1.55 }}>
+            <strong style={{ color: 'var(--text2)' }}>Tuetut raportit:</strong> tuloslaskelma, tuloslaskelman kuukausierittely sekä tase (Perusraportti). Tiedostomuodot CSV, XLSX ja PDF.<br />
+            Kuukausierittelystä tuodaan tiedostonimessä olevan kuukauden tuloslaskelma. Tase tallennetaan osioittain (Aineettomat, Aineelliset, ..., Lyhytaikainen vieras pääoma).
           </div>
         </div>
       )}
@@ -372,7 +601,11 @@ export default function KirjanpitoTuonti() {
           )}
           <div style={{ display: 'flex', gap: '.75rem', justifyContent: 'center' }}>
             <button className="btn btn-ghost" onClick={reset}>Tuo uusi tiedosto</button>
-            <a href="/finance/kirjanpito/tulos" className="btn btn-primary">Katso tuloslaskelma →</a>
+            {result.kind === 'tase' ? (
+              <a href="/finance/kirjanpito/tase" className="btn btn-primary">Katso tase →</a>
+            ) : (
+              <a href="/finance/kirjanpito/tulos" className="btn btn-primary">Katso tuloslaskelma →</a>
+            )}
           </div>
         </div>
       )}
