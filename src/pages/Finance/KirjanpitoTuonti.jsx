@@ -107,17 +107,17 @@ function mapToTulosRow(dataRows, period) {
   return row
 }
 
-// Tase-PDF:n osiot → tase_snapshot.sub_section
+// Tase-PDF:n osiot → tase_snapshot.sub_section (name = ihmisluettava otsikko)
 const TASE_MAP = [
-  { side: 'vastaavaa',   sub_section: 'aineettomat', patterns: ['aineettomat hyödykkeet'] },
-  { side: 'vastaavaa',   sub_section: 'aineelliset', patterns: ['aineelliset hyödykkeet'] },
-  { side: 'vastaavaa',   sub_section: 'sijoitukset', patterns: ['sijoitukset'] },
-  { side: 'vastaavaa',   sub_section: 'vaihto',      patterns: ['vaihto-omaisuus'] },
-  { side: 'vastaavaa',   sub_section: 'saamiset',    patterns: ['saamiset'] },
-  { side: 'vastaavaa',   sub_section: 'rahat',       patterns: ['rahat ja pankkisaamiset', 'rahoitusarvopaperit'] },
-  { side: 'vastattavaa', sub_section: 'oma_paaoma',  patterns: ['oma pääoma'] },
-  { side: 'vastattavaa', sub_section: 'vieras_pit',  patterns: ['pitkäaikainen vieras pääoma', 'pitkäaikainen vieraspääoma'] },
-  { side: 'vastattavaa', sub_section: 'vieras_lyh',  patterns: ['lyhytaikainen vieras pääoma', 'lyhytaikainen vieraspääoma'] },
+  { side: 'vastaavaa',   sub_section: 'aineettomat', name: 'Aineettomat hyödykkeet',        patterns: ['aineettomat hyödykkeet'] },
+  { side: 'vastaavaa',   sub_section: 'aineelliset', name: 'Aineelliset hyödykkeet',        patterns: ['aineelliset hyödykkeet'] },
+  { side: 'vastaavaa',   sub_section: 'sijoitukset', name: 'Sijoitukset',                   patterns: ['sijoitukset'] },
+  { side: 'vastaavaa',   sub_section: 'vaihto',      name: 'Vaihto-omaisuus',               patterns: ['vaihto-omaisuus'] },
+  { side: 'vastaavaa',   sub_section: 'saamiset',    name: 'Saamiset',                      patterns: ['saamiset'] },
+  { side: 'vastaavaa',   sub_section: 'rahat',       name: 'Rahat ja pankkisaamiset',       patterns: ['rahat ja pankkisaamiset', 'rahoitusarvopaperit'] },
+  { side: 'vastattavaa', sub_section: 'oma_paaoma',  name: 'Oma pääoma',                    patterns: ['oma pääoma'] },
+  { side: 'vastattavaa', sub_section: 'vieras_pit',  name: 'Pitkäaikainen vieras pääoma',   patterns: ['pitkäaikainen vieras pääoma', 'pitkäaikainen vieraspääoma'] },
+  { side: 'vastattavaa', sub_section: 'vieras_lyh',  name: 'Lyhytaikainen vieras pääoma',   patterns: ['lyhytaikainen vieras pääoma', 'lyhytaikainen vieraspääoma'] },
 ]
 const TASE_SKIP_PATTERNS = ['yhteensä', 'vastaavaa', 'vastattavaa', 'pysyvät', 'vaihtuvat', 'vieras pääoma yhteensä']
 
@@ -215,6 +215,7 @@ function parseTase(text, period) {
         section: mapping.sub_section,
         sub_section: mapping.sub_section,
         account_code: 'summary',
+        account_name: mapping.name,
         alkusaldo,
         muutos,
         loppusaldo,
